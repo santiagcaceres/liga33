@@ -12,78 +12,76 @@ export async function createPlayer(formData: FormData) {
     const numberStr = formData.get("number") as string
     const teamIdStr = formData.get("team_id") as string
 
+    console.log("[v0] Raw form data:", { name, cedula, numberStr, teamIdStr })
+
     const number = Number.parseInt(numberStr, 10)
     const team_id = Number.parseInt(teamIdStr, 10)
 
-    console.log("[v0] Creating player with data:", {
-      name,
-      cedula,
-      number,
-      team_id,
-    })
+    console.log("[v0] Converted data:", { name, cedula, number, team_id })
 
-    // Validate numeric fields
-    if (isNaN(team_id) || team_id <= 0) {
-      console.error("[v0] Invalid team_id:", teamIdStr)
-      return {
-        success: false,
-        error: "ID de equipo inválido",
-      }
+    if (!name || !name.trim()) {
+      console.error("[v0] Invalid name")
+      return { success: false, error: "Nombre inválido" }
+    }
+
+    if (!cedula || !cedula.trim()) {
+      console.error("[v0] Invalid cedula")
+      return { success: false, error: "Cédula inválida" }
     }
 
     if (isNaN(number) || number <= 0) {
-      return {
-        success: false,
-        error: "Número de camiseta inválido",
-      }
+      console.error("[v0] Invalid number:", numberStr)
+      return { success: false, error: "Número de camiseta inválido" }
     }
 
-    // Check if team exists
-    const { data: teamExists, error: teamError } = await supabase.from("teams").select("id").eq("id", team_id).single()
+    if (isNaN(team_id) || team_id <= 0) {
+      console.error("[v0] Invalid team_id:", teamIdStr)
+      return { success: false, error: "ID de equipo inválido" }
+    }
+
+    console.log("[v0] Checking if team exists:", team_id)
+    const { data: teamExists, error: teamError } = await supabase
+      .from("teams")
+      .select("id, name")
+      .eq("id", team_id)
+      .single()
 
     if (teamError || !teamExists) {
       console.error("[v0] Team not found:", team_id, teamError)
-      return {
-        success: false,
-        error: `El equipo no existe`,
-      }
+      return { success: false, error: `El equipo con ID ${team_id} no existe` }
     }
 
-    const { data, error } = await supabase
-      .from("players")
-      .insert({
-        name: name.trim(),
-        cedula: cedula.trim(),
-        number,
-        team_id,
-        goals: 0,
-        yellow_cards: 0,
-        red_cards: 0,
-        suspended: false,
-      })
-      .select()
-      .single()
+    console.log("[v0] Team found:", teamExists)
+
+    const playerData = {
+      name: name.trim(),
+      cedula: cedula.trim(),
+      number: number,
+      team_id: team_id,
+      goals: 0,
+      yellow_cards: 0,
+      red_cards: 0,
+      suspended: false,
+    }
+
+    console.log("[v0] Inserting player with data:", playerData)
+
+    const { data, error } = await supabase.from("players").insert(playerData).select().single()
 
     if (error) {
       console.error("[v0] Database error creating player:", error)
-      return {
-        success: false,
-        error: `Error de base de datos: ${error.message}`,
-      }
+      return { success: false, error: `Error de base de datos: ${error.message}` }
     }
 
     console.log("[v0] Player created successfully:", data)
     revalidatePath("/")
 
-    return {
-      success: true,
-      data,
-    }
+    return { success: true, data }
   } catch (error) {
-    console.error("[v0] Unexpected error:", error)
+    console.error("[v0] Unexpected error in createPlayer:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Error inesperado",
+      error: error instanceof Error ? error.message : "Error inesperado al crear jugador",
     }
   }
 }
@@ -113,14 +111,12 @@ export async function updatePlayer(id: number, formData: FormData) {
   const name = formData.get("name") as string
   const cedula = formData.get("cedula") as string
   const numberStr = formData.get("number") as string
-  const ageStr = formData.get("age") as string
   const teamIdStr = formData.get("team_id") as string
 
   const number = Number.parseInt(numberStr, 10)
-  const age = Number.parseInt(ageStr, 10)
   const team_id = Number.parseInt(teamIdStr, 10)
 
-  const { error } = await supabase.from("players").update({ name, cedula, number, age, team_id }).eq("id", id)
+  const { error } = await supabase.from("players").update({ name, cedula, number, team_id }).eq("id", id)
 
   if (error) {
     console.error("[v0] Error updating player:", error)
