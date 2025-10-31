@@ -150,8 +150,7 @@ export async function updateMatchResult(
           const newYellowCards = (player.yellow_cards || 0) + 1
           updates.yellow_cards = newYellowCards
 
-          // Suspend if 3 yellow cards
-          if (newYellowCards >= 3) {
+          if (newYellowCards >= 2) {
             updates.suspended = true
           }
         } else if (card.card_type === "red") {

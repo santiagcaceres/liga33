@@ -51,8 +51,8 @@ export default function TeamsRoster() {
 
   const currentTeamPlayers = selectedTeam ? players.filter((p) => p.team_id === Number.parseInt(selectedTeam)) : []
 
-  const hasThreeYellowCards = (player: Player) => {
-    return player.yellow_cards === 3
+  const hasTwoYellowCards = (player: Player) => {
+    return player.yellow_cards >= 2
   }
 
   if (isLoading) {
@@ -166,9 +166,9 @@ export default function TeamsRoster() {
                               <td className="p-3 text-center">
                                 <span
                                   className={`font-semibold ${
-                                    hasThreeYellowCards(player)
+                                    hasTwoYellowCards(player)
                                       ? "text-red-600"
-                                      : player.yellow_cards === 2
+                                      : player.yellow_cards === 1
                                         ? "text-orange-600"
                                         : ""
                                   }`}
@@ -180,11 +180,11 @@ export default function TeamsRoster() {
                               <td className="p-3 text-center">
                                 {player.suspended ? (
                                   <span className="text-xs bg-red-600 text-white px-2 py-1 rounded">SUSPENDIDO</span>
-                                ) : hasThreeYellowCards(player) ? (
+                                ) : hasTwoYellowCards(player) ? (
                                   <span className="text-xs bg-red-600 text-white px-2 py-1 rounded">
-                                    🔴 3 AMARILLAS
+                                    🔴 2 AMARILLAS
                                   </span>
-                                ) : player.yellow_cards === 2 ? (
+                                ) : player.yellow_cards === 1 ? (
                                   <span className="text-xs bg-orange-500 text-white px-2 py-1 rounded">⚠️ RIESGO</span>
                                 ) : (
                                   <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">HABILITADO</span>
@@ -209,8 +209,8 @@ export default function TeamsRoster() {
               </h4>
               <ul className="text-sm space-y-1 text-foreground">
                 <li>
-                  • <strong>3 tarjetas amarillas</strong> = Suspensión automática de 1 partido (se mantienen visibles
-                  las 3 amarillas)
+                  • <strong>2 tarjetas amarillas</strong> = Suspensión automática de 1 partido (se mantienen visibles
+                  las 2 amarillas)
                 </li>
                 <li>
                   • <strong>Después de cumplir la suspensión</strong>, las amarillas se resetean a 0 y el jugador queda
@@ -220,8 +220,8 @@ export default function TeamsRoster() {
                   • <strong>1 tarjeta roja</strong> = Suspensión automática de 1 partido
                 </li>
                 <li>• Los jugadores suspendidos aparecen tachados con fondo rojo</li>
-                <li>• ⚠️ Jugadores con 2 amarillas están próximos a suspensión</li>
-                <li>• 🔴 Jugadores con 3 amarillas están suspendidos</li>
+                <li>• ⚠️ Jugadores con 1 amarilla están próximos a suspensión</li>
+                <li>• 🔴 Jugadores con 2 amarillas están suspendidos</li>
               </ul>
             </CardContent>
           </Card>

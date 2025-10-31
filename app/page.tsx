@@ -61,7 +61,7 @@ export default function HomePage() {
               onClick={() => setActiveSection("inicio")}
               className="flex items-center gap-3 hover:opacity-80 transition-opacity"
             >
-              <img src="/logo-liga33.png" alt="Liga 33" className="w-10 h-10 md:w-12 md:h-12 object-contain" />
+              <img src="/logo-liga33.png" alt="Liga 33" className="w-16 h-16 md:w-20 md:h-20 object-contain" />
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold leading-tight text-primary">Liga 33</h1>
                 <p className="text-gray-300 text-sm md:text-base">Copa Libertadores</p>
@@ -230,11 +230,11 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <img src="/logo-liga33.png" alt="Liga 33" className="w-8 h-8 object-contain" />
+                <img src="/logo-liga33.png" alt="Liga 33" className="w-12 h-12 object-contain" />
                 <h3 className="text-lg font-bold text-primary">Liga 33</h3>
               </div>
-              <p className="text-gray-300 text-sm md:text-base">
-                La liga de fútbol más competitiva de la región. Seguí toda la acción de la Copa Libertadores.
+              <p className="text-gray-300 text-sm md:text-base font-semibold">
+                MUCHO MAS QUE FUTBOL, MAS FUTBOL Y DEL BUENO
               </p>
             </div>
             <div>
@@ -250,7 +250,7 @@ export default function HomePage() {
               <div className="text-gray-300 text-sm md:text-base">
                 <div>Sábados: 14:00 - 20:00</div>
                 <div>Domingos: 14:00 - 19:00</div>
-                <div>Entrenamientos: Lun-Vie 18:00-21:00</div>
+                <div>Entrenamientos: Lun-Vie 17:00-21:00</div>
               </div>
             </div>
           </div>

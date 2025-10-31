@@ -90,17 +90,17 @@ export default function CopaLibertadores() {
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b-2 border-primary/30">
-                <th className="text-left p-2 text-sm font-semibold">Pos</th>
-                <th className="text-left p-2 text-sm font-semibold">Equipo</th>
-                <th className="text-center p-2 text-sm font-semibold">PJ</th>
-                <th className="text-center p-2 text-sm font-semibold">PG</th>
-                <th className="text-center p-2 text-sm font-semibold">PE</th>
-                <th className="text-center p-2 text-sm font-semibold">PP</th>
-                <th className="text-center p-2 text-sm font-semibold">GF</th>
-                <th className="text-center p-2 text-sm font-semibold">GC</th>
-                <th className="text-center p-2 text-sm font-semibold">DIF</th>
-                <th className="text-center p-2 text-sm font-semibold">PTS</th>
+              <tr className="border-b-2 border-primary">
+                <th className="text-left p-2 text-sm font-semibold text-primary">Pos</th>
+                <th className="text-left p-2 text-sm font-semibold text-primary">Equipo</th>
+                <th className="text-center p-2 text-sm font-semibold text-primary">PJ</th>
+                <th className="text-center p-2 text-sm font-semibold text-primary">PG</th>
+                <th className="text-center p-2 text-sm font-semibold text-primary">PE</th>
+                <th className="text-center p-2 text-sm font-semibold text-primary">PP</th>
+                <th className="text-center p-2 text-sm font-semibold text-primary">GF</th>
+                <th className="text-center p-2 text-sm font-semibold text-primary">GC</th>
+                <th className="text-center p-2 text-sm font-semibold text-primary">DIF</th>
+                <th className="text-center p-2 text-sm font-semibold text-primary">PTS</th>
               </tr>
             </thead>
             <tbody>
@@ -109,37 +109,37 @@ export default function CopaLibertadores() {
                 return (
                   <tr
                     key={team.id}
-                    className={`border-b border-primary/20 hover:bg-primary/5 transition-colors ${
-                      pos <= 2 ? "bg-green-50" : ""
+                    className={`border-b border-primary/20 hover:bg-primary/10 transition-colors ${
+                      pos <= 2 ? "bg-primary/5" : "bg-black/40"
                     }`}
                   >
                     <td className="p-2">
                       <Badge
-                        className={`${getPositionColor(pos)} w-8 h-8 rounded-full flex items-center justify-center`}
+                        className={`${getPositionColor(pos)} w-8 h-8 rounded-full flex items-center justify-center text-white`}
                       >
                         {pos}
                       </Badge>
                     </td>
                     <td className="p-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{team.teams?.name}</span>
-                        {pos <= 2 && <Badge className="bg-green-600 text-xs">{getPositionBadge(pos)}</Badge>}
+                        <span className="font-medium text-white">{team.teams?.name}</span>
+                        {pos <= 2 && <Badge className="bg-green-600 text-white text-xs">{getPositionBadge(pos)}</Badge>}
                       </div>
                     </td>
-                    <td className="text-center p-2">{team.played}</td>
-                    <td className="text-center p-2">{team.won}</td>
-                    <td className="text-center p-2">{team.drawn}</td>
-                    <td className="text-center p-2">{team.lost}</td>
-                    <td className="text-center p-2">{team.goals_for}</td>
-                    <td className="text-center p-2">{team.goals_against}</td>
+                    <td className="text-center p-2 text-white">{team.played}</td>
+                    <td className="text-center p-2 text-white">{team.won}</td>
+                    <td className="text-center p-2 text-white">{team.drawn}</td>
+                    <td className="text-center p-2 text-white">{team.lost}</td>
+                    <td className="text-center p-2 text-white">{team.goals_for}</td>
+                    <td className="text-center p-2 text-white">{team.goals_against}</td>
                     <td className="text-center p-2">
                       <span
                         className={
                           team.goal_difference > 0
-                            ? "text-green-600 font-semibold"
+                            ? "text-green-400 font-semibold"
                             : team.goal_difference < 0
-                              ? "text-red-600 font-semibold"
-                              : ""
+                              ? "text-red-400 font-semibold"
+                              : "text-white"
                         }
                       >
                         {team.goal_difference > 0 ? `+${team.goal_difference}` : team.goal_difference}
@@ -160,44 +160,46 @@ export default function CopaLibertadores() {
           {groupStandings.map((team, index) => {
             const pos = index + 1
             return (
-              <Card key={team.id} className={`border-primary/30 ${pos <= 2 ? "bg-green-50 border-green-300" : ""}`}>
+              <Card key={team.id} className={`border-primary/30 bg-black/60 ${pos <= 2 ? "border-primary" : ""}`}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <Badge
-                        className={`${getPositionColor(pos)} w-8 h-8 rounded-full flex items-center justify-center`}
+                        className={`${getPositionColor(pos)} w-8 h-8 rounded-full flex items-center justify-center text-white`}
                       >
                         {pos}
                       </Badge>
                       <div>
-                        <div className="font-semibold">{team.teams?.name}</div>
-                        {pos <= 2 && <Badge className="bg-green-600 text-xs mt-1">{getPositionBadge(pos)}</Badge>}
+                        <div className="font-semibold text-white">{team.teams?.name}</div>
+                        {pos <= 2 && (
+                          <Badge className="bg-green-600 text-white text-xs mt-1">{getPositionBadge(pos)}</Badge>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-primary">{team.points}</div>
-                      <div className="text-xs text-gray-500">puntos</div>
+                      <div className="text-xs text-gray-400">puntos</div>
                     </div>
                   </div>
                   <div className="grid grid-cols-4 gap-2 text-center text-sm">
                     <div>
-                      <div className="text-gray-500 text-xs">PJ</div>
-                      <div className="font-semibold">{team.played}</div>
+                      <div className="text-gray-400 text-xs">PJ</div>
+                      <div className="font-semibold text-white">{team.played}</div>
                     </div>
                     <div>
-                      <div className="text-gray-500 text-xs">PG</div>
-                      <div className="font-semibold text-green-600">{team.won}</div>
+                      <div className="text-gray-400 text-xs">PG</div>
+                      <div className="font-semibold text-green-400">{team.won}</div>
                     </div>
                     <div>
-                      <div className="text-gray-500 text-xs">GF-GC</div>
-                      <div className="font-semibold">
+                      <div className="text-gray-400 text-xs">GF-GC</div>
+                      <div className="font-semibold text-white">
                         {team.goals_for}-{team.goals_against}
                       </div>
                     </div>
                     <div>
-                      <div className="text-gray-500 text-xs">DIF</div>
+                      <div className="text-gray-400 text-xs">DIF</div>
                       <div
-                        className={`font-semibold ${team.goal_difference > 0 ? "text-green-600" : team.goal_difference < 0 ? "text-red-600" : ""}`}
+                        className={`font-semibold ${team.goal_difference > 0 ? "text-green-400" : team.goal_difference < 0 ? "text-red-400" : "text-white"}`}
                       >
                         {team.goal_difference > 0 ? `+${team.goal_difference}` : team.goal_difference}
                       </div>
