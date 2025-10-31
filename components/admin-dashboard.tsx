@@ -124,6 +124,9 @@ export default function AdminDashboard() {
   const [players, setPlayers] = useState<Player[]>([])
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(false)
 
+  const [playerFilterTeam, setPlayerFilterTeam] = useState<string>("all")
+  const [playerSearchTerm, setPlayerSearchTerm] = useState<string>("")
+
   const [newsList, setNewsList] = useState<News[]>([])
   const [isLoadingNews, setIsLoadingNews] = useState(false)
 
@@ -765,6 +768,12 @@ export default function AdminDashboard() {
       })
     }
   }
+
+  const filteredPlayers = players.filter((player) => {
+    const matchesTeam = playerFilterTeam === "all" || player.team_id.toString() === playerFilterTeam
+    const matchesSearch = !playerSearchTerm || player.name.toLowerCase().includes(playerSearchTerm.toLowerCase())
+    return matchesTeam && matchesSearch
+  })
 
   const roundMatches = fixtures.filter((m) => m.round === Number.parseInt(selectedRound))
   const selectedMatch = fixtures.find((m) => m.id === selectedMatchId)
@@ -1824,8 +1833,55 @@ export default function AdminDashboard() {
 
                   <div className="mt-6">
                     <h3 className="font-semibold mb-3">Jugadores Registrados ({players.length})</h3>
+
+                    {players.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
+                        <div className="space-y-2">
+                          <Label>Filtrar por Equipo</Label>
+                          <Select value={playerFilterTeam} onValueChange={setPlayerFilterTeam}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Todos los equipos" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Todos los equipos</SelectItem>
+                              {teams.map((team) => (
+                                <SelectItem key={team.id} value={team.id.toString()}>
+                                  {team.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Buscar por Nombre</Label>
+                          <Input
+                            value={playerSearchTerm}
+                            onChange={(e) => setPlayerSearchTerm(e.target.value)}
+                            placeholder="Buscar jugador..."
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     {isLoadingPlayers ? (
                       <div className="text-center py-8 text-muted-foreground">Cargando jugadores...</div>
+                    ) : filteredPlayers.length === 0 && players.length > 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Target className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
+                        <p>No se encontraron jugadores con los filtros aplicados</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setPlayerFilterTeam("all")
+                            setPlayerSearchTerm("")
+                          }}
+                          className="mt-2"
+                        >
+                          Limpiar filtros
+                        </Button>
+                      </div>
                     ) : players.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <Target className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
@@ -1834,7 +1890,7 @@ export default function AdminDashboard() {
                       </div>
                     ) : (
                       <div className="grid gap-3">
-                        {players.map((player) => (
+                        {filteredPlayers.map((player) => (
                           <Card key={player.id} className="border-primary/30">
                             <CardContent className="p-4">
                               <div className="flex items-center justify-between">
