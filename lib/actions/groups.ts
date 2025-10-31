@@ -30,8 +30,30 @@ export async function getGroups() {
   return data || []
 }
 
+export async function isTeamInGroup(teamId: number) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("team_groups")
+    .select("*, copa_groups(name)")
+    .eq("team_id", teamId)
+    .single()
+
+  if (error) {
+    // Team is not in any group
+    return null
+  }
+
+  return data
+}
+
 export async function assignTeamToGroup(teamId: number, groupId: number) {
   const supabase = await createClient()
+
+  const existingAssignment = await isTeamInGroup(teamId)
+  if (existingAssignment) {
+    throw new Error(`El equipo ya está asignado a ${existingAssignment.copa_groups?.name}`)
+  }
 
   const { error } = await supabase.from("team_groups").insert([
     {
@@ -50,6 +72,19 @@ export async function assignTeamToGroup(teamId: number, groupId: number) {
 
   if (error) {
     console.error("[v0] Error assigning team to group:", error)
+    throw new Error(error.message)
+  }
+
+  revalidatePath("/")
+}
+
+export async function removeTeamFromGroup(teamId: number) {
+  const supabase = await createClient()
+
+  const { error } = await supabase.from("team_groups").delete().eq("team_id", teamId)
+
+  if (error) {
+    console.error("[v0] Error removing team from group:", error)
     throw new Error(error.message)
   }
 

@@ -381,7 +381,7 @@ export default function AdminDashboard() {
     // Validate all fields are filled
     if (!newTeam.name.trim() || !newTeam.coach.trim()) {
       toast({
-        title: "Campos incompletos",
+        title: "❌ Campos incompletos",
         description: "Por favor completa todos los campos antes de crear el equipo",
         variant: "destructive",
       })
@@ -396,7 +396,7 @@ export default function AdminDashboard() {
       await createTeam(formData)
 
       toast({
-        title: "¡Equipo creado exitosamente!",
+        title: "✅ ¡Equipo creado exitosamente!",
         description: `${newTeam.name} ha sido agregado a la base de datos`,
         className: "bg-green-50 border-green-200",
       })
@@ -406,7 +406,7 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("[v0] Error creating team:", error)
       toast({
-        title: "Error al crear equipo",
+        title: "❌ Error al crear equipo",
         description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
         variant: "destructive",
       })
@@ -463,7 +463,7 @@ export default function AdminDashboard() {
       const groupName = groups.find((g) => g.id === Number.parseInt(selectedGroupForAssignment))?.name
 
       toast({
-        title: "¡Equipo asignado exitosamente!",
+        title: "✅ ¡Equipo asignado exitosamente!",
         description: `${teamName} ha sido asignado a ${groupName}`,
         className: "bg-green-50 border-green-200",
       })
@@ -474,7 +474,33 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("[v0] Error assigning team to group:", error)
       toast({
-        title: "Error al asignar equipo",
+        title: "❌ Error al asignar equipo",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRemoveTeamFromGroup = async (teamId: number, teamName: string, groupName: string) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar a ${teamName} de ${groupName}?`)) {
+      return
+    }
+
+    try {
+      const { removeTeamFromGroup } = await import("@/lib/actions/groups")
+      await removeTeamFromGroup(teamId)
+
+      toast({
+        title: "✅ ¡Equipo eliminado del grupo!",
+        description: `${teamName} ha sido eliminado de ${groupName}`,
+        className: "bg-green-50 border-green-200",
+      })
+
+      await loadGroups()
+    } catch (error) {
+      console.error("[v0] Error removing team from group:", error)
+      toast({
+        title: "❌ Error al eliminar equipo",
         description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
         variant: "destructive",
       })
@@ -484,7 +510,7 @@ export default function AdminDashboard() {
   const handleAddPlayer = async () => {
     if (teams.length === 0) {
       toast({
-        title: "No hay equipos disponibles",
+        title: "❌ No hay equipos disponibles",
         description: "Debes crear al menos un equipo antes de agregar jugadores",
         variant: "destructive",
       })
@@ -500,8 +526,30 @@ export default function AdminDashboard() {
       !newPlayer.number
     ) {
       toast({
-        title: "Campos incompletos",
+        title: "❌ Campos incompletos",
         description: "Por favor completa todos los campos antes de crear el jugador",
+        variant: "destructive",
+      })
+      return
+    }
+
+    console.log("[v0] Attempting to create player with data:", {
+      name: newPlayer.name,
+      cedula: newPlayer.cedula,
+      number: newPlayer.number,
+      age: newPlayer.age,
+      team_id: newPlayer.team_id,
+      team_id_type: typeof newPlayer.team_id,
+    })
+
+    const selectedTeam = teams.find((t) => t.id === Number.parseInt(newPlayer.team_id))
+    console.log("[v0] Selected team:", selectedTeam)
+    console.log("[v0] Available teams:", teams)
+
+    if (!selectedTeam) {
+      toast({
+        title: "❌ Error de sincronización",
+        description: "El equipo seleccionado no está disponible. Por favor recarga la página e intenta nuevamente.",
         variant: "destructive",
       })
       return
@@ -515,12 +563,13 @@ export default function AdminDashboard() {
       formData.append("age", newPlayer.age)
       formData.append("team_id", newPlayer.team_id)
 
+      console.log("[v0] Calling createPlayer with formData")
       await createPlayer(formData)
 
-      const teamName = teams.find((t) => t.id === Number.parseInt(newPlayer.team_id))?.name || "el equipo"
+      const teamName = selectedTeam.name
 
       toast({
-        title: "¡Jugador creado exitosamente!",
+        title: "✅ ¡Jugador creado exitosamente!",
         description: `${newPlayer.name} ha sido agregado a ${teamName}`,
         className: "bg-green-50 border-green-200",
       })
@@ -530,7 +579,7 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("[v0] Error creating player:", error)
       toast({
-        title: "Error al crear jugador",
+        title: "❌ Error al crear jugador",
         description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
         variant: "destructive",
       })
@@ -939,9 +988,25 @@ export default function AdminDashboard() {
                                         className="flex items-center justify-between p-2 bg-background rounded border border-primary/20"
                                       >
                                         <span className="font-medium">{standing.teams?.name}</span>
-                                        <Badge className="bg-primary">
-                                          {standing.points} pts • {standing.played} PJ
-                                        </Badge>
+                                        <div className="flex items-center gap-2">
+                                          <Badge className="bg-primary">
+                                            {standing.points} pts • {standing.played} PJ
+                                          </Badge>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                              handleRemoveTeamFromGroup(
+                                                standing.team_id,
+                                                standing.teams?.name,
+                                                group.name,
+                                              )
+                                            }
+                                            className="border-red-300 text-red-600 hover:bg-red-50"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </Button>
+                                        </div>
                                       </div>
                                     ))}
                                   </div>

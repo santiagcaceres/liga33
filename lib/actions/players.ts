@@ -12,6 +12,30 @@ export async function createPlayer(formData: FormData) {
   const age = Number.parseInt(formData.get("age") as string)
   const team_id = Number.parseInt(formData.get("team_id") as string)
 
+  console.log("[v0] Creating player with data:", {
+    name,
+    cedula,
+    number,
+    age,
+    team_id,
+    team_id_type: typeof team_id,
+    team_id_isNaN: Number.isNaN(team_id),
+  })
+
+  if (Number.isNaN(team_id) || team_id <= 0) {
+    console.error("[v0] Invalid team_id:", team_id)
+    throw new Error("ID de equipo inválido. Por favor selecciona un equipo válido.")
+  }
+
+  const { data: teamExists, error: teamError } = await supabase.from("teams").select("id").eq("id", team_id).single()
+
+  if (teamError || !teamExists) {
+    console.error("[v0] Team not found:", team_id, teamError)
+    throw new Error(`El equipo con ID ${team_id} no existe. Por favor recarga la página e intenta nuevamente.`)
+  }
+
+  console.log("[v0] Team exists, proceeding with player creation")
+
   const { data, error } = await supabase
     .from("players")
     .insert([
@@ -34,6 +58,8 @@ export async function createPlayer(formData: FormData) {
     console.error("[v0] Error creating player:", error)
     throw new Error(error.message)
   }
+
+  console.log("[v0] Player created successfully:", data)
 
   revalidatePath("/")
   return data
