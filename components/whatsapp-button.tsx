@@ -14,7 +14,7 @@ export default function WhatsAppButton() {
   return (
     <Button
       onClick={handleWhatsAppClick}
-      className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-full px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 text-sm font-medium"
+      className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900 text-white rounded-full px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 text-sm font-medium"
     >
       <MessageCircle className="w-5 h-5" />
       <span className="hidden sm:inline">Inscribirme</span>
