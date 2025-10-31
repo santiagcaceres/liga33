@@ -1,7 +1,8 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Newspaper, Calendar } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Newspaper, Calendar, FileText, Download } from "lucide-react"
 import { useEffect, useState } from "react"
 import { getNews } from "@/lib/actions/news"
 
@@ -35,6 +36,19 @@ export default function HomeSection({ onNavigate }: HomeSectionProps) {
     } finally {
       setIsLoadingNews(false)
     }
+  }
+
+  const getNewsCardClass = (index: number, totalNews: number) => {
+    // 1 noticia: ocupa todo el ancho
+    if (totalNews === 1) {
+      return "md:col-span-2"
+    }
+    // 3 noticias: primera grande, las otras dos pequeñas
+    if (totalNews === 3 && index === 0) {
+      return "md:col-span-2"
+    }
+    // 2 o 4 noticias: todas del mismo tamaño (default)
+    return ""
   }
 
   return (
@@ -75,6 +89,54 @@ export default function HomeSection({ onNavigate }: HomeSectionProps) {
         </Card>
       </button>
 
+      <Card className="border-primary/30 bg-gradient-to-br from-card to-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-2xl text-primary">
+            <FileText className="w-6 h-6" />
+            Reglamento Oficial
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex-1">
+              <h3 className="font-bold text-lg mb-2 text-foreground">Copa Libertadores 2025</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed mb-2">
+                Descarga el reglamento oficial de la Copa Libertadores 2025. Incluye sistema de competencia, reglas del
+                juego, sanciones, premios y toda la información necesaria para participar.
+              </p>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                  Sistema de competencia y formato
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                  Reglamento completo del torneo
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                  Premios y reconocimientos
+                </li>
+              </ul>
+            </div>
+            <Button
+              onClick={() => {
+                const link = document.createElement("a")
+                link.href = "/reglamento.txt"
+                link.download = "Reglamento_Copa_Libertadores_2025.txt"
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+              }}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 py-6 text-base whitespace-nowrap"
+            >
+              <Download className="w-5 h-5 mr-2" />
+              Descargar Reglamento
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* News Section */}
       <Card className="border-primary/30 bg-card">
         <CardHeader>
@@ -97,10 +159,10 @@ export default function HomeSection({ onNavigate }: HomeSectionProps) {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {news.map((item) => (
+              {news.map((item, index) => (
                 <Card
                   key={item.id}
-                  className="border-primary/30 bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/20 transition-all hover:border-primary/50"
+                  className={`border-primary/30 bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/20 transition-all hover:border-primary/50 ${getNewsCardClass(index, news.length)}`}
                 >
                   <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-black to-primary/20">
                     <img

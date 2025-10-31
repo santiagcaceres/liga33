@@ -250,7 +250,7 @@ export default function HomePage() {
               <div className="text-gray-300 text-sm md:text-base">
                 <div>Sábados: 14:00 - 20:00</div>
                 <div>Domingos: 14:00 - 19:00</div>
-                <div>Entrenamientos: Lun-Vie 17:00-21:00</div>
+                <div>Entrenamientos: Sábados 17:00-21:00</div>
               </div>
             </div>
           </div>

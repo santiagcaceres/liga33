@@ -123,9 +123,6 @@ export default function TeamsRoster() {
                         <h3 className="font-semibold text-lg">
                           {teams.find((t) => t.id === Number.parseInt(selectedTeam))?.name}
                         </h3>
-                        <p className="text-sm text-muted-foreground">
-                          DT: {teams.find((t) => t.id === Number.parseInt(selectedTeam))?.coach}
-                        </p>
                       </div>
                     </div>
                   </div>

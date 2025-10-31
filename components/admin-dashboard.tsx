@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { createTeam, getTeams, deleteTeam } from "@/lib/actions/teams"
 import { createPlayer, getPlayers, deletePlayer } from "@/lib/actions/players"
-import { createNews, getNews } from "@/lib/actions/news"
+import { createNews, getNews, deleteNews } from "@/lib/actions/news"
 import { useToast } from "@/hooks/use-toast"
 
 interface Match {
@@ -110,7 +110,7 @@ export default function AdminDashboard() {
   const [homeRedCards, setHomeRedCards] = useState([{ player: "", minute: "" }])
   const [awayRedCards, setAwayRedCards] = useState([{ player: "", minute: "" }])
 
-  const [newTeam, setNewTeam] = useState({ name: "", coach: "", logo_url: "" })
+  const [newTeam, setNewTeam] = useState({ name: "", logo_url: "" })
   const [teams, setTeams] = useState<Team[]>([])
   const [isLoadingTeams, setIsLoadingTeams] = useState(false)
   const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null)
@@ -385,7 +385,7 @@ export default function AdminDashboard() {
       if (!file.type.startsWith("image/")) {
         toast({
           title: "❌ Archivo inválido",
-          description: "Por favor selecciona una imagen JPG",
+          description: "Por favor selecciona una imagen JPG o PNG",
           variant: "destructive",
         })
         return
@@ -401,7 +401,7 @@ export default function AdminDashboard() {
   }
 
   const handleAddTeam = async () => {
-    if (!newTeam.name.trim() || !newTeam.coach.trim() || !newTeam.logo_url) {
+    if (!newTeam.name.trim() || !newTeam.logo_url) {
       toast({
         title: "❌ Campos incompletos",
         description: "Por favor completa todos los campos incluyendo la foto del equipo",
@@ -413,7 +413,6 @@ export default function AdminDashboard() {
     try {
       const formData = new FormData()
       formData.append("name", newTeam.name.trim())
-      formData.append("coach", newTeam.coach.trim())
       formData.append("logo_url", newTeam.logo_url)
 
       await createTeam(formData)
@@ -424,7 +423,7 @@ export default function AdminDashboard() {
         className: "bg-green-50 border-green-200",
       })
 
-      setNewTeam({ name: "", coach: "", logo_url: "" })
+      setNewTeam({ name: "", logo_url: "" })
       setTeamLogoFile(null)
       await loadTeams()
     } catch (error) {
@@ -644,7 +643,7 @@ export default function AdminDashboard() {
     // Validate all fields are filled
     if (!newNews.title.trim() || !newNews.content.trim() || !newNews.image) {
       toast({
-        title: "Campos incompletos",
+        title: "❌ Campos incompletos",
         description: "Por favor completa todos los campos antes de crear la noticia",
         variant: "destructive",
       })
@@ -654,7 +653,7 @@ export default function AdminDashboard() {
     // Validate max 4 news
     if (newsList.length >= 4) {
       toast({
-        title: "Límite alcanzado",
+        title: "❌ Límite alcanzado",
         description: "Solo puedes tener un máximo de 4 noticias publicadas",
         variant: "destructive",
       })
@@ -738,6 +737,29 @@ export default function AdminDashboard() {
       console.error("[v0] Error deleting player:", error)
       toast({
         title: "Error al eliminar jugador",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteNews = async (newsId: number, newsTitle: string) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar la noticia "${newsTitle}"?`)) {
+      return
+    }
+
+    try {
+      await deleteNews(newsId)
+      toast({
+        title: "✅ ¡Noticia eliminada!",
+        description: `"${newsTitle}" ha sido eliminada exitosamente`,
+        className: "bg-green-50 border-green-200",
+      })
+      await loadNews()
+    } catch (error) {
+      console.error("[v0] Error deleting news:", error)
+      toast({
+        title: "❌ Error al eliminar noticia",
         description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
         variant: "destructive",
       })
@@ -913,6 +935,14 @@ export default function AdminDashboard() {
                                   <p className="text-sm text-muted-foreground line-clamp-2">{news.content}</p>
                                   <p className="text-xs text-muted-foreground mt-1">{news.published_date}</p>
                                 </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteNews(news.id, news.title)}
+                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
                               </div>
                             </CardContent>
                           </Card>
@@ -1610,31 +1640,21 @@ export default function AdminDashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Nombre del Equipo *</Label>
-                      <Input
-                        value={newTeam.name}
-                        onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
-                        placeholder="Ej: Deportivo Central"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Director Técnico *</Label>
-                      <Input
-                        value={newTeam.coach}
-                        onChange={(e) => setNewTeam({ ...newTeam, coach: e.target.value })}
-                        placeholder="Ej: Juan Pérez"
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label>Nombre del Equipo *</Label>
+                    <Input
+                      value={newTeam.name}
+                      onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
+                      placeholder="Ej: Deportivo Central"
+                    />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Foto del Equipo (JPG) *</Label>
+                    <Label>Foto del Equipo (JPG o PNG) *</Label>
                     <div className="flex gap-2">
                       <Input
                         type="file"
-                        accept="image/jpeg,image/jpg"
+                        accept="image/jpeg,image/jpg,image/png"
                         onChange={handleTeamLogoUpload}
                         className="flex-1"
                       />
@@ -1642,7 +1662,9 @@ export default function AdminDashboard() {
                         <Upload className="w-4 h-4" />
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">Selecciona una imagen JPG desde tu computadora</p>
+                    <p className="text-xs text-muted-foreground">
+                      Selecciona una imagen JPG o PNG desde tu computadora
+                    </p>
                     {newTeam.logo_url && (
                       <div className="mt-2 w-24 h-24 border border-primary/30 rounded-lg overflow-hidden">
                         <img
@@ -1660,7 +1682,7 @@ export default function AdminDashboard() {
                   <Button
                     onClick={handleAddTeam}
                     className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                    disabled={!newTeam.name.trim() || !newTeam.coach.trim() || !newTeam.logo_url}
+                    disabled={!newTeam.name.trim() || !newTeam.logo_url}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Agregar Equipo
@@ -1684,7 +1706,6 @@ export default function AdminDashboard() {
                               <div className="flex items-center justify-between">
                                 <div className="flex-1">
                                   <h4 className="font-semibold">{team.name}</h4>
-                                  <p className="text-sm text-muted-foreground">DT: {team.coach}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <Badge className="bg-primary">ID: {team.id}</Badge>

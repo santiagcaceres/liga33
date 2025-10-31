@@ -7,10 +7,9 @@ export async function createTeam(formData: FormData) {
   const supabase = await createClient()
 
   const name = formData.get("name") as string
-  const coach = formData.get("coach") as string
   const logo_url = formData.get("logo_url") as string
 
-  const { data, error } = await supabase.from("teams").insert([{ name, coach, logo_url }]).select().single()
+  const { data, error } = await supabase.from("teams").insert([{ name, logo_url }]).select().single()
 
   if (error) {
     console.error("[v0] Error creating team:", error)
@@ -38,10 +37,9 @@ export async function updateTeam(id: number, formData: FormData) {
   const supabase = await createClient()
 
   const name = formData.get("name") as string
-  const coach = formData.get("coach") as string
   const logo_url = formData.get("logo_url") as string
 
-  const { error } = await supabase.from("teams").update({ name, coach, logo_url }).eq("id", id)
+  const { error } = await supabase.from("teams").update({ name, logo_url }).eq("id", id)
 
   if (error) {
     console.error("[v0] Error updating team:", error)
