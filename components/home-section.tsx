@@ -2,13 +2,15 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Newspaper, Calendar } from "lucide-react"
+import { useEffect, useState } from "react"
+import { getNews } from "@/lib/actions/news"
 
 interface News {
   id: number
   title: string
   content: string
-  image: string
-  date: string
+  image_url: string
+  published_date: string
 }
 
 interface HomeSectionProps {
@@ -16,7 +18,24 @@ interface HomeSectionProps {
 }
 
 export default function HomeSection({ onNavigate }: HomeSectionProps) {
-  const news: News[] = []
+  const [news, setNews] = useState<News[]>([])
+  const [isLoadingNews, setIsLoadingNews] = useState(true)
+
+  useEffect(() => {
+    loadNews()
+  }, [])
+
+  const loadNews = async () => {
+    setIsLoadingNews(true)
+    try {
+      const data = await getNews(4) // Load maximum 4 news
+      setNews(data)
+    } catch (error) {
+      console.error("[v0] Error loading news:", error)
+    } finally {
+      setIsLoadingNews(false)
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -65,7 +84,12 @@ export default function HomeSection({ onNavigate }: HomeSectionProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {news.length === 0 ? (
+          {isLoadingNews ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Newspaper className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary animate-pulse" />
+              <p className="text-lg">Cargando noticias...</p>
+            </div>
+          ) : news.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Newspaper className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary" />
               <p className="text-lg">No hay noticias disponibles</p>
@@ -80,7 +104,7 @@ export default function HomeSection({ onNavigate }: HomeSectionProps) {
                 >
                   <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-black to-primary/20">
                     <img
-                      src={item.image || "/placeholder.svg"}
+                      src={item.image_url || "/placeholder.svg"}
                       alt={item.title}
                       className="w-full h-full object-cover"
                     />
@@ -88,7 +112,7 @@ export default function HomeSection({ onNavigate }: HomeSectionProps) {
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                       <Calendar className="w-4 h-4 text-primary" />
-                      {item.date}
+                      {item.published_date}
                     </div>
                     <h3 className="font-bold text-lg mb-2 line-clamp-2 text-foreground">{item.title}</h3>
                     <p className="text-muted-foreground text-sm line-clamp-3">{item.content}</p>

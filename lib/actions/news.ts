@@ -42,7 +42,13 @@ export async function getNews(limit?: number) {
     return []
   }
 
-  return data || []
+  return (data || []).map((item: any) => ({
+    id: item.id,
+    title: item.title,
+    content: item.content,
+    image_url: item.image_url,
+    published_date: item.published_date,
+  }))
 }
 
 export async function updateNews(id: number, formData: FormData) {

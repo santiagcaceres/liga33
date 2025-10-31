@@ -72,8 +72,8 @@ interface News {
   id: number
   title: string
   content: string
-  image: string
-  date: string
+  image_url?: string // Changed from image to image_url
+  published_date?: string // Changed from date to published_date
 }
 
 export default function AdminDashboard() {
@@ -94,7 +94,7 @@ export default function AdminDashboard() {
   const [newNews, setNewNews] = useState({
     title: "",
     content: "",
-    image: "",
+    image: "", // This will hold the data URL before appending to FormData
     date: new Date().toISOString().split("T")[0],
   })
   const [newsImageFile, setNewsImageFile] = useState<File | null>(null)
@@ -665,13 +665,13 @@ export default function AdminDashboard() {
       const formData = new FormData()
       formData.append("title", newNews.title.trim())
       formData.append("content", newNews.content.trim())
-      formData.append("image", newNews.image)
-      formData.append("date", newNews.date)
+      formData.append("image_url", newNews.image)
+      formData.append("published_date", newNews.date)
 
       await createNews(formData)
 
       toast({
-        title: "¡Noticia publicada exitosamente!",
+        title: "✅ ¡Noticia publicada exitosamente!",
         description: `"${newNews.title}" ha sido agregada`,
         className: "bg-green-50 border-green-200",
       })
@@ -682,7 +682,7 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("[v0] Error creating news:", error)
       toast({
-        title: "Error al crear noticia",
+        title: "❌ Error al crear noticia",
         description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
         variant: "destructive",
       })
@@ -905,14 +905,14 @@ export default function AdminDashboard() {
                             <CardContent className="p-4">
                               <div className="flex gap-4">
                                 <img
-                                  src={news.image || "/placeholder.svg"}
+                                  src={news.image_url || "/placeholder.svg"}
                                   alt={news.title}
                                   className="w-24 h-24 object-cover rounded"
                                 />
                                 <div className="flex-1">
                                   <h4 className="font-semibold">{news.title}</h4>
                                   <p className="text-sm text-muted-foreground line-clamp-2">{news.content}</p>
-                                  <p className="text-xs text-muted-foreground mt-1">{news.date}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">{news.published_date}</p>
                                 </div>
                               </div>
                             </CardContent>
