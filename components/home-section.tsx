@@ -39,7 +39,6 @@ export default function HomeSection({ onNavigate }: HomeSectionProps) {
   }
 
   const getNewsCardClass = (index: number, totalNews: number) => {
-    // 1 noticia: ocupa todo el ancho
     if (totalNews === 1) {
       return "md:col-span-2"
     }
@@ -159,28 +158,55 @@ export default function HomeSection({ onNavigate }: HomeSectionProps) {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {news.map((item, index) => (
-                <Card
-                  key={item.id}
-                  className={`border-primary/30 bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/20 transition-all hover:border-primary/50 ${getNewsCardClass(index, news.length)}`}
-                >
-                  <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-black to-primary/20">
-                    <img
-                      src={item.image_url || "/placeholder.svg"}
-                      alt={item.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                      <Calendar className="w-4 h-4 text-primary" />
-                      {item.published_date}
-                    </div>
-                    <h3 className="font-bold text-lg mb-2 line-clamp-2 text-foreground">{item.title}</h3>
-                    <p className="text-muted-foreground text-sm line-clamp-3">{item.content}</p>
-                  </CardContent>
-                </Card>
-              ))}
+              {news.map((item, index) => {
+                const isSingleNews = news.length === 1
+
+                return (
+                  <Card
+                    key={item.id}
+                    className={`border-primary/30 bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/20 transition-all hover:border-primary/50 ${getNewsCardClass(index, news.length)}`}
+                  >
+                    {isSingleNews ? (
+                      <div className="relative h-64 md:h-80 w-full overflow-hidden group cursor-pointer">
+                        <img
+                          src={item.image_url || "/placeholder.svg"}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        {/* Degradado negro para legibilidad del texto */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent"></div>
+                        {/* Contenido sobre la imagen */}
+                        <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                          <div className="flex items-center gap-2 text-sm mb-3">
+                            <Calendar className="w-4 h-4 text-primary" />
+                            <span className="text-gray-200">{item.published_date}</span>
+                          </div>
+                          <h3 className="font-bold text-2xl md:text-3xl mb-3 line-clamp-2">{item.title}</h3>
+                          <p className="text-gray-200 text-sm md:text-base line-clamp-2">{item.content}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-black to-primary/20">
+                          <img
+                            src={item.image_url || "/placeholder.svg"}
+                            alt={item.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                            <Calendar className="w-4 h-4 text-primary" />
+                            {item.published_date}
+                          </div>
+                          <h3 className="font-bold text-lg mb-2 line-clamp-2 text-foreground">{item.title}</h3>
+                          <p className="text-muted-foreground text-sm line-clamp-3">{item.content}</p>
+                        </CardContent>
+                      </>
+                    )}
+                  </Card>
+                )
+              })}
             </div>
           )}
         </CardContent>
