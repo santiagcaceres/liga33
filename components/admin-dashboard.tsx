@@ -37,8 +37,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { createTeam, getTeams } from "@/lib/actions/teams"
-import { createPlayer, getPlayers } from "@/lib/actions/players"
+import { createTeam, getTeams, deleteTeam } from "@/lib/actions/teams"
+import { createPlayer, getPlayers, deletePlayer } from "@/lib/actions/players"
 import { createNews, getNews } from "@/lib/actions/news"
 import { useToast } from "@/hooks/use-toast"
 
@@ -501,6 +501,52 @@ export default function AdminDashboard() {
       description: "El sorteo se realizará con los datos reales de los clasificados",
     })
     setShowDrawConfirm(false)
+  }
+
+  const handleDeleteTeam = async (teamId: number, teamName: string) => {
+    toast({
+      title: "Eliminando equipo...",
+      description: `Se está eliminando el equipo ${teamName}.`,
+    })
+    try {
+      await deleteTeam(teamId)
+      toast({
+        title: "¡Equipo eliminado!",
+        description: `${teamName} ha sido eliminado exitosamente.`,
+        className: "bg-green-50 border-green-200",
+      })
+      await loadTeams()
+    } catch (error) {
+      console.error("[v0] Error deleting team:", error)
+      toast({
+        title: "Error al eliminar equipo",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeletePlayer = async (playerId: number, playerName: string) => {
+    toast({
+      title: "Eliminando jugador...",
+      description: `Se está eliminando al jugador ${playerName}.`,
+    })
+    try {
+      await deletePlayer(playerId)
+      toast({
+        title: "¡Jugador eliminado!",
+        description: `${playerName} ha sido eliminado exitosamente.`,
+        className: "bg-green-50 border-green-200",
+      })
+      await loadPlayers()
+    } catch (error) {
+      console.error("[v0] Error deleting player:", error)
+      toast({
+        title: "Error al eliminar jugador",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
   }
 
   const roundMatches = fixtures.filter((m) => m.round === Number.parseInt(selectedRound))
@@ -1251,11 +1297,21 @@ export default function AdminDashboard() {
                           <Card key={team.id} className="border-primary/30">
                             <CardContent className="p-4">
                               <div className="flex items-center justify-between">
-                                <div>
+                                <div className="flex-1">
                                   <h4 className="font-semibold">{team.name}</h4>
                                   <p className="text-sm text-muted-foreground">DT: {team.coach}</p>
                                 </div>
-                                <Badge className="bg-primary">ID: {team.id}</Badge>
+                                <div className="flex items-center gap-2">
+                                  <Badge className="bg-primary">ID: {team.id}</Badge>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteTeam(team.id, team.name)}
+                                    className="border-red-300 text-red-600 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </div>
                             </CardContent>
                           </Card>
@@ -1387,6 +1443,14 @@ export default function AdminDashboard() {
                                     {player.teams?.name} • CI: {player.cedula} • {player.age} años
                                   </p>
                                 </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeletePlayer(player.id, player.name)}
+                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
                               </div>
                             </CardContent>
                           </Card>

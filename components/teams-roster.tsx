@@ -1,34 +1,72 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Users, AlertCircle } from "lucide-react"
+import { getTeams } from "@/lib/actions/teams"
+import { getPlayers } from "@/lib/actions/players"
 
 interface Player {
+  id: number
   number: number
   name: string
   cedula: string
   age: number
   goals: number
-  yellowCards: number
-  redCards: number
+  yellow_cards: number
+  red_cards: number
   suspended: boolean
 }
 
 interface Team {
+  id: number
   name: string
-  players: Player[]
+  coach: string
 }
 
 export default function TeamsRoster() {
   const [selectedTeam, setSelectedTeam] = useState("")
+  const [teams, setTeams] = useState<Team[]>([])
+  const [players, setPlayers] = useState<Player[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const teams: Record<string, Team> = {}
+  useEffect(() => {
+    loadData()
+  }, [])
 
-  const currentTeam = selectedTeam ? teams[selectedTeam] : null
+  const loadData = async () => {
+    setIsLoading(true)
+    try {
+      const [teamsData, playersData] = await Promise.all([getTeams(), getPlayers()])
+      setTeams(teamsData)
+      setPlayers(playersData)
+    } catch (error) {
+      console.error("[v0] Error loading teams and players:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const currentTeamPlayers = selectedTeam ? players.filter((p) => p.team_id === Number.parseInt(selectedTeam)) : []
 
   const hasThreeYellowCards = (player: Player) => {
-    return player.yellowCards === 3
+    return player.yellow_cards === 3
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-primary/30 bg-card">
+          <CardContent className="p-12">
+            <div className="text-center text-muted-foreground">
+              <Users className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary animate-pulse" />
+              <p className="text-lg">Cargando equipos...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -41,13 +79,112 @@ export default function TeamsRoster() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-12 text-muted-foreground">
-            <Users className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary" />
-            <p className="text-lg">No hay equipos registrados</p>
-            <p className="text-sm">
-              El administrador debe agregar equipos y jugadores desde el panel de administración
-            </p>
-          </div>
+          {teams.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Users className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary" />
+              <p className="text-lg">No hay equipos registrados</p>
+              <p className="text-sm">
+                El administrador debe agregar equipos y jugadores desde el panel de administración
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-6">
+                <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                  <SelectTrigger className="w-full max-w-md border-primary/30">
+                    <SelectValue placeholder="Selecciona un equipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id.toString()}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedTeam && (
+                <div className="space-y-4">
+                  <div className="bg-primary/10 p-4 rounded-lg border border-primary/30">
+                    <h3 className="font-semibold text-lg">
+                      {teams.find((t) => t.id === Number.parseInt(selectedTeam))?.name}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      DT: {teams.find((t) => t.id === Number.parseInt(selectedTeam))?.coach}
+                    </p>
+                  </div>
+
+                  {currentTeamPlayers.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Users className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
+                      <p>Este equipo no tiene jugadores registrados</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-primary/30">
+                            <th className="text-left p-3">#</th>
+                            <th className="text-left p-3">Jugador</th>
+                            <th className="text-left p-3">CI</th>
+                            <th className="text-center p-3">Edad</th>
+                            <th className="text-center p-3">⚽</th>
+                            <th className="text-center p-3">🟨</th>
+                            <th className="text-center p-3">🟥</th>
+                            <th className="text-center p-3">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {currentTeamPlayers.map((player) => (
+                            <tr
+                              key={player.id}
+                              className={`border-b border-primary/20 ${
+                                player.suspended ? "bg-red-500/20 line-through" : ""
+                              }`}
+                            >
+                              <td className="p-3 font-semibold">{player.number}</td>
+                              <td className="p-3">{player.name}</td>
+                              <td className="p-3 text-sm text-muted-foreground">{player.cedula}</td>
+                              <td className="p-3 text-center">{player.age}</td>
+                              <td className="p-3 text-center font-semibold">{player.goals}</td>
+                              <td className="p-3 text-center">
+                                <span
+                                  className={`font-semibold ${
+                                    hasThreeYellowCards(player)
+                                      ? "text-red-600"
+                                      : player.yellow_cards === 2
+                                        ? "text-orange-600"
+                                        : ""
+                                  }`}
+                                >
+                                  {player.yellow_cards}
+                                </span>
+                              </td>
+                              <td className="p-3 text-center font-semibold">{player.red_cards}</td>
+                              <td className="p-3 text-center">
+                                {player.suspended ? (
+                                  <span className="text-xs bg-red-600 text-white px-2 py-1 rounded">SUSPENDIDO</span>
+                                ) : hasThreeYellowCards(player) ? (
+                                  <span className="text-xs bg-red-600 text-white px-2 py-1 rounded">
+                                    🔴 3 AMARILLAS
+                                  </span>
+                                ) : player.yellow_cards === 2 ? (
+                                  <span className="text-xs bg-orange-500 text-white px-2 py-1 rounded">⚠️ RIESGO</span>
+                                ) : (
+                                  <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">HABILITADO</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
 
           <Card className="mt-6 border-primary/30 bg-primary/5">
             <CardContent className="p-4">
