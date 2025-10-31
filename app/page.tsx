@@ -248,9 +248,7 @@ export default function HomePage() {
             <div>
               <h3 className="text-lg font-bold mb-4 text-primary">Horarios</h3>
               <div className="text-gray-300 text-sm md:text-base">
-                <div>Sábados: 14:00 - 20:00</div>
-                <div>Domingos: 14:00 - 19:00</div>
-                <div>Entrenamientos: Sábados 17:00-21:00</div>
+                <div className="font-semibold">Sábados: 17:00 - 21:00</div>
               </div>
             </div>
           </div>

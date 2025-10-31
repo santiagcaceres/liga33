@@ -26,6 +26,8 @@ import {
   AlertCircle,
   Newspaper,
   Upload,
+  Edit,
+  X,
 } from "lucide-react"
 import {
   AlertDialog,
@@ -37,7 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { createTeam, getTeams, deleteTeam } from "@/lib/actions/teams"
+import { createTeam, getTeams, deleteTeam, updateTeam } from "@/lib/actions/teams" // Import updateTeam
 import { createPlayer, getPlayers, deletePlayer } from "@/lib/actions/players"
 import { createNews, getNews, deleteNews } from "@/lib/actions/news"
 import { useToast } from "@/hooks/use-toast"
@@ -115,6 +117,8 @@ export default function AdminDashboard() {
   const [isLoadingTeams, setIsLoadingTeams] = useState(false)
   const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null)
 
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null)
+
   const [newPlayer, setNewPlayer] = useState({
     name: "",
     team_id: "",
@@ -123,6 +127,8 @@ export default function AdminDashboard() {
   })
   const [players, setPlayers] = useState<Player[]>([])
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(false)
+
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
 
   const [playerFilterTeam, setPlayerFilterTeam] = useState<string>("all")
   const [playerSearchTerm, setPlayerSearchTerm] = useState<string>("")
@@ -418,25 +424,52 @@ export default function AdminDashboard() {
       formData.append("name", newTeam.name.trim())
       formData.append("logo_url", newTeam.logo_url)
 
-      await createTeam(formData)
-
-      toast({
-        title: "✅ ¡Equipo creado exitosamente!",
-        description: `${newTeam.name} ha sido agregado a la base de datos`,
-        className: "bg-green-50 border-green-200",
-      })
+      if (editingTeam) {
+        // Update existing team
+        await updateTeam(editingTeam.id, formData)
+        toast({
+          title: "✅ ¡Equipo actualizado exitosamente!",
+          description: `${newTeam.name} ha sido actualizado`,
+          className: "bg-green-50 border-green-200",
+        })
+        setEditingTeam(null)
+      } else {
+        // Create new team
+        await createTeam(formData)
+        toast({
+          title: "✅ ¡Equipo creado exitosamente!",
+          description: `${newTeam.name} ha sido agregado a la base de datos`,
+          className: "bg-green-50 border-green-200",
+        })
+      }
 
       setNewTeam({ name: "", logo_url: "" })
       setTeamLogoFile(null)
       await loadTeams()
     } catch (error) {
-      console.error("[v0] Error creating team:", error)
+      console.error("[v0] Error creating/updating team:", error)
       toast({
-        title: "❌ Error al crear equipo",
+        title: `❌ Error al ${editingTeam ? "actualizar" : "crear"} equipo`,
         description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
         variant: "destructive",
       })
     }
+  }
+
+  const handleEditTeam = (team: Team) => {
+    setEditingTeam(team)
+    setNewTeam({
+      name: team.name,
+      logo_url: team.logo_url || "",
+    })
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  const handleCancelEditTeam = () => {
+    setEditingTeam(null)
+    setNewTeam({ name: "", logo_url: "" })
+    setTeamLogoFile(null)
   }
 
   const handleCreateGroup = async () => {
@@ -640,6 +673,66 @@ export default function AdminDashboard() {
         variant: "destructive",
       })
     }
+  }
+
+  const handleEditPlayer = (player: Player) => {
+    setEditingPlayer(player)
+    setNewPlayer({
+      name: player.name,
+      team_id: player.team_id.toString(),
+      cedula: player.cedula,
+      number: player.number.toString(),
+    })
+    // Scroll to top of the form
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  const handleUpdatePlayer = async () => {
+    if (!editingPlayer) return
+
+    if (!newPlayer.name.trim() || !newPlayer.team_id || !newPlayer.cedula.trim() || !newPlayer.number) {
+      toast({
+        title: "❌ Campos incompletos",
+        description: "Por favor completa todos los campos antes de actualizar el jugador",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const formData = new FormData()
+      formData.append("name", newPlayer.name.trim())
+      formData.append("cedula", newPlayer.cedula.trim())
+      formData.append("number", newPlayer.number)
+      formData.append("team_id", newPlayer.team_id)
+
+      const { updatePlayer } = await import("@/lib/actions/players")
+      await updatePlayer(editingPlayer.id, formData)
+
+      const selectedTeam = teams.find((t) => t.id === Number.parseInt(newPlayer.team_id, 10))
+
+      toast({
+        title: "✅ ¡Jugador actualizado exitosamente!",
+        description: `${newPlayer.name} ha sido actualizado en ${selectedTeam?.name}`,
+        className: "bg-green-50 border-green-200",
+      })
+
+      setNewPlayer({ name: "", team_id: "", cedula: "", number: "" })
+      setEditingPlayer(null)
+      await loadPlayers()
+    } catch (error) {
+      console.error("[v0] Error updating player:", error)
+      toast({
+        title: "❌ Error al actualizar jugador",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingPlayer(null)
+    setNewPlayer({ name: "", team_id: "", cedula: "", number: "" })
   }
 
   const handleAddNews = async () => {
@@ -1645,8 +1738,13 @@ export default function AdminDashboard() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-primary">
                     <Users className="w-5 h-5" />
-                    Gestión de Equipos
+                    {editingTeam ? "Editar Equipo" : "Gestión de Equipos"}
                   </CardTitle>
+                  {editingTeam && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Editando: <span className="font-semibold text-primary">{editingTeam.name}</span>
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
@@ -1688,14 +1786,31 @@ export default function AdminDashboard() {
                     )}
                   </div>
 
-                  <Button
-                    onClick={handleAddTeam}
-                    className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                    disabled={!newTeam.name.trim() || !newTeam.logo_url}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Agregar Equipo
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleAddTeam}
+                      className="flex-1 bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                      disabled={!newTeam.name.trim() || !newTeam.logo_url}
+                    >
+                      {editingTeam ? (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Actualizar Equipo
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Agregar Equipo
+                        </>
+                      )}
+                    </Button>
+                    {editingTeam && (
+                      <Button variant="outline" onClick={handleCancelEditTeam}>
+                        <X className="w-4 h-4 mr-2" />
+                        Cancelar
+                      </Button>
+                    )}
+                  </div>
 
                   <div className="mt-6">
                     <h3 className="font-semibold mb-3">Equipos Registrados ({teams.length})</h3>
@@ -1718,7 +1833,6 @@ export default function AdminDashboard() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <Badge className="bg-primary">ID: {team.id}</Badge>
-                                  {/* Display team logo if available */}
                                   {team.logo_url && (
                                     <img
                                       src={team.logo_url || "/placeholder.svg"}
@@ -1729,6 +1843,14 @@ export default function AdminDashboard() {
                                       }}
                                     />
                                   )}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleEditTeam(team)}
+                                    className="border-primary/30 text-primary hover:bg-primary/10"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -1754,12 +1876,18 @@ export default function AdminDashboard() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-primary">
                     <Target className="w-5 h-5" />
-                    Gestión de Jugadores
+                    {editingPlayer ? "Editar Jugador" : "Gestión de Jugadores"}
                   </CardTitle>
                   {teams.length === 0 && (
                     <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
                       <AlertCircle className="w-5 h-5" />
                       <p className="text-sm">Debes crear al menos un equipo antes de agregar jugadores</p>
+                    </div>
+                  )}
+                  {editingPlayer && (
+                    <div className="flex items-center gap-2 text-blue-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                      <AlertCircle className="w-5 h-5" />
+                      <p className="text-sm">Editando: {editingPlayer.name}</p>
                     </div>
                   )}
                 </CardHeader>
@@ -1816,20 +1944,48 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <Button
-                    onClick={handleAddPlayer}
-                    className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                    disabled={
-                      teams.length === 0 ||
-                      !newPlayer.name.trim() ||
-                      !newPlayer.team_id ||
-                      !newPlayer.cedula.trim() ||
-                      !newPlayer.number
-                    }
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Agregar Jugador
-                  </Button>
+                  <div className="flex gap-2">
+                    {editingPlayer ? (
+                      <>
+                        <Button
+                          onClick={handleUpdatePlayer}
+                          className="flex-1 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-700 hover:via-blue-600 hover:to-blue-700"
+                          disabled={
+                            teams.length === 0 ||
+                            !newPlayer.name.trim() ||
+                            !newPlayer.team_id ||
+                            !newPlayer.cedula.trim() ||
+                            !newPlayer.number
+                          }
+                        >
+                          <Save className="w-4 h-4 mr-2" />
+                          Actualizar Jugador
+                        </Button>
+                        <Button
+                          onClick={handleCancelEdit}
+                          variant="outline"
+                          className="border-red-300 text-red-600 hover:bg-red-50 bg-transparent"
+                        >
+                          Cancelar
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        onClick={handleAddPlayer}
+                        className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                        disabled={
+                          teams.length === 0 ||
+                          !newPlayer.name.trim() ||
+                          !newPlayer.team_id ||
+                          !newPlayer.cedula.trim() ||
+                          !newPlayer.number
+                        }
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Agregar Jugador
+                      </Button>
+                    )}
+                  </div>
 
                   <div className="mt-6">
                     <h3 className="font-semibold mb-3">Jugadores Registrados ({players.length})</h3>
@@ -1903,14 +2059,24 @@ export default function AdminDashboard() {
                                     {player.teams?.name} • CI: {player.cedula}
                                   </p>
                                 </div>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleDeletePlayer(player.id, player.name)}
-                                  className="border-red-300 text-red-600 hover:bg-red-50"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleEditPlayer(player)}
+                                    className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                                  >
+                                    <Settings className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeletePlayer(player.id, player.name)}
+                                    className="border-red-300 text-red-600 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </div>
                             </CardContent>
                           </Card>
