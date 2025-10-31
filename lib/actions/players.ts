@@ -9,24 +9,43 @@ export async function createPlayer(formData: FormData) {
 
     const name = formData.get("name") as string
     const cedula = formData.get("cedula") as string
-    const number = Number.parseInt(formData.get("number") as string)
-    const age = Number.parseInt(formData.get("age") as string)
-    const team_id = Number.parseInt(formData.get("team_id") as string)
+    const numberStr = formData.get("number") as string
+    const ageStr = formData.get("age") as string
+    const teamIdStr = formData.get("team_id") as string
 
-    console.log("[v0] Creating player with data:", {
+    const number = Number.parseInt(numberStr, 10)
+    const age = Number.parseInt(ageStr, 10)
+    const team_id = Number.parseInt(teamIdStr, 10)
+
+    console.log("[v0] Attempting to create player with data:", {
       name,
       cedula,
       number,
       age,
       team_id,
+      team_id_type: typeof team_id,
     })
 
-    // Validate team_id
+    // Validate all numeric fields
     if (Number.isNaN(team_id) || team_id <= 0) {
-      console.error("[v0] Invalid team_id:", team_id)
+      console.error("[v0] Invalid team_id:", teamIdStr, "->", team_id)
       return {
         success: false,
         error: "ID de equipo inválido. Por favor selecciona un equipo válido.",
+      }
+    }
+
+    if (Number.isNaN(number) || number <= 0) {
+      return {
+        success: false,
+        error: "Número de camiseta inválido.",
+      }
+    }
+
+    if (Number.isNaN(age) || age <= 0) {
+      return {
+        success: false,
+        error: "Edad inválida.",
       }
     }
 
@@ -48,8 +67,8 @@ export async function createPlayer(formData: FormData) {
       .from("players")
       .insert([
         {
-          name,
-          cedula,
+          name: name.trim(),
+          cedula: cedula.trim(),
           number,
           age,
           team_id,
@@ -110,9 +129,13 @@ export async function updatePlayer(id: number, formData: FormData) {
 
   const name = formData.get("name") as string
   const cedula = formData.get("cedula") as string
-  const number = Number.parseInt(formData.get("number") as string)
-  const age = Number.parseInt(formData.get("age") as string)
-  const team_id = Number.parseInt(formData.get("team_id") as string)
+  const numberStr = formData.get("number") as string
+  const ageStr = formData.get("age") as string
+  const teamIdStr = formData.get("team_id") as string
+
+  const number = Number.parseInt(numberStr, 10)
+  const age = Number.parseInt(ageStr, 10)
+  const team_id = Number.parseInt(teamIdStr, 10)
 
   const { error } = await supabase.from("players").update({ name, cedula, number, age, team_id }).eq("id", id)
 

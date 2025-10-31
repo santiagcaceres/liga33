@@ -6,6 +6,12 @@ import { revalidatePath } from "next/cache"
 export async function createGroup(name: string) {
   const supabase = await createClient()
 
+  const { data: existing } = await supabase.from("copa_groups").select("id").eq("name", name).single()
+
+  if (existing) {
+    throw new Error(`El grupo "${name}" ya existe`)
+  }
+
   const { data, error } = await supabase.from("copa_groups").insert([{ name }]).select().single()
 
   if (error) {
@@ -109,4 +115,26 @@ export async function getGroupStandings() {
   }
 
   return data || []
+}
+
+export async function deleteGroup(groupId: number) {
+  const supabase = await createClient()
+
+  // First, remove all teams from this group
+  const { error: removeTeamsError } = await supabase.from("team_groups").delete().eq("group_id", groupId)
+
+  if (removeTeamsError) {
+    console.error("[v0] Error removing teams from group:", removeTeamsError)
+    throw new Error("Error al eliminar equipos del grupo")
+  }
+
+  // Then delete the group
+  const { error } = await supabase.from("copa_groups").delete().eq("id", groupId)
+
+  if (error) {
+    console.error("[v0] Error deleting group:", error)
+    throw new Error(error.message)
+  }
+
+  revalidatePath("/")
 }

@@ -55,6 +55,7 @@ interface Team {
   id: number
   name: string
   coach: string
+  logo_url?: string // Added logo_url to Team interface
 }
 
 interface Player {
@@ -109,7 +110,7 @@ export default function AdminDashboard() {
   const [homeRedCards, setHomeRedCards] = useState([{ player: "", minute: "" }])
   const [awayRedCards, setAwayRedCards] = useState([{ player: "", minute: "" }])
 
-  const [newTeam, setNewTeam] = useState({ name: "", coach: "" })
+  const [newTeam, setNewTeam] = useState({ name: "", coach: "", logo_url: "" }) // Added logo_url to newTeam state
   const [teams, setTeams] = useState<Team[]>([])
   const [isLoadingTeams, setIsLoadingTeams] = useState(false)
 
@@ -379,10 +380,11 @@ export default function AdminDashboard() {
 
   const handleAddTeam = async () => {
     // Validate all fields are filled
-    if (!newTeam.name.trim() || !newTeam.coach.trim()) {
+    if (!newTeam.name.trim() || !newTeam.coach.trim() || !newTeam.logo_url.trim()) {
+      // Added check for logo_url
       toast({
         title: "❌ Campos incompletos",
-        description: "Por favor completa todos los campos antes de crear el equipo",
+        description: "Por favor completa todos los campos incluyendo la foto del equipo", // Updated description
         variant: "destructive",
       })
       return
@@ -392,6 +394,7 @@ export default function AdminDashboard() {
       const formData = new FormData()
       formData.append("name", newTeam.name.trim())
       formData.append("coach", newTeam.coach.trim())
+      formData.append("logo_url", newTeam.logo_url.trim())
 
       await createTeam(formData)
 
@@ -401,7 +404,7 @@ export default function AdminDashboard() {
         className: "bg-green-50 border-green-200",
       })
 
-      setNewTeam({ name: "", coach: "" })
+      setNewTeam({ name: "", coach: "", logo_url: "" })
       await loadTeams()
     } catch (error) {
       console.error("[v0] Error creating team:", error)
@@ -501,6 +504,36 @@ export default function AdminDashboard() {
       console.error("[v0] Error removing team from group:", error)
       toast({
         title: "❌ Error al eliminar equipo",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteGroup = async (groupId: number, groupName: string) => {
+    if (
+      !confirm(
+        `¿Estás seguro de que deseas eliminar ${groupName}? Esto también eliminará todos los equipos asignados a este grupo.`,
+      )
+    ) {
+      return
+    }
+
+    try {
+      const { deleteGroup } = await import("@/lib/actions/groups")
+      await deleteGroup(groupId)
+
+      toast({
+        title: "✅ ¡Grupo eliminado!",
+        description: `${groupName} ha sido eliminado exitosamente`,
+        className: "bg-green-50 border-green-200",
+      })
+
+      await loadGroups()
+    } catch (error) {
+      console.error("[v0] Error deleting group:", error)
+      toast({
+        title: "❌ Error al eliminar grupo",
         description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
         variant: "destructive",
       })
@@ -984,7 +1017,18 @@ export default function AdminDashboard() {
                           return (
                             <Card key={group.id} className="border-primary/30">
                               <CardHeader>
-                                <CardTitle className="text-lg">{group.name}</CardTitle>
+                                <div className="flex items-center justify-between">
+                                  <CardTitle className="text-lg">{group.name}</CardTitle>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteGroup(group.id, group.name)}
+                                    className="border-red-300 text-red-600 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-1" />
+                                    Eliminar Grupo
+                                  </Button>
+                                </div>
                               </CardHeader>
                               <CardContent>
                                 {teamsInGroup.length === 0 ? (
@@ -1574,10 +1618,33 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label>Foto del Equipo (URL) *</Label>
+                    <Input
+                      value={newTeam.logo_url}
+                      onChange={(e) => setNewTeam({ ...newTeam, logo_url: e.target.value })}
+                      placeholder="https://ejemplo.com/logo-equipo.jpg"
+                      type="url"
+                    />
+                    <p className="text-xs text-muted-foreground">Ingresa la URL de la foto del equipo en formato JPG</p>
+                    {newTeam.logo_url && (
+                      <div className="mt-2 w-24 h-24 border border-primary/30 rounded-lg overflow-hidden">
+                        <img
+                          src={newTeam.logo_url || "/placeholder.svg"}
+                          alt="Preview"
+                          className="w-full h-full object-contain bg-white"
+                          onError={(e) => {
+                            e.currentTarget.src = "/placeholder.svg?height=96&width=96"
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
                   <Button
                     onClick={handleAddTeam}
                     className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                    disabled={!newTeam.name.trim() || !newTeam.coach.trim()}
+                    disabled={!newTeam.name.trim() || !newTeam.coach.trim() || !newTeam.logo_url.trim()} // Added disabled condition for logo_url
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Agregar Equipo
@@ -1605,6 +1672,17 @@ export default function AdminDashboard() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <Badge className="bg-primary">ID: {team.id}</Badge>
+                                  {/* Display team logo if available */}
+                                  {team.logo_url && (
+                                    <img
+                                      src={team.logo_url || "/placeholder.svg"}
+                                      alt={`${team.name} logo`}
+                                      className="w-8 h-8 rounded-full object-contain bg-white"
+                                      onError={(e) => {
+                                        e.currentTarget.src = "/placeholder.svg?height=32&width=32"
+                                      }}
+                                    />
+                                  )}
                                   <Button
                                     variant="outline"
                                     size="sm"

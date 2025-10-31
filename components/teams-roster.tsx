@@ -23,6 +23,7 @@ interface Team {
   id: number
   name: string
   coach: string
+  logo_url?: string
 }
 
 export default function TeamsRoster() {
@@ -107,12 +108,26 @@ export default function TeamsRoster() {
               {selectedTeam && (
                 <div className="space-y-4">
                   <div className="bg-primary/10 p-4 rounded-lg border border-primary/30">
-                    <h3 className="font-semibold text-lg">
-                      {teams.find((t) => t.id === Number.parseInt(selectedTeam))?.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      DT: {teams.find((t) => t.id === Number.parseInt(selectedTeam))?.coach}
-                    </p>
+                    <div className="flex items-center gap-4">
+                      {teams.find((t) => t.id === Number.parseInt(selectedTeam))?.logo_url && (
+                        <img
+                          src={teams.find((t) => t.id === Number.parseInt(selectedTeam))?.logo_url || ""}
+                          alt={teams.find((t) => t.id === Number.parseInt(selectedTeam))?.name}
+                          className="w-16 h-16 object-contain bg-white rounded-lg border border-primary/30"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none"
+                          }}
+                        />
+                      )}
+                      <div>
+                        <h3 className="font-semibold text-lg">
+                          {teams.find((t) => t.id === Number.parseInt(selectedTeam))?.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          DT: {teams.find((t) => t.id === Number.parseInt(selectedTeam))?.coach}
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   {currentTeamPlayers.length === 0 ? (
