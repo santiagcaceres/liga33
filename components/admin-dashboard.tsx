@@ -126,15 +126,19 @@ export default function AdminDashboard() {
   const [newsList, setNewsList] = useState<News[]>([])
   const [isLoadingNews, setIsLoadingNews] = useState(false)
 
-  useEffect(() => {
-    loadTeams()
-  }, [])
+  const [groups, setGroups] = useState<{ id: number; name: string }[]>([])
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false)
+  const [newGroupName, setNewGroupName] = useState("")
+  const [selectedGroupForAssignment, setSelectedGroupForAssignment] = useState("")
+  const [selectedTeamForAssignment, setSelectedTeamForAssignment] = useState("")
+  const [groupStandings, setGroupStandings] = useState<any[]>([])
 
   useEffect(() => {
-    if (activeTab === "players") {
-      loadPlayers()
-    }
-  }, [activeTab])
+    loadTeams()
+    loadGroups() // Load groups on mount
+  }, [])
+
+  // Players will be loaded only when needed
 
   useEffect(() => {
     if (activeTab === "news") {
@@ -190,6 +194,26 @@ export default function AdminDashboard() {
       })
     } finally {
       setIsLoadingNews(false)
+    }
+  }
+
+  const loadGroups = async () => {
+    setIsLoadingGroups(true)
+    try {
+      const { getGroups, getGroupStandings } = await import("@/lib/actions/groups")
+      const groupsData = await getGroups()
+      const standingsData = await getGroupStandings()
+      setGroups(groupsData)
+      setGroupStandings(standingsData)
+    } catch (error) {
+      console.error("[v0] Error loading groups:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los grupos",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingGroups(false)
     }
   }
 
@@ -388,8 +412,75 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim()) {
+      toast({
+        title: "Campo incompleto",
+        description: "Por favor ingresa el nombre del grupo",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const { createGroup } = await import("@/lib/actions/groups")
+      await createGroup(newGroupName.trim())
+
+      toast({
+        title: "¡Grupo creado exitosamente!",
+        description: `${newGroupName} ha sido creado`,
+        className: "bg-green-50 border-green-200",
+      })
+
+      setNewGroupName("")
+      await loadGroups()
+    } catch (error) {
+      console.error("[v0] Error creating group:", error)
+      toast({
+        title: "Error al crear grupo",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleAssignTeamToGroup = async () => {
+    if (!selectedTeamForAssignment || !selectedGroupForAssignment) {
+      toast({
+        title: "Campos incompletos",
+        description: "Por favor selecciona un equipo y un grupo",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const { assignTeamToGroup } = await import("@/lib/actions/groups")
+      await assignTeamToGroup(Number.parseInt(selectedTeamForAssignment), Number.parseInt(selectedGroupForAssignment))
+
+      const teamName = teams.find((t) => t.id === Number.parseInt(selectedTeamForAssignment))?.name
+      const groupName = groups.find((g) => g.id === Number.parseInt(selectedGroupForAssignment))?.name
+
+      toast({
+        title: "¡Equipo asignado exitosamente!",
+        description: `${teamName} ha sido asignado a ${groupName}`,
+        className: "bg-green-50 border-green-200",
+      })
+
+      setSelectedTeamForAssignment("")
+      setSelectedGroupForAssignment("")
+      await loadGroups()
+    } catch (error) {
+      console.error("[v0] Error assigning team to group:", error)
+      toast({
+        title: "Error al asignar equipo",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleAddPlayer = async () => {
-    // Validate that at least one team exists
     if (teams.length === 0) {
       toast({
         title: "No hay equipos disponibles",
@@ -434,7 +525,9 @@ export default function AdminDashboard() {
       })
 
       setNewPlayer({ name: "", team_id: "", cedula: "", age: "", number: "" })
-      await loadPlayers()
+      if (activeTab === "players") {
+        await loadPlayers()
+      }
     } catch (error) {
       console.error("[v0] Error creating player:", error)
       toast({
@@ -617,8 +710,9 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="news">Noticias</TabsTrigger>
+              <TabsTrigger value="groups">Grupos</TabsTrigger>
               <TabsTrigger value="results">Resultados</TabsTrigger>
               <TabsTrigger value="draw">Sorteo</TabsTrigger>
               <TabsTrigger value="teams">Equipos</TabsTrigger>
@@ -722,6 +816,141 @@ export default function AdminDashboard() {
                             </CardContent>
                           </Card>
                         ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="groups" className="space-y-6">
+              <Card className="border-primary/30 bg-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-primary">
+                    <Trophy className="w-5 h-5" />
+                    Gestión de Grupos
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Crea los grupos de la Copa Libertadores y asigna equipos a cada grupo
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Create Group Section */}
+                  <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
+                    <h3 className="font-semibold">Crear Nuevo Grupo</h3>
+                    <div className="flex gap-2">
+                      <Input
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        placeholder="Ej: Grupo A"
+                        className="flex-1"
+                      />
+                      <Button
+                        onClick={handleCreateGroup}
+                        className="bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                        disabled={!newGroupName.trim()}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Crear Grupo
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Assign Team to Group Section */}
+                  <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
+                    <h3 className="font-semibold">Asignar Equipo a Grupo</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Seleccionar Equipo</Label>
+                        <Select
+                          value={selectedTeamForAssignment}
+                          onValueChange={setSelectedTeamForAssignment}
+                          disabled={teams.length === 0}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar equipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teams.map((team) => (
+                              <SelectItem key={team.id} value={team.id.toString()}>
+                                {team.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Seleccionar Grupo</Label>
+                        <Select
+                          value={selectedGroupForAssignment}
+                          onValueChange={setSelectedGroupForAssignment}
+                          disabled={groups.length === 0}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar grupo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {groups.map((group) => (
+                              <SelectItem key={group.id} value={group.id.toString()}>
+                                {group.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={handleAssignTeamToGroup}
+                      className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                      disabled={!selectedTeamForAssignment || !selectedGroupForAssignment}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Asignar Equipo
+                    </Button>
+                  </div>
+
+                  {/* Display Groups and Teams */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Grupos Creados ({groups.length})</h3>
+                    {isLoadingGroups ? (
+                      <div className="text-center py-8 text-muted-foreground">Cargando grupos...</div>
+                    ) : groups.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Trophy className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
+                        <p>No hay grupos creados</p>
+                        <p className="text-sm">Crea grupos usando el formulario de arriba</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4">
+                        {groups.map((group) => {
+                          const teamsInGroup = groupStandings.filter((s: any) => s.copa_groups?.id === group.id)
+                          return (
+                            <Card key={group.id} className="border-primary/30">
+                              <CardHeader>
+                                <CardTitle className="text-lg">{group.name}</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                {teamsInGroup.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground">No hay equipos asignados</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {teamsInGroup.map((standing: any) => (
+                                      <div
+                                        key={standing.id}
+                                        className="flex items-center justify-between p-2 bg-background rounded border border-primary/20"
+                                      >
+                                        <span className="font-medium">{standing.teams?.name}</span>
+                                        <Badge className="bg-primary">
+                                          {standing.points} pts • {standing.played} PJ
+                                        </Badge>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
@@ -1416,6 +1645,15 @@ export default function AdminDashboard() {
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Agregar Jugador
+                  </Button>
+
+                  <Button
+                    onClick={loadPlayers}
+                    variant="outline"
+                    className="w-full border-primary/30 bg-transparent"
+                    disabled={isLoadingPlayers}
+                  >
+                    {isLoadingPlayers ? "Cargando..." : "Cargar Jugadores"}
                   </Button>
 
                   <div className="mt-6">

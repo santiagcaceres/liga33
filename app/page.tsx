@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Settings, Menu, X } from "lucide-react"
 import LoadingAnimation from "@/components/loading-animation"
@@ -14,8 +14,19 @@ import HomeSection from "@/components/home-section"
 
 export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true)
-  const [activeSection, setActiveSection] = useState("inicio")
+  const [activeSection, setActiveSection] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("activeSection") || "inicio"
+    }
+    return "inicio"
+  })
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("activeSection", activeSection)
+    }
+  }, [activeSection])
 
   if (isLoading) {
     return <LoadingAnimation onComplete={() => setIsLoading(false)} />
