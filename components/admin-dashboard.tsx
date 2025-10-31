@@ -37,6 +37,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { createTeam, getTeams } from "@/lib/actions/teams"
+import { createPlayer, getPlayers } from "@/lib/actions/players"
+import { createNews, getNews } from "@/lib/actions/news"
+import { useToast } from "@/hooks/use-toast"
 
 interface Match {
   id: number
@@ -47,11 +51,36 @@ interface Match {
   date: string
 }
 
+interface Team {
+  id: number
+  name: string
+  coach: string
+}
+
+interface Player {
+  id: number
+  name: string
+  cedula: string
+  number: number
+  age: number
+  team_id: number
+  teams?: { name: string }
+}
+
+interface News {
+  id: number
+  title: string
+  content: string
+  image: string
+  date: string
+}
+
 export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [activeTab, setActiveTab] = useState("results")
+  const { toast } = useToast()
 
   const [selectedRound, setSelectedRound] = useState("1")
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
@@ -80,27 +109,99 @@ export default function AdminDashboard() {
   const [homeRedCards, setHomeRedCards] = useState([{ player: "", minute: "" }])
   const [awayRedCards, setAwayRedCards] = useState([{ player: "", minute: "" }])
 
-  // Team management state
   const [newTeam, setNewTeam] = useState({ name: "", coach: "" })
+  const [teams, setTeams] = useState<Team[]>([])
+  const [isLoadingTeams, setIsLoadingTeams] = useState(false)
 
-  // Player management state
   const [newPlayer, setNewPlayer] = useState({
     name: "",
-    team: "",
+    team_id: "",
     cedula: "",
     age: "",
     number: "",
   })
+  const [players, setPlayers] = useState<Player[]>([])
+  const [isLoadingPlayers, setIsLoadingPlayers] = useState(false)
 
-  const teams: { id: string; name: string }[] = []
+  const [newsList, setNewsList] = useState<News[]>([])
+  const [isLoadingNews, setIsLoadingNews] = useState(false)
 
-  const players: Record<string, string[]> = {}
+  useEffect(() => {
+    loadTeams()
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === "players") {
+      loadPlayers()
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab === "news") {
+      loadNews()
+    }
+  }, [activeTab])
+
+  const loadTeams = async () => {
+    setIsLoadingTeams(true)
+    try {
+      const data = await getTeams()
+      setTeams(data)
+    } catch (error) {
+      console.error("[v0] Error loading teams:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los equipos",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingTeams(false)
+    }
+  }
+
+  const loadPlayers = async () => {
+    setIsLoadingPlayers(true)
+    try {
+      const data = await getPlayers()
+      setPlayers(data)
+    } catch (error) {
+      console.error("[v0] Error loading players:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los jugadores",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingPlayers(false)
+    }
+  }
+
+  const loadNews = async () => {
+    setIsLoadingNews(true)
+    try {
+      const data = await getNews()
+      setNewsList(data)
+    } catch (error) {
+      console.error("[v0] Error loading news:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las noticias",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingNews(false)
+    }
+  }
 
   const handleLogin = () => {
     if (password === "liga33admin") {
       setIsAuthenticated(true)
     } else {
-      alert("Contraseña incorrecta")
+      toast({
+        title: "Error",
+        description: "Contraseña incorrecta",
+        variant: "destructive",
+      })
     }
   }
 
@@ -221,9 +322,13 @@ export default function AdminDashboard() {
       homeRedCards,
       awayRedCards,
     })
-    alert("Resultado guardado exitosamente! Las estadísticas se actualizaron automáticamente.")
+
+    toast({
+      title: "Resultado guardado",
+      description: "Las estadísticas se actualizaron automáticamente",
+    })
+
     setShowResultConfirm(false)
-    // Reset form
     setSelectedMatchId(null)
     setHomeScore("")
     setAwayScore("")
@@ -239,7 +344,6 @@ export default function AdminDashboard() {
     const file = e.target.files?.[0]
     if (file) {
       setNewsImageFile(file)
-      // Create preview URL
       const reader = new FileReader()
       reader.onloadend = () => {
         setNewNews({ ...newNews, image: reader.result as string })
@@ -248,28 +352,154 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleAddTeam = () => {
-    console.log("[v0] Adding new team:", newTeam)
-    alert("Equipo agregado exitosamente!")
-    setNewTeam({ name: "", coach: "" })
+  const handleAddTeam = async () => {
+    // Validate all fields are filled
+    if (!newTeam.name.trim() || !newTeam.coach.trim()) {
+      toast({
+        title: "Campos incompletos",
+        description: "Por favor completa todos los campos antes de crear el equipo",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const formData = new FormData()
+      formData.append("name", newTeam.name.trim())
+      formData.append("coach", newTeam.coach.trim())
+
+      await createTeam(formData)
+
+      toast({
+        title: "¡Equipo creado exitosamente!",
+        description: `${newTeam.name} ha sido agregado a la base de datos`,
+        className: "bg-green-50 border-green-200",
+      })
+
+      setNewTeam({ name: "", coach: "" })
+      await loadTeams()
+    } catch (error) {
+      console.error("[v0] Error creating team:", error)
+      toast({
+        title: "Error al crear equipo",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleAddPlayer = () => {
-    console.log("[v0] Adding new player:", newPlayer)
-    alert("Jugador agregado exitosamente!")
-    setNewPlayer({ name: "", team: "", cedula: "", age: "", number: "" })
+  const handleAddPlayer = async () => {
+    // Validate that at least one team exists
+    if (teams.length === 0) {
+      toast({
+        title: "No hay equipos disponibles",
+        description: "Debes crear al menos un equipo antes de agregar jugadores",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate all fields are filled
+    if (
+      !newPlayer.name.trim() ||
+      !newPlayer.team_id ||
+      !newPlayer.cedula.trim() ||
+      !newPlayer.age ||
+      !newPlayer.number
+    ) {
+      toast({
+        title: "Campos incompletos",
+        description: "Por favor completa todos los campos antes de crear el jugador",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const formData = new FormData()
+      formData.append("name", newPlayer.name.trim())
+      formData.append("cedula", newPlayer.cedula.trim())
+      formData.append("number", newPlayer.number)
+      formData.append("age", newPlayer.age)
+      formData.append("team_id", newPlayer.team_id)
+
+      await createPlayer(formData)
+
+      const teamName = teams.find((t) => t.id === Number.parseInt(newPlayer.team_id))?.name || "el equipo"
+
+      toast({
+        title: "¡Jugador creado exitosamente!",
+        description: `${newPlayer.name} ha sido agregado a ${teamName}`,
+        className: "bg-green-50 border-green-200",
+      })
+
+      setNewPlayer({ name: "", team_id: "", cedula: "", age: "", number: "" })
+      await loadPlayers()
+    } catch (error) {
+      console.error("[v0] Error creating player:", error)
+      toast({
+        title: "Error al crear jugador",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleAddNews = () => {
-    console.log("[v0] Adding new news:", newNews)
-    alert("Noticia agregada exitosamente!")
-    setNewNews({ title: "", content: "", image: "", date: new Date().toISOString().split("T")[0] })
-    setNewsImageFile(null)
+  const handleAddNews = async () => {
+    // Validate all fields are filled
+    if (!newNews.title.trim() || !newNews.content.trim() || !newNews.image) {
+      toast({
+        title: "Campos incompletos",
+        description: "Por favor completa todos los campos antes de crear la noticia",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate max 4 news
+    if (newsList.length >= 4) {
+      toast({
+        title: "Límite alcanzado",
+        description: "Solo puedes tener un máximo de 4 noticias publicadas",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const formData = new FormData()
+      formData.append("title", newNews.title.trim())
+      formData.append("content", newNews.content.trim())
+      formData.append("image", newNews.image)
+      formData.append("date", newNews.date)
+
+      await createNews(formData)
+
+      toast({
+        title: "¡Noticia publicada exitosamente!",
+        description: `"${newNews.title}" ha sido agregada`,
+        className: "bg-green-50 border-green-200",
+      })
+
+      setNewNews({ title: "", content: "", image: "", date: new Date().toISOString().split("T")[0] })
+      setNewsImageFile(null)
+      await loadNews()
+    } catch (error) {
+      console.error("[v0] Error creating news:", error)
+      toast({
+        title: "Error al crear noticia",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
   }
 
   const performDraw = () => {
     console.log("[v0] Performing draw with real data from database")
-    alert("El sorteo se realizará con los datos reales de los clasificados una vez conectada la base de datos")
+    toast({
+      title: "Sorteo realizado",
+      description: "El sorteo se realizará con los datos reales de los clasificados",
+    })
     setShowDrawConfirm(false)
   }
 
@@ -362,7 +592,7 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Título de la Noticia</Label>
+                    <Label>Título de la Noticia *</Label>
                     <Input
                       value={newNews.title}
                       onChange={(e) => setNewNews({ ...newNews, title: e.target.value })}
@@ -371,7 +601,7 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Contenido</Label>
+                    <Label>Contenido *</Label>
                     <Textarea
                       value={newNews.content}
                       onChange={(e) => setNewNews({ ...newNews, content: e.target.value })}
@@ -390,7 +620,7 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Imagen Banner</Label>
+                    <Label>Imagen Banner *</Label>
                     <div className="flex gap-2">
                       <Input type="file" accept="image/*" onChange={handleNewsImageUpload} className="flex-1" />
                       <Button variant="outline" size="icon">
@@ -411,18 +641,43 @@ export default function AdminDashboard() {
                   <Button
                     onClick={handleAddNews}
                     className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                    disabled={!newNews.title || !newNews.content || !newNews.image}
+                    disabled={!newNews.title || !newNews.content || !newNews.image || newsList.length >= 4}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Agregar Noticia
                   </Button>
 
                   <div className="mt-6">
-                    <h3 className="font-semibold mb-3">Noticias Publicadas (0/4)</h3>
-                    <div className="text-center py-8 text-gray-500">
-                      <Newspaper className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p>No hay noticias publicadas</p>
-                    </div>
+                    <h3 className="font-semibold mb-3">Noticias Publicadas ({newsList.length}/4)</h3>
+                    {isLoadingNews ? (
+                      <div className="text-center py-8 text-muted-foreground">Cargando noticias...</div>
+                    ) : newsList.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Newspaper className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>No hay noticias publicadas</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4">
+                        {newsList.map((news) => (
+                          <Card key={news.id} className="border-primary/30">
+                            <CardContent className="p-4">
+                              <div className="flex gap-4">
+                                <img
+                                  src={news.image || "/placeholder.svg"}
+                                  alt={news.title}
+                                  className="w-24 h-24 object-cover rounded"
+                                />
+                                <div className="flex-1">
+                                  <h4 className="font-semibold">{news.title}</h4>
+                                  <p className="text-sm text-muted-foreground line-clamp-2">{news.content}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">{news.date}</p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -560,11 +815,15 @@ export default function AdminDashboard() {
                                       <SelectValue placeholder="Seleccionar jugador" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {players["deportivo-central"]?.map((player) => (
-                                        <SelectItem key={player} value={player}>
-                                          {player}
-                                        </SelectItem>
-                                      ))}
+                                      {players
+                                        .filter((p) =>
+                                          teams.some((t) => t.id === p.team_id && t.name === selectedMatch.home),
+                                        )
+                                        .map((player) => (
+                                          <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -616,11 +875,15 @@ export default function AdminDashboard() {
                                       <SelectValue placeholder="Seleccionar jugador" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {players["deportivo-central"]?.map((player) => (
-                                        <SelectItem key={player} value={player}>
-                                          {player}
-                                        </SelectItem>
-                                      ))}
+                                      {players
+                                        .filter((p) =>
+                                          teams.some((t) => t.id === p.team_id && t.name === selectedMatch.home),
+                                        )
+                                        .map((player) => (
+                                          <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -670,11 +933,15 @@ export default function AdminDashboard() {
                                       <SelectValue placeholder="Seleccionar jugador" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {players["deportivo-central"]?.map((player) => (
-                                        <SelectItem key={player} value={player}>
-                                          {player}
-                                        </SelectItem>
-                                      ))}
+                                      {players
+                                        .filter((p) =>
+                                          teams.some((t) => t.id === p.team_id && t.name === selectedMatch.home),
+                                        )
+                                        .map((player) => (
+                                          <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -724,11 +991,15 @@ export default function AdminDashboard() {
                                       <SelectValue placeholder="Seleccionar jugador" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {players["racing-fc"]?.map((player) => (
-                                        <SelectItem key={player} value={player}>
-                                          {player}
-                                        </SelectItem>
-                                      ))}
+                                      {players
+                                        .filter((p) =>
+                                          teams.some((t) => t.id === p.team_id && t.name === selectedMatch.away),
+                                        )
+                                        .map((player) => (
+                                          <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -780,11 +1051,15 @@ export default function AdminDashboard() {
                                       <SelectValue placeholder="Seleccionar jugador" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {players["racing-fc"]?.map((player) => (
-                                        <SelectItem key={player} value={player}>
-                                          {player}
-                                        </SelectItem>
-                                      ))}
+                                      {players
+                                        .filter((p) =>
+                                          teams.some((t) => t.id === p.team_id && t.name === selectedMatch.away),
+                                        )
+                                        .map((player) => (
+                                          <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -834,11 +1109,15 @@ export default function AdminDashboard() {
                                       <SelectValue placeholder="Seleccionar jugador" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {players["racing-fc"]?.map((player) => (
-                                        <SelectItem key={player} value={player}>
-                                          {player}
-                                        </SelectItem>
-                                      ))}
+                                      {players
+                                        .filter((p) =>
+                                          teams.some((t) => t.id === p.team_id && t.name === selectedMatch.away),
+                                        )
+                                        .map((player) => (
+                                          <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -930,7 +1209,7 @@ export default function AdminDashboard() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Nombre del Equipo</Label>
+                      <Label>Nombre del Equipo *</Label>
                       <Input
                         value={newTeam.name}
                         onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
@@ -938,7 +1217,7 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Director Técnico</Label>
+                      <Label>Director Técnico *</Label>
                       <Input
                         value={newTeam.coach}
                         onChange={(e) => setNewTeam({ ...newTeam, coach: e.target.value })}
@@ -950,19 +1229,39 @@ export default function AdminDashboard() {
                   <Button
                     onClick={handleAddTeam}
                     className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                    disabled={!newTeam.name || !newTeam.coach}
+                    disabled={!newTeam.name.trim() || !newTeam.coach.trim()}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Agregar Equipo
                   </Button>
 
                   <div className="mt-6">
-                    <h3 className="font-semibold mb-3">Equipos Registrados</h3>
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Users className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
-                      <p>No hay equipos registrados</p>
-                      <p className="text-sm">Agrega equipos usando el formulario de arriba</p>
-                    </div>
+                    <h3 className="font-semibold mb-3">Equipos Registrados ({teams.length})</h3>
+                    {isLoadingTeams ? (
+                      <div className="text-center py-8 text-muted-foreground">Cargando equipos...</div>
+                    ) : teams.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Users className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
+                        <p>No hay equipos registrados</p>
+                        <p className="text-sm">Agrega equipos usando el formulario de arriba</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {teams.map((team) => (
+                          <Card key={team.id} className="border-primary/30">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="font-semibold">{team.name}</h4>
+                                  <p className="text-sm text-muted-foreground">DT: {team.coach}</p>
+                                </div>
+                                <Badge className="bg-primary">ID: {team.id}</Badge>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -975,44 +1274,54 @@ export default function AdminDashboard() {
                     <Target className="w-5 h-5" />
                     Gestión de Jugadores
                   </CardTitle>
+                  {teams.length === 0 && (
+                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                      <AlertCircle className="w-5 h-5" />
+                      <p className="text-sm">Debes crear al menos un equipo antes de agregar jugadores</p>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label>Nombre Completo</Label>
+                      <Label>Nombre Completo *</Label>
                       <Input
                         value={newPlayer.name}
                         onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
                         placeholder="Ej: Carlos Rodríguez"
+                        disabled={teams.length === 0}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Cédula</Label>
+                      <Label>Cédula *</Label>
                       <Input
                         value={newPlayer.cedula}
                         onChange={(e) => setNewPlayer({ ...newPlayer, cedula: e.target.value })}
                         placeholder="Ej: 12345678"
+                        disabled={teams.length === 0}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Equipo</Label>
+                      <Label>Equipo *</Label>
                       <Select
-                        value={newPlayer.team}
-                        onValueChange={(value) => setNewPlayer({ ...newPlayer, team: value })}
+                        value={newPlayer.team_id}
+                        onValueChange={(value) => setNewPlayer({ ...newPlayer, team_id: value })}
+                        disabled={teams.length === 0}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar equipo" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="deportivo-central">Deportivo Central</SelectItem>
-                          <SelectItem value="racing-fc">Racing FC</SelectItem>
-                          <SelectItem value="unidos">Club Atlético Unidos</SelectItem>
-                          <SelectItem value="independiente">Independiente Sur</SelectItem>
+                          {teams.map((team) => (
+                            <SelectItem key={team.id} value={team.id.toString()}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Edad</Label>
+                      <Label>Edad *</Label>
                       <Input
                         type="number"
                         value={newPlayer.age}
@@ -1020,10 +1329,11 @@ export default function AdminDashboard() {
                         placeholder="25"
                         min="16"
                         max="45"
+                        disabled={teams.length === 0}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Número</Label>
+                      <Label>Número *</Label>
                       <Input
                         type="number"
                         value={newPlayer.number}
@@ -1031,6 +1341,7 @@ export default function AdminDashboard() {
                         placeholder="10"
                         min="1"
                         max="99"
+                        disabled={teams.length === 0}
                       />
                     </div>
                   </div>
@@ -1038,11 +1349,51 @@ export default function AdminDashboard() {
                   <Button
                     onClick={handleAddPlayer}
                     className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                    disabled={!newPlayer.name || !newPlayer.team || !newPlayer.cedula}
+                    disabled={
+                      teams.length === 0 ||
+                      !newPlayer.name.trim() ||
+                      !newPlayer.team_id ||
+                      !newPlayer.cedula.trim() ||
+                      !newPlayer.age ||
+                      !newPlayer.number
+                    }
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Agregar Jugador
                   </Button>
+
+                  <div className="mt-6">
+                    <h3 className="font-semibold mb-3">Jugadores Registrados ({players.length})</h3>
+                    {isLoadingPlayers ? (
+                      <div className="text-center py-8 text-muted-foreground">Cargando jugadores...</div>
+                    ) : players.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Target className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
+                        <p>No hay jugadores registrados</p>
+                        <p className="text-sm">Agrega jugadores usando el formulario de arriba</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {players.map((player) => (
+                          <Card key={player.id} className="border-primary/30">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-semibold">{player.name}</h4>
+                                    <Badge variant="outline">#{player.number}</Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">
+                                    {player.teams?.name} • CI: {player.cedula} • {player.age} años
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
