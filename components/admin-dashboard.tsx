@@ -786,7 +786,6 @@ export default function AdminDashboard() {
           >
             Ingresar
           </Button>
-          <p className="text-xs text-gray-500 text-center">Contraseña de prueba: liga33admin</p>
         </CardContent>
       </Card>
     )

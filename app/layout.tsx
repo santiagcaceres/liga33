@@ -7,9 +7,36 @@ import { Suspense } from "react"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Liga 33 - Gestión de Liga de Fútbol",
-  description: "Sistema de gestión para Liga 33 - Tablas de posiciones, fixtures, goleadores y más",
+  title: "Copa Libertadores - Liga 33",
+  description:
+    "Sigue toda la acción de la Copa Libertadores Liga 33 - Tablas de posiciones, fixtures, goleadores y más",
   generator: "v0.app",
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
+  openGraph: {
+    title: "Copa Libertadores - Liga 33",
+    description:
+      "Sigue toda la acción de la Copa Libertadores Liga 33 - Tablas de posiciones, fixtures, goleadores y más",
+    type: "website",
+    images: [
+      {
+        url: "/favicon.png",
+        width: 1200,
+        height: 1200,
+        alt: "Copa Libertadores Liga 33",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Copa Libertadores - Liga 33",
+    description:
+      "Sigue toda la acción de la Copa Libertadores Liga 33 - Tablas de posiciones, fixtures, goleadores y más",
+    images: ["/favicon.png"],
+  },
 }
 
 export default function RootLayout({
@@ -18,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="es">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
         <Suspense fallback={null}>{children}</Suspense>
         <Analytics />

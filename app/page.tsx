@@ -2,18 +2,29 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Settings, Menu, X } from "lucide-react"
+import { Menu, X } from "lucide-react"
 import LoadingAnimation from "@/components/loading-animation"
 import FixturesSystem from "@/components/fixtures-system"
 import TopScorers from "@/components/top-scorers"
-import AdminDashboard from "@/components/admin-dashboard"
 import WhatsAppButton from "@/components/whatsapp-button"
 import CopaLibertadores from "@/components/copa-libertadores"
 import TeamsRoster from "@/components/teams-roster"
 import HomeSection from "@/components/home-section"
 
 export default function HomePage() {
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window !== "undefined") {
+      const lastShown = localStorage.getItem("lastLoadingShown")
+      if (!lastShown) return true
+
+      const twentyMinutes = 20 * 60 * 1000 // 20 minutes in milliseconds
+      const timeSinceLastShown = Date.now() - Number.parseInt(lastShown, 10)
+
+      return timeSinceLastShown >= twentyMinutes
+    }
+    return true
+  })
+
   const [activeSection, setActiveSection] = useState<string>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("activeSection") || "inicio"
@@ -28,8 +39,15 @@ export default function HomePage() {
     }
   }, [activeSection])
 
+  const handleLoadingComplete = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("lastLoadingShown", Date.now().toString())
+    }
+    setIsLoading(false)
+  }
+
   if (isLoading) {
-    return <LoadingAnimation onComplete={() => setIsLoading(false)} />
+    return <LoadingAnimation onComplete={handleLoadingComplete} />
   }
 
   return (
@@ -97,14 +115,6 @@ export default function HomePage() {
               >
                 Goleadores
               </Button>
-              <Button
-                variant="ghost"
-                className="text-white hover:bg-primary/20 hover:text-primary text-sm lg:text-base"
-                onClick={() => setActiveSection("admin")}
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Admin
-              </Button>
             </nav>
           </div>
 
@@ -161,17 +171,6 @@ export default function HomePage() {
                 >
                   Goleadores
                 </Button>
-                <Button
-                  variant="ghost"
-                  className="text-white hover:bg-primary/20 hover:text-primary justify-start"
-                  onClick={() => {
-                    setActiveSection("admin")
-                    setIsMobileMenuOpen(false)
-                  }}
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Admin
-                </Button>
               </div>
             </nav>
           )}
@@ -202,13 +201,13 @@ export default function HomePage() {
         </section>
       )}
 
-      {activeSection === "admin" && (
+      {/* {activeSection === "admin" && (
         <section className="py-8 md:py-12">
           <div className="container mx-auto px-4">
             <AdminDashboard />
           </div>
         </section>
-      )}
+      )} */}
 
       {activeSection === "goleadores" && (
         <section className="py-8 md:py-12">
