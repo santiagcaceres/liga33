@@ -1,31 +1,58 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Trophy } from "lucide-react"
+import { getGroups, getGroupStandings } from "@/lib/actions/groups"
 
 interface TeamStanding {
-  pos: number
-  team: string
-  pj: number
-  pg: number
-  pe: number
-  pp: number
-  gf: number
-  gc: number
-  dif: number
-  pts: number
+  id: number
+  team_id: number
+  group_id: number
+  played: number
+  won: number
+  drawn: number
+  lost: number
+  goals_for: number
+  goals_against: number
+  goal_difference: number
+  points: number
+  teams?: { id: number; name: string }
+  copa_groups?: { id: number; name: string }
+}
+
+interface Group {
+  id: number
+  name: string
 }
 
 export default function CopaLibertadores() {
-  const [activeGroup, setActiveGroup] = useState("A")
+  const [activeGroup, setActiveGroup] = useState<string>("")
+  const [groups, setGroups] = useState<Group[]>([])
+  const [standings, setStandings] = useState<TeamStanding[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const groups = {
-    A: [] as TeamStanding[],
-    B: [] as TeamStanding[],
-    C: [] as TeamStanding[],
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    setIsLoading(true)
+    try {
+      const [groupsData, standingsData] = await Promise.all([getGroups(), getGroupStandings()])
+      setGroups(groupsData)
+      setStandings(standingsData)
+
+      if (groupsData.length > 0 && !activeGroup) {
+        setActiveGroup(groupsData[0].id.toString())
+      }
+    } catch (error) {
+      console.error("[v0] Error loading Copa Libertadores data:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const getPositionColor = (pos: number) => {
@@ -38,8 +65,16 @@ export default function CopaLibertadores() {
     return ""
   }
 
-  const renderGroupTable = (teams: TeamStanding[]) => {
-    if (teams.length === 0) {
+  const renderGroupTable = (groupId: number) => {
+    const groupStandings = standings
+      .filter((s) => s.group_id === groupId)
+      .sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points
+        if (b.goal_difference !== a.goal_difference) return b.goal_difference - a.goal_difference
+        return b.goals_for - a.goals_for
+      })
+
+    if (groupStandings.length === 0) {
       return (
         <div className="text-center py-12 text-muted-foreground">
           <Trophy className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary" />
@@ -69,102 +104,129 @@ export default function CopaLibertadores() {
               </tr>
             </thead>
             <tbody>
-              {teams.map((team) => (
-                <tr
-                  key={team.pos}
-                  className={`border-b border-primary/20 hover:bg-primary/5 transition-colors ${
-                    team.pos <= 2 ? "bg-green-50" : ""
-                  }`}
-                >
-                  <td className="p-2">
-                    <Badge
-                      className={`${getPositionColor(team.pos)} w-8 h-8 rounded-full flex items-center justify-center`}
-                    >
-                      {team.pos}
-                    </Badge>
-                  </td>
-                  <td className="p-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{team.team}</span>
-                      {team.pos <= 2 && <Badge className="bg-green-600 text-xs">{getPositionBadge(team.pos)}</Badge>}
-                    </div>
-                  </td>
-                  <td className="text-center p-2">{team.pj}</td>
-                  <td className="text-center p-2">{team.pg}</td>
-                  <td className="text-center p-2">{team.pe}</td>
-                  <td className="text-center p-2">{team.pp}</td>
-                  <td className="text-center p-2">{team.gf}</td>
-                  <td className="text-center p-2">{team.gc}</td>
-                  <td className="text-center p-2">
-                    <span
-                      className={
-                        team.dif > 0 ? "text-green-600 font-semibold" : team.dif < 0 ? "text-red-600 font-semibold" : ""
-                      }
-                    >
-                      {team.dif > 0 ? `+${team.dif}` : team.dif}
-                    </span>
-                  </td>
-                  <td className="text-center p-2">
-                    <span className="font-bold text-primary">{team.pts}</span>
-                  </td>
-                </tr>
-              ))}
+              {groupStandings.map((team, index) => {
+                const pos = index + 1
+                return (
+                  <tr
+                    key={team.id}
+                    className={`border-b border-primary/20 hover:bg-primary/5 transition-colors ${
+                      pos <= 2 ? "bg-green-50" : ""
+                    }`}
+                  >
+                    <td className="p-2">
+                      <Badge
+                        className={`${getPositionColor(pos)} w-8 h-8 rounded-full flex items-center justify-center`}
+                      >
+                        {pos}
+                      </Badge>
+                    </td>
+                    <td className="p-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{team.teams?.name}</span>
+                        {pos <= 2 && <Badge className="bg-green-600 text-xs">{getPositionBadge(pos)}</Badge>}
+                      </div>
+                    </td>
+                    <td className="text-center p-2">{team.played}</td>
+                    <td className="text-center p-2">{team.won}</td>
+                    <td className="text-center p-2">{team.drawn}</td>
+                    <td className="text-center p-2">{team.lost}</td>
+                    <td className="text-center p-2">{team.goals_for}</td>
+                    <td className="text-center p-2">{team.goals_against}</td>
+                    <td className="text-center p-2">
+                      <span
+                        className={
+                          team.goal_difference > 0
+                            ? "text-green-600 font-semibold"
+                            : team.goal_difference < 0
+                              ? "text-red-600 font-semibold"
+                              : ""
+                        }
+                      >
+                        {team.goal_difference > 0 ? `+${team.goal_difference}` : team.goal_difference}
+                      </span>
+                    </td>
+                    <td className="text-center p-2">
+                      <span className="font-bold text-primary">{team.points}</span>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
 
         {/* Mobile view */}
         <div className="md:hidden space-y-3">
-          {teams.map((team) => (
-            <Card key={team.pos} className={`border-primary/30 ${team.pos <= 2 ? "bg-green-50 border-green-300" : ""}`}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <Badge
-                      className={`${getPositionColor(team.pos)} w-8 h-8 rounded-full flex items-center justify-center`}
-                    >
-                      {team.pos}
-                    </Badge>
+          {groupStandings.map((team, index) => {
+            const pos = index + 1
+            return (
+              <Card key={team.id} className={`border-primary/30 ${pos <= 2 ? "bg-green-50 border-green-300" : ""}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <Badge
+                        className={`${getPositionColor(pos)} w-8 h-8 rounded-full flex items-center justify-center`}
+                      >
+                        {pos}
+                      </Badge>
+                      <div>
+                        <div className="font-semibold">{team.teams?.name}</div>
+                        {pos <= 2 && <Badge className="bg-green-600 text-xs mt-1">{getPositionBadge(pos)}</Badge>}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-primary">{team.points}</div>
+                      <div className="text-xs text-gray-500">puntos</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-center text-sm">
                     <div>
-                      <div className="font-semibold">{team.team}</div>
-                      {team.pos <= 2 && (
-                        <Badge className="bg-green-600 text-xs mt-1">{getPositionBadge(team.pos)}</Badge>
-                      )}
+                      <div className="text-gray-500 text-xs">PJ</div>
+                      <div className="font-semibold">{team.played}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500 text-xs">PG</div>
+                      <div className="font-semibold text-green-600">{team.won}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500 text-xs">GF-GC</div>
+                      <div className="font-semibold">
+                        {team.goals_for}-{team.goals_against}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500 text-xs">DIF</div>
+                      <div
+                        className={`font-semibold ${team.goal_difference > 0 ? "text-green-600" : team.goal_difference < 0 ? "text-red-600" : ""}`}
+                      >
+                        {team.goal_difference > 0 ? `+${team.goal_difference}` : team.goal_difference}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-primary">{team.pts}</div>
-                    <div className="text-xs text-gray-500">puntos</div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 gap-2 text-center text-sm">
-                  <div>
-                    <div className="text-gray-500 text-xs">PJ</div>
-                    <div className="font-semibold">{team.pj}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-500 text-xs">PG</div>
-                    <div className="font-semibold text-green-600">{team.pg}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-500 text-xs">GF-GC</div>
-                    <div className="font-semibold">
-                      {team.gf}-{team.gc}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-gray-500 text-xs">DIF</div>
-                    <div
-                      className={`font-semibold ${team.dif > 0 ? "text-green-600" : team.dif < 0 ? "text-red-600" : ""}`}
-                    >
-                      {team.dif > 0 ? `+${team.dif}` : team.dif}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-12">
+        <Trophy className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary animate-pulse" />
+        <p className="text-lg text-muted-foreground">Cargando Copa Libertadores...</p>
+      </div>
+    )
+  }
+
+  if (groups.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Trophy className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary" />
+        <p className="text-lg text-muted-foreground">No hay grupos creados</p>
+        <p className="text-sm text-muted-foreground">El administrador debe crear los grupos de la Copa Libertadores</p>
       </div>
     )
   }
@@ -182,38 +244,24 @@ export default function CopaLibertadores() {
       </Card>
 
       <Tabs value={activeGroup} onValueChange={setActiveGroup} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="A">Grupo A</TabsTrigger>
-          <TabsTrigger value="B">Grupo B</TabsTrigger>
-          <TabsTrigger value="C">Grupo C</TabsTrigger>
+        <TabsList className={`grid w-full grid-cols-${groups.length}`}>
+          {groups.map((group) => (
+            <TabsTrigger key={group.id} value={group.id.toString()}>
+              {group.name}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="A" className="mt-6">
-          <Card className="border-primary/30">
-            <CardHeader>
-              <CardTitle className="text-xl">Grupo A</CardTitle>
-            </CardHeader>
-            <CardContent>{renderGroupTable(groups.A)}</CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="B" className="mt-6">
-          <Card className="border-primary/30">
-            <CardHeader>
-              <CardTitle className="text-xl">Grupo B</CardTitle>
-            </CardHeader>
-            <CardContent>{renderGroupTable(groups.B)}</CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="C" className="mt-6">
-          <Card className="border-primary/30">
-            <CardHeader>
-              <CardTitle className="text-xl">Grupo C</CardTitle>
-            </CardHeader>
-            <CardContent>{renderGroupTable(groups.C)}</CardContent>
-          </Card>
-        </TabsContent>
+        {groups.map((group) => (
+          <TabsContent key={group.id} value={group.id.toString()} className="mt-6">
+            <Card className="border-primary/30">
+              <CardHeader>
+                <CardTitle className="text-xl">{group.name}</CardTitle>
+              </CardHeader>
+              <CardContent>{renderGroupTable(group.id)}</CardContent>
+            </Card>
+          </TabsContent>
+        ))}
       </Tabs>
 
       {/* Leyenda */}

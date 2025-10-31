@@ -136,6 +136,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadTeams()
     loadGroups() // Load groups on mount
+    loadPlayers()
   }, [])
 
   // Players will be loaded only when needed
@@ -525,9 +526,7 @@ export default function AdminDashboard() {
       })
 
       setNewPlayer({ name: "", team_id: "", cedula: "", age: "", number: "" })
-      if (activeTab === "players") {
-        await loadPlayers()
-      }
+      await loadPlayers()
     } catch (error) {
       console.error("[v0] Error creating player:", error)
       toast({
@@ -1645,15 +1644,6 @@ export default function AdminDashboard() {
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Agregar Jugador
-                  </Button>
-
-                  <Button
-                    onClick={loadPlayers}
-                    variant="outline"
-                    className="w-full border-primary/30 bg-transparent"
-                    disabled={isLoadingPlayers}
-                  >
-                    {isLoadingPlayers ? "Cargando..." : "Cargar Jugadores"}
                   </Button>
 
                   <div className="mt-6">
