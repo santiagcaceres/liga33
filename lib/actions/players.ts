@@ -4,65 +4,86 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 export async function createPlayer(formData: FormData) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const name = formData.get("name") as string
-  const cedula = formData.get("cedula") as string
-  const number = Number.parseInt(formData.get("number") as string)
-  const age = Number.parseInt(formData.get("age") as string)
-  const team_id = Number.parseInt(formData.get("team_id") as string)
+    const name = formData.get("name") as string
+    const cedula = formData.get("cedula") as string
+    const number = Number.parseInt(formData.get("number") as string)
+    const age = Number.parseInt(formData.get("age") as string)
+    const team_id = Number.parseInt(formData.get("team_id") as string)
 
-  console.log("[v0] Creating player with data:", {
-    name,
-    cedula,
-    number,
-    age,
-    team_id,
-    team_id_type: typeof team_id,
-    team_id_isNaN: Number.isNaN(team_id),
-  })
+    console.log("[v0] Creating player with data:", {
+      name,
+      cedula,
+      number,
+      age,
+      team_id,
+    })
 
-  if (Number.isNaN(team_id) || team_id <= 0) {
-    console.error("[v0] Invalid team_id:", team_id)
-    throw new Error("ID de equipo inválido. Por favor selecciona un equipo válido.")
+    // Validate team_id
+    if (Number.isNaN(team_id) || team_id <= 0) {
+      console.error("[v0] Invalid team_id:", team_id)
+      return {
+        success: false,
+        error: "ID de equipo inválido. Por favor selecciona un equipo válido.",
+      }
+    }
+
+    // Check if team exists
+    const { data: teamExists, error: teamError } = await supabase.from("teams").select("id").eq("id", team_id).single()
+
+    if (teamError || !teamExists) {
+      console.error("[v0] Team not found:", team_id, teamError)
+      return {
+        success: false,
+        error: `El equipo con ID ${team_id} no existe. Por favor recarga la página e intenta nuevamente.`,
+      }
+    }
+
+    console.log("[v0] Team exists, proceeding with player creation")
+
+    // Insert player
+    const { data, error } = await supabase
+      .from("players")
+      .insert([
+        {
+          name,
+          cedula,
+          number,
+          age,
+          team_id,
+          goals: 0,
+          yellow_cards: 0,
+          red_cards: 0,
+          suspended: false,
+        },
+      ])
+      .select()
+      .single()
+
+    if (error) {
+      console.error("[v0] Error creating player:", error)
+      return {
+        success: false,
+        error: error.message || "Error al crear el jugador",
+      }
+    }
+
+    console.log("[v0] Player created successfully:", data)
+
+    revalidatePath("/")
+    return {
+      success: true,
+      data,
+    }
+  } catch (error) {
+    console.error("[v0] Unexpected error creating player:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error inesperado al crear el jugador",
+    }
   }
-
-  const { data: teamExists, error: teamError } = await supabase.from("teams").select("id").eq("id", team_id).single()
-
-  if (teamError || !teamExists) {
-    console.error("[v0] Team not found:", team_id, teamError)
-    throw new Error(`El equipo con ID ${team_id} no existe. Por favor recarga la página e intenta nuevamente.`)
-  }
-
-  console.log("[v0] Team exists, proceeding with player creation")
-
-  const { data, error } = await supabase
-    .from("players")
-    .insert([
-      {
-        name,
-        cedula,
-        number,
-        age,
-        team_id,
-        goals: 0,
-        yellow_cards: 0,
-        red_cards: 0,
-        suspended: false,
-      },
-    ])
-    .select()
-    .single()
-
-  if (error) {
-    console.error("[v0] Error creating player:", error)
-    throw new Error(error.message)
-  }
-
-  console.log("[v0] Player created successfully:", data)
-
-  revalidatePath("/")
-  return data
 }
 
 export async function getPlayers(teamId?: number) {

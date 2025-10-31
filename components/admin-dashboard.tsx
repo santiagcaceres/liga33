@@ -564,7 +564,16 @@ export default function AdminDashboard() {
       formData.append("team_id", newPlayer.team_id)
 
       console.log("[v0] Calling createPlayer with formData")
-      await createPlayer(formData)
+      const result = await createPlayer(formData)
+
+      if (!result.success) {
+        toast({
+          title: "❌ Error al crear jugador",
+          description: result.error || "Ocurrió un error inesperado",
+          variant: "destructive",
+        })
+        return
+      }
 
       const teamName = selectedTeam.name
 
