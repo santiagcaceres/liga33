@@ -10,42 +10,31 @@ export async function createPlayer(formData: FormData) {
     const name = formData.get("name") as string
     const cedula = formData.get("cedula") as string
     const numberStr = formData.get("number") as string
-    const ageStr = formData.get("age") as string
     const teamIdStr = formData.get("team_id") as string
 
     const number = Number.parseInt(numberStr, 10)
-    const age = Number.parseInt(ageStr, 10)
     const team_id = Number.parseInt(teamIdStr, 10)
 
-    console.log("[v0] Attempting to create player with data:", {
+    console.log("[v0] Creating player with data:", {
       name,
       cedula,
       number,
-      age,
       team_id,
-      team_id_type: typeof team_id,
     })
 
-    // Validate all numeric fields
-    if (Number.isNaN(team_id) || team_id <= 0) {
-      console.error("[v0] Invalid team_id:", teamIdStr, "->", team_id)
+    // Validate numeric fields
+    if (isNaN(team_id) || team_id <= 0) {
+      console.error("[v0] Invalid team_id:", teamIdStr)
       return {
         success: false,
-        error: "ID de equipo inválido. Por favor selecciona un equipo válido.",
+        error: "ID de equipo inválido",
       }
     }
 
-    if (Number.isNaN(number) || number <= 0) {
+    if (isNaN(number) || number <= 0) {
       return {
         success: false,
-        error: "Número de camiseta inválido.",
-      }
-    }
-
-    if (Number.isNaN(age) || age <= 0) {
-      return {
-        success: false,
-        error: "Edad inválida.",
+        error: "Número de camiseta inválido",
       }
     }
 
@@ -56,51 +45,45 @@ export async function createPlayer(formData: FormData) {
       console.error("[v0] Team not found:", team_id, teamError)
       return {
         success: false,
-        error: `El equipo con ID ${team_id} no existe. Por favor recarga la página e intenta nuevamente.`,
+        error: `El equipo no existe`,
       }
     }
 
-    console.log("[v0] Team exists, proceeding with player creation")
-
-    // Insert player
     const { data, error } = await supabase
       .from("players")
-      .insert([
-        {
-          name: name.trim(),
-          cedula: cedula.trim(),
-          number,
-          age,
-          team_id,
-          goals: 0,
-          yellow_cards: 0,
-          red_cards: 0,
-          suspended: false,
-        },
-      ])
+      .insert({
+        name: name.trim(),
+        cedula: cedula.trim(),
+        number,
+        team_id,
+        goals: 0,
+        yellow_cards: 0,
+        red_cards: 0,
+        suspended: false,
+      })
       .select()
       .single()
 
     if (error) {
-      console.error("[v0] Error creating player:", error)
+      console.error("[v0] Database error creating player:", error)
       return {
         success: false,
-        error: error.message || "Error al crear el jugador",
+        error: `Error de base de datos: ${error.message}`,
       }
     }
 
     console.log("[v0] Player created successfully:", data)
-
     revalidatePath("/")
+
     return {
       success: true,
       data,
     }
   } catch (error) {
-    console.error("[v0] Unexpected error creating player:", error)
+    console.error("[v0] Unexpected error:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Error inesperado al crear el jugador",
+      error: error instanceof Error ? error.message : "Error inesperado",
     }
   }
 }

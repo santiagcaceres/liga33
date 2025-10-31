@@ -110,15 +110,15 @@ export default function AdminDashboard() {
   const [homeRedCards, setHomeRedCards] = useState([{ player: "", minute: "" }])
   const [awayRedCards, setAwayRedCards] = useState([{ player: "", minute: "" }])
 
-  const [newTeam, setNewTeam] = useState({ name: "", coach: "", logo_url: "" }) // Added logo_url to newTeam state
+  const [newTeam, setNewTeam] = useState({ name: "", coach: "", logo_url: "" })
   const [teams, setTeams] = useState<Team[]>([])
   const [isLoadingTeams, setIsLoadingTeams] = useState(false)
+  const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null)
 
   const [newPlayer, setNewPlayer] = useState({
     name: "",
     team_id: "",
     cedula: "",
-    age: "",
     number: "",
   })
   const [players, setPlayers] = useState<Player[]>([])
@@ -378,13 +378,33 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleTeamLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast({
+          title: "❌ Archivo inválido",
+          description: "Por favor selecciona una imagen JPG",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setTeamLogoFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setNewTeam({ ...newTeam, logo_url: reader.result as string })
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
   const handleAddTeam = async () => {
-    // Validate all fields are filled
-    if (!newTeam.name.trim() || !newTeam.coach.trim() || !newTeam.logo_url.trim()) {
-      // Added check for logo_url
+    if (!newTeam.name.trim() || !newTeam.coach.trim() || !newTeam.logo_url) {
       toast({
         title: "❌ Campos incompletos",
-        description: "Por favor completa todos los campos incluyendo la foto del equipo", // Updated description
+        description: "Por favor completa todos los campos incluyendo la foto del equipo",
         variant: "destructive",
       })
       return
@@ -394,7 +414,7 @@ export default function AdminDashboard() {
       const formData = new FormData()
       formData.append("name", newTeam.name.trim())
       formData.append("coach", newTeam.coach.trim())
-      formData.append("logo_url", newTeam.logo_url.trim())
+      formData.append("logo_url", newTeam.logo_url)
 
       await createTeam(formData)
 
@@ -405,6 +425,7 @@ export default function AdminDashboard() {
       })
 
       setNewTeam({ name: "", coach: "", logo_url: "" })
+      setTeamLogoFile(null)
       await loadTeams()
     } catch (error) {
       console.error("[v0] Error creating team:", error)
@@ -550,14 +571,7 @@ export default function AdminDashboard() {
       return
     }
 
-    // Validate all fields are filled
-    if (
-      !newPlayer.name.trim() ||
-      !newPlayer.team_id ||
-      !newPlayer.cedula.trim() ||
-      !newPlayer.age ||
-      !newPlayer.number
-    ) {
+    if (!newPlayer.name.trim() || !newPlayer.team_id || !newPlayer.cedula.trim() || !newPlayer.number) {
       toast({
         title: "❌ Campos incompletos",
         description: "Por favor completa todos los campos antes de crear el jugador",
@@ -570,12 +584,11 @@ export default function AdminDashboard() {
       name: newPlayer.name,
       cedula: newPlayer.cedula,
       number: newPlayer.number,
-      age: newPlayer.age,
       team_id: newPlayer.team_id,
       team_id_type: typeof newPlayer.team_id,
     })
 
-    const selectedTeam = teams.find((t) => t.id === Number.parseInt(newPlayer.team_id))
+    const selectedTeam = teams.find((t) => t.id === Number.parseInt(newPlayer.team_id, 10))
     console.log("[v0] Selected team:", selectedTeam)
     console.log("[v0] Available teams:", teams)
 
@@ -593,7 +606,6 @@ export default function AdminDashboard() {
       formData.append("name", newPlayer.name.trim())
       formData.append("cedula", newPlayer.cedula.trim())
       formData.append("number", newPlayer.number)
-      formData.append("age", newPlayer.age)
       formData.append("team_id", newPlayer.team_id)
 
       console.log("[v0] Calling createPlayer with formData")
@@ -616,7 +628,7 @@ export default function AdminDashboard() {
         className: "bg-green-50 border-green-200",
       })
 
-      setNewPlayer({ name: "", team_id: "", cedula: "", age: "", number: "" })
+      setNewPlayer({ name: "", team_id: "", cedula: "", number: "" })
       await loadPlayers()
     } catch (error) {
       console.error("[v0] Error creating player:", error)
@@ -1619,14 +1631,19 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Foto del Equipo (URL) *</Label>
-                    <Input
-                      value={newTeam.logo_url}
-                      onChange={(e) => setNewTeam({ ...newTeam, logo_url: e.target.value })}
-                      placeholder="https://ejemplo.com/logo-equipo.jpg"
-                      type="url"
-                    />
-                    <p className="text-xs text-muted-foreground">Ingresa la URL de la foto del equipo en formato JPG</p>
+                    <Label>Foto del Equipo (JPG) *</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="file"
+                        accept="image/jpeg,image/jpg"
+                        onChange={handleTeamLogoUpload}
+                        className="flex-1"
+                      />
+                      <Button variant="outline" size="icon" disabled>
+                        <Upload className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Selecciona una imagen JPG desde tu computadora</p>
                     {newTeam.logo_url && (
                       <div className="mt-2 w-24 h-24 border border-primary/30 rounded-lg overflow-hidden">
                         <img
@@ -1644,7 +1661,7 @@ export default function AdminDashboard() {
                   <Button
                     onClick={handleAddTeam}
                     className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                    disabled={!newTeam.name.trim() || !newTeam.coach.trim() || !newTeam.logo_url.trim()} // Added disabled condition for logo_url
+                    disabled={!newTeam.name.trim() || !newTeam.coach.trim() || !newTeam.logo_url}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Agregar Equipo
@@ -1718,7 +1735,7 @@ export default function AdminDashboard() {
                   )}
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="space-y-2">
                       <Label>Nombre Completo *</Label>
                       <Input
@@ -1757,18 +1774,6 @@ export default function AdminDashboard() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Edad *</Label>
-                      <Input
-                        type="number"
-                        value={newPlayer.age}
-                        onChange={(e) => setNewPlayer({ ...newPlayer, age: e.target.value })}
-                        placeholder="25"
-                        min="16"
-                        max="45"
-                        disabled={teams.length === 0}
-                      />
-                    </div>
-                    <div className="space-y-2">
                       <Label>Número *</Label>
                       <Input
                         type="number"
@@ -1790,7 +1795,6 @@ export default function AdminDashboard() {
                       !newPlayer.name.trim() ||
                       !newPlayer.team_id ||
                       !newPlayer.cedula.trim() ||
-                      !newPlayer.age ||
                       !newPlayer.number
                     }
                   >
@@ -1820,7 +1824,7 @@ export default function AdminDashboard() {
                                     <Badge variant="outline">#{player.number}</Badge>
                                   </div>
                                   <p className="text-sm text-muted-foreground">
-                                    {player.teams?.name} • CI: {player.cedula} • {player.age} años
+                                    {player.teams?.name} • CI: {player.cedula}
                                   </p>
                                 </div>
                                 <Button
