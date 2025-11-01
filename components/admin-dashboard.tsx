@@ -45,10 +45,12 @@ import { createPlayer, getPlayers, deletePlayer } from "@/lib/actions/players"
 import { createNews, getNews, deleteNews } from "@/lib/actions/news"
 import { useToast } from "@/hooks/use-toast"
 import { createMatch, getMatches, deleteMatch, updateMatchResult } from "@/lib/actions/matches" // Import match actions
+import MatchDetailsDisplay from "@/components/match-details-display" // Fixed import to match kebab-case filename
+import { createClient } from "@/lib/supabase/client" // Fixed import path from utils to lib
 
 interface Match {
   id: number
-  round: number
+  round: number | string // Allow string for playoff rounds
   group: string
   home: string
   away: string
@@ -61,8 +63,8 @@ interface Match {
   home_score?: number
   away_score?: number
   played?: boolean
-  home_team?: { name: string; id: number }
-  away_team?: { name: string; id: number }
+  home_team?: { name: string; id: number; ci: string } // Added CI to player interface for fetching
+  away_team?: { name: string; id: number; ci: string } // Added CI to player interface for fetching
   copa_groups?: { name: string; id: number }
 }
 
@@ -80,6 +82,7 @@ interface Player {
   number: number
   age: number
   team_id: number
+  ci?: string // Added CI to player interface
   teams?: { name: string }
 }
 
@@ -167,6 +170,16 @@ export default function AdminDashboard() {
     match_date: "",
   })
   const [selectedGroupForMatch, setSelectedGroupForMatch] = useState("")
+
+  const loadMatchDetails = async (matchId: number) => {
+    const supabase = await createClient()
+
+    const { data: goals } = await supabase.from("goals").select("*, players(name, ci)").eq("match_id", matchId)
+
+    const { data: cards } = await supabase.from("cards").select("*, players(name, ci)").eq("match_id", matchId)
+
+    return { goals: goals || [], cards: cards || [] }
+  }
 
   useEffect(() => {
     loadTeams()
@@ -1634,6 +1647,7 @@ export default function AdminDashboard() {
                                                 day: "numeric",
                                               })}
                                             </p>
+                                            {match.played && <MatchDetailsDisplay matchId={match.id} />}
                                           </div>
                                           <Button
                                             variant="outline"
@@ -1642,6 +1656,12 @@ export default function AdminDashboard() {
                                               handleDeleteMatch(match.id, match.home_team?.name, match.away_team?.name)
                                             }
                                             className="border-red-300 text-red-600 hover:bg-red-50"
+                                            disabled={match.played}
+                                            title={
+                                              match.played
+                                                ? "No se puede eliminar un partido ya jugado"
+                                                : "Eliminar partido"
+                                            }
                                           >
                                             <Trash2 className="w-4 h-4" />
                                           </Button>
@@ -1682,61 +1702,113 @@ export default function AdminDashboard() {
                   ) : (
                     <>
                       <div className="space-y-2">
-                        <Label>Seleccionar Fecha</Label>
-                        <Select
-                          value={selectedRound}
-                          onValueChange={(value) => {
-                            setSelectedRound(value)
-                            setSelectedMatchId(null)
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar fecha" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {/* Dynamically generate SelectItems based on available rounds */}
-                            {Array.from(new Set(matches.map((m) => m.round))).map((round) => (
-                              <SelectItem key={round} value={round.toString()}>
+                        <Label className="text-base font-semibold">Seleccionar Fecha</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {Array.from(new Set(matches.map((m) => m.round)))
+                            .sort((a, b) => a - b)
+                            .map((round) => (
+                              <Button
+                                key={round}
+                                variant={selectedRound === round.toString() ? "default" : "outline"}
+                                className={
+                                  selectedRound === round.toString()
+                                    ? "bg-gradient-to-r from-primary to-primary/80"
+                                    : "border-primary/30"
+                                }
+                                onClick={() => {
+                                  setSelectedRound(round.toString())
+                                  setSelectedMatchId(null)
+                                }}
+                              >
                                 Fecha {round}
-                              </SelectItem>
+                              </Button>
                             ))}
-                          </SelectContent>
-                        </Select>
+                          <Button
+                            variant={selectedRound === "cuartos" ? "default" : "outline"}
+                            className={
+                              selectedRound === "cuartos"
+                                ? "bg-gradient-to-r from-primary to-primary/80"
+                                : "border-primary/30"
+                            }
+                            onClick={() => {
+                              setSelectedRound("cuartos")
+                              setSelectedMatchId(null)
+                            }}
+                          >
+                            Cuartos de Final
+                          </Button>
+                          <Button
+                            variant={selectedRound === "semi" ? "default" : "outline"}
+                            className={
+                              selectedRound === "semi"
+                                ? "bg-gradient-to-r from-primary to-primary/80"
+                                : "border-primary/30"
+                            }
+                            onClick={() => {
+                              setSelectedRound("semi")
+                              setSelectedMatchId(null)
+                            }}
+                          >
+                            Semifinales
+                          </Button>
+                          <Button
+                            variant={selectedRound === "final" ? "default" : "outline"}
+                            className={
+                              selectedRound === "final"
+                                ? "bg-gradient-to-r from-primary to-primary/80"
+                                : "border-primary/30"
+                            }
+                            onClick={() => {
+                              setSelectedRound("final")
+                              setSelectedMatchId(null)
+                            }}
+                          >
+                            Final
+                          </Button>
+                        </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label>Seleccionar Partido</Label>
-                        <div className="grid gap-2">
-                          {roundMatches.map((match) => (
-                            <Button
-                              key={match.id}
-                              variant={selectedMatchId === match.id ? "default" : "outline"}
-                              className={`w-full justify-start h-auto py-3 ${
-                                selectedMatchId === match.id
-                                  ? "bg-gradient-to-r from-primary to-primary/80"
-                                  : "border-primary/30"
-                              }`}
-                              onClick={() => setSelectedMatchId(match.id)}
-                            >
-                              <div className="flex flex-col items-start w-full">
-                                <div className="flex items-center justify-between w-full">
-                                  <span className="font-semibold">
-                                    {match.home_team?.name} vs {match.away_team?.name}
-                                  </span>
-                                  <Badge variant="outline" className="ml-2">
-                                    Grupo {match.copa_groups?.name}
-                                  </Badge>
-                                  {match.played && (
-                                    <Badge className="bg-green-600 text-xs">
-                                      {match.home_score} - {match.away_score}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <span className="text-xs opacity-80">{match.date}</span>
+                      <div className="space-y-4">
+                        <Label className="text-base font-semibold">Seleccionar Partido</Label>
+                        {Array.from(new Set(roundMatches.map((m) => m.copa_groups?.name)))
+                          .filter(Boolean)
+                          .map((groupName) => (
+                            <div key={groupName} className="space-y-2">
+                              <h4 className="text-sm font-semibold text-primary">{groupName}</h4>
+                              <div className="grid gap-2">
+                                {roundMatches
+                                  .filter((m) => m.copa_groups?.name === groupName)
+                                  .map((match) => (
+                                    <Button
+                                      key={match.id}
+                                      variant={selectedMatchId === match.id ? "default" : "outline"}
+                                      className={`w-full justify-start h-auto py-3 ${
+                                        selectedMatchId === match.id
+                                          ? "bg-gradient-to-r from-primary to-primary/80"
+                                          : "border-primary/30"
+                                      }`}
+                                      onClick={() => setSelectedMatchId(match.id)}
+                                    >
+                                      <div className="flex flex-col items-start w-full">
+                                        <div className="flex items-center justify-between w-full">
+                                          <span className="font-semibold">
+                                            {match.home_team?.name} vs {match.away_team?.name}
+                                          </span>
+                                          {match.played && (
+                                            <Badge className="bg-green-600 text-xs ml-2">
+                                              {match.home_score} - {match.away_score}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        <span className="text-xs opacity-80">
+                                          {new Date(match.match_date).toLocaleDateString("es-ES")}
+                                        </span>
+                                      </div>
+                                    </Button>
+                                  ))}
                               </div>
-                            </Button>
+                            </div>
                           ))}
-                        </div>
                       </div>
 
                       {selectedMatch && (
