@@ -64,7 +64,8 @@ export default function HomePage() {
               <img src="/logo-liga33.png" alt="Liga 33" className="w-20 h-20 md:w-28 md:h-28 object-contain" />
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold leading-tight text-primary">Liga 33</h1>
-                <p className="text-gray-300 text-sm md:text-base">Sábados 17:00-21:00</p>
+                <p className="text-sm md:text-base text-primary/80 font-semibold">Copa Libertadores</p>
+                <p className="text-gray-300 text-xs md:text-sm">Sábados 17:00-21:00</p>
               </div>
             </button>
 

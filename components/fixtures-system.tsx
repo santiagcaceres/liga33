@@ -70,6 +70,12 @@ export default function FixturesSystem() {
     loadMatches()
   }, [])
 
+  const formatTime = (time: string | undefined) => {
+    if (!time) return null
+    // Si el formato es HH:MM:SS, extraer solo HH:MM
+    return time.substring(0, 5)
+  }
+
   if (loading) {
     return (
       <Card className="border-primary/30 bg-card">
@@ -122,62 +128,68 @@ export default function FixturesSystem() {
                       .map((match) => (
                         <Card key={match.id} className="border-primary/30 bg-primary/5">
                           <CardContent className="p-4">
-                            <div className="flex items-center justify-between gap-4">
-                              <div className="flex items-center gap-3 flex-1">
-                                {match.home_team.logo_url && (
-                                  <img
-                                    src={match.home_team.logo_url || "/placeholder.svg"}
-                                    alt={match.home_team.name}
-                                    className="w-12 h-12 object-contain"
-                                  />
-                                )}
-                                <span className="font-semibold text-sm md:text-base">{match.home_team.name}</span>
-                              </div>
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                              {/* Equipos y VS */}
+                              <div className="flex items-center justify-between md:justify-start gap-2 md:gap-4 flex-1">
+                                {/* Equipo Local */}
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  {match.home_team.logo_url && (
+                                    <img
+                                      src={match.home_team.logo_url || "/placeholder.svg"}
+                                      alt={match.home_team.name}
+                                      className="w-10 h-10 md:w-12 md:h-12 object-contain flex-shrink-0"
+                                    />
+                                  )}
+                                  <span className="font-semibold text-xs md:text-base truncate">
+                                    {match.home_team.name}
+                                  </span>
+                                </div>
 
-                              <div className="flex items-center gap-2">
-                                <span className="text-primary font-bold text-lg">VS</span>
-                                <Badge variant="outline" className="text-xs">
-                                  {match.copa_groups.name}
-                                </Badge>
-                              </div>
+                                {/* VS */}
+                                <span className="text-primary font-bold text-sm md:text-lg flex-shrink-0 px-2">VS</span>
 
-                              <div className="flex items-center gap-3 flex-1 justify-end">
-                                <span className="font-semibold text-sm md:text-base text-right">
-                                  {match.away_team.name}
-                                </span>
-                                {match.away_team.logo_url && (
-                                  <img
-                                    src={match.away_team.logo_url || "/placeholder.svg"}
-                                    alt={match.away_team.name}
-                                    className="w-12 h-12 object-contain"
-                                  />
-                                )}
+                                {/* Equipo Visitante */}
+                                <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
+                                  <span className="font-semibold text-xs md:text-base text-right truncate">
+                                    {match.away_team.name}
+                                  </span>
+                                  {match.away_team.logo_url && (
+                                    <img
+                                      src={match.away_team.logo_url || "/placeholder.svg"}
+                                      alt={match.away_team.name}
+                                      className="w-10 h-10 md:w-12 md:h-12 object-contain flex-shrink-0"
+                                    />
+                                  )}
+                                </div>
                               </div>
                             </div>
 
-                            <div className="mt-3 flex flex-wrap gap-3 text-sm text-muted-foreground">
+                            <div className="mt-3 flex flex-wrap gap-2 md:gap-3 text-xs md:text-sm text-muted-foreground">
                               <div className="flex items-center gap-1">
-                                <Calendar className="w-4 h-4" />
+                                <Calendar className="w-3 h-3 md:w-4 md:h-4" />
                                 <span>
                                   {new Date(match.match_date).toLocaleDateString("es-ES", {
-                                    weekday: "long",
+                                    weekday: "short",
                                     day: "numeric",
-                                    month: "long",
+                                    month: "short",
                                   })}
                                 </span>
                               </div>
                               {match.match_time && (
                                 <div className="flex items-center gap-1">
-                                  <Clock className="w-4 h-4" />
-                                  <span>{match.match_time}</span>
+                                  <Clock className="w-3 h-3 md:w-4 md:h-4" />
+                                  <span>{formatTime(match.match_time)}</span>
                                 </div>
                               )}
                               {match.field && (
                                 <div className="flex items-center gap-1">
-                                  <MapPin className="w-4 h-4" />
+                                  <MapPin className="w-3 h-3 md:w-4 md:h-4" />
                                   <span>{match.field}</span>
                                 </div>
                               )}
+                              <Badge variant="outline" className="text-xs">
+                                {match.copa_groups.name}
+                              </Badge>
                             </div>
                           </CardContent>
                         </Card>
