@@ -24,9 +24,10 @@ export default function FixturesSystem() {
 
   useEffect(() => {
     const loadMatches = async () => {
-      const supabase = await createClient()
+      console.log("[v0] Loading matches for fixtures...")
+      const supabase = createClient()
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("matches")
         .select(
           `
@@ -44,6 +45,12 @@ export default function FixturesSystem() {
         .order("match_date", { ascending: true })
         .order("round", { ascending: true })
 
+      if (error) {
+        console.error("[v0] Error loading matches:", error)
+      } else {
+        console.log("[v0] Matches loaded:", { total: data?.length || 0, matches: data })
+      }
+
       setMatches(data || [])
       setLoading(false)
     }
@@ -52,6 +59,7 @@ export default function FixturesSystem() {
   }, [])
 
   const upcomingMatches = matches.filter((m) => !m.played)
+  console.log("[v0] Upcoming matches:", { total: upcomingMatches.length, matches: upcomingMatches })
 
   if (loading) {
     return (
@@ -76,7 +84,9 @@ export default function FixturesSystem() {
           <div className="text-center py-12 text-muted-foreground">
             <Calendar className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary" />
             <p className="text-lg">No hay partidos próximos</p>
-            <p className="text-sm">Todos los partidos han sido jugados</p>
+            <p className="text-sm">
+              {matches.length === 0 ? "No hay partidos creados aún" : "Todos los partidos han sido jugados"}
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -173,7 +173,12 @@ export async function updateMatchResult(
           continue
         }
 
-        console.log("[v0] Found player by CI:", { ci: card.player_ci, playerId: player.id })
+        console.log("[v0] Found player by CI:", {
+          ci: card.player_ci,
+          playerId: player.id,
+          currentYellowCards: player.yellow_cards,
+          currentRedCards: player.red_cards,
+        })
 
         const { error: cardError } = await supabase.from("cards").insert({
           match_id: matchId,
@@ -188,24 +193,46 @@ export async function updateMatchResult(
           continue
         }
 
-        console.log("[v0] Card inserted successfully")
+        console.log("[v0] Card inserted successfully for player:", player.id)
 
         const updates: any = {}
 
         if (card.card_type === "yellow") {
           const newYellowCards = (player.yellow_cards || 0) + 1
           updates.yellow_cards = newYellowCards
+          console.log("[v0] Updating yellow cards:", {
+            playerId: player.id,
+            oldCount: player.yellow_cards,
+            newCount: newYellowCards,
+          })
 
           if (newYellowCards >= 2) {
             updates.suspended = true
+            console.log("[v0] Player suspended due to 2 yellow cards:", player.id)
           }
         } else if (card.card_type === "red") {
-          updates.red_cards = (player.red_cards || 0) + 1
+          const newRedCards = (player.red_cards || 0) + 1
+          updates.red_cards = newRedCards
           updates.suspended = true
+          console.log("[v0] Updating red cards and suspending player:", {
+            playerId: player.id,
+            oldCount: player.red_cards,
+            newCount: newRedCards,
+          })
         }
 
-        console.log("[v0] Updating player cards:", { playerId: player.id, updates })
-        await supabase.from("players").update(updates).eq("id", player.id)
+        console.log("[v0] About to update player with:", { playerId: player.id, updates })
+        const { error: updateError, data: updatedPlayer } = await supabase
+          .from("players")
+          .update(updates)
+          .eq("id", player.id)
+          .select()
+
+        if (updateError) {
+          console.error("[v0] ERROR updating player cards:", { playerId: player.id, error: updateError })
+        } else {
+          console.log("[v0] Player cards updated successfully:", { playerId: player.id, updatedData: updatedPlayer })
+        }
       }
     }
 
