@@ -490,19 +490,18 @@ export default function AdminDashboard() {
     const calculatedHomeScore = homeGoals.filter((g) => g.player).length
     const calculatedAwayScore = awayGoals.filter((g) => g.player).length
 
-    const extractPlayerCI = (playerString: string): string | null => {
-      const match = playerString.match(/CI:\s*(\d+)/)
-      const ci = match ? match[1] : null
-      console.log("[v0] Extracting CI from:", playerString, "Result:", ci)
-      return ci
+    const getPlayerCI = (playerId: string): string | null => {
+      const player = players.find((p) => p.id.toString() === playerId)
+      console.log("[v0] Getting CI for player ID:", playerId, "Found:", player?.ci)
+      return player?.ci || null
     }
 
     const goalsData = [
       ...homeGoals
         .filter((g) => g.player && g.minute)
         .map((g) => {
-          const player_ci = extractPlayerCI(g.player)
-          console.log("[v0] Processing home goal:", { player: g.player, player_ci, minute: g.minute })
+          const player_ci = getPlayerCI(g.player)
+          console.log("[v0] Processing home goal:", { playerId: g.player, player_ci, minute: g.minute })
           return {
             player_ci: player_ci!,
             team_id: selectedMatch.home_team_id,
@@ -512,8 +511,8 @@ export default function AdminDashboard() {
       ...awayGoals
         .filter((g) => g.player && g.minute)
         .map((g) => {
-          const player_ci = extractPlayerCI(g.player)
-          console.log("[v0] Processing away goal:", { player: g.player, player_ci, minute: g.minute })
+          const player_ci = getPlayerCI(g.player)
+          console.log("[v0] Processing away goal:", { playerId: g.player, player_ci, minute: g.minute })
           return {
             player_ci: player_ci!,
             team_id: selectedMatch.away_team_id,
@@ -526,48 +525,48 @@ export default function AdminDashboard() {
       ...homeYellowCards
         .filter((c) => c.player && c.minute)
         .map((c) => {
-          const player_ci = extractPlayerCI(c.player)
-          console.log("[v0] Processing home yellow card:", { player: c.player, player_ci, minute: c.minute })
+          const player_ci = getPlayerCI(c.player)
+          console.log("[v0] Processing home yellow card:", { playerId: c.player, player_ci, minute: c.minute })
           return {
             player_ci: player_ci!,
             team_id: selectedMatch.home_team_id,
-            card_type: "yellow",
+            card_type: "yellow" as const,
             minute: Number.parseInt(c.minute),
           }
         }),
       ...awayYellowCards
         .filter((c) => c.player && c.minute)
         .map((c) => {
-          const player_ci = extractPlayerCI(c.player)
-          console.log("[v0] Processing away yellow card:", { player: c.player, player_ci, minute: c.minute })
+          const player_ci = getPlayerCI(c.player)
+          console.log("[v0] Processing away yellow card:", { playerId: c.player, player_ci, minute: c.minute })
           return {
             player_ci: player_ci!,
             team_id: selectedMatch.away_team_id,
-            card_type: "yellow",
+            card_type: "yellow" as const,
             minute: Number.parseInt(c.minute),
           }
         }),
       ...homeRedCards
         .filter((c) => c.player && c.minute)
         .map((c) => {
-          const player_ci = extractPlayerCI(c.player)
-          console.log("[v0] Processing home red card:", { player: c.player, player_ci, minute: c.minute })
+          const player_ci = getPlayerCI(c.player)
+          console.log("[v0] Processing home red card:", { playerId: c.player, player_ci, minute: c.minute })
           return {
             player_ci: player_ci!,
             team_id: selectedMatch.home_team_id,
-            card_type: "red",
+            card_type: "red" as const,
             minute: Number.parseInt(c.minute),
           }
         }),
       ...awayRedCards
         .filter((c) => c.player && c.minute)
         .map((c) => {
-          const player_ci = extractPlayerCI(c.player)
-          console.log("[v0] Processing away red card:", { player: c.player, player_ci, minute: c.minute })
+          const player_ci = getPlayerCI(c.player)
+          console.log("[v0] Processing away red card:", { playerId: c.player, player_ci, minute: c.minute })
           return {
             player_ci: player_ci!,
             team_id: selectedMatch.away_team_id,
-            card_type: "red",
+            card_type: "red" as const,
             minute: Number.parseInt(c.minute),
           }
         }),
@@ -1811,397 +1810,416 @@ export default function AdminDashboard() {
                           ))}
                       </div>
 
-                      {selectedMatch && (
-                        <>
-                          <div className="p-4 bg-primary/10 rounded-lg border border-primary/30">
-                            <h3 className="font-semibold text-lg text-center mb-2">
-                              {selectedMatch.home_team?.name} vs {selectedMatch.away_team?.name}
-                            </h3>
-                            <p className="text-sm text-center text-muted-foreground">
-                              Fecha {selectedMatch.round} - Grupo {selectedMatch.copa_groups?.name}
+                      {selectedMatch && selectedMatch.played ? (
+                        <div className="space-y-4">
+                          <div className="p-4 bg-muted/50 rounded-lg border border-primary/30">
+                            <p className="text-center text-muted-foreground mb-4">
+                              Este partido ya ha finalizado. No se pueden agregar más goles o tarjetas.
                             </p>
+                            <MatchDetailsDisplay matchId={selectedMatch.id} />
                           </div>
-
-                          {/* Goleadores Local */}
-                          <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/30">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold text-primary">
-                                ⚽ Goleadores {selectedMatch.home_team?.name}
-                              </Label>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addIncident("goal", "home")}
-                                className="border-primary/30 text-primary hover:bg-primary/10"
-                              >
-                                <Plus className="w-4 h-4 mr-1" />
-                                Agregar Gol
-                              </Button>
+                        </div>
+                      ) : (
+                        selectedMatch && (
+                          <>
+                            <div className="p-4 bg-primary/10 rounded-lg border border-primary/30">
+                              <h3 className="font-semibold text-lg text-center mb-2">
+                                {selectedMatch.home_team?.name} vs {selectedMatch.away_team?.name}
+                              </h3>
+                              <p className="text-sm text-center text-muted-foreground">
+                                Fecha {selectedMatch.round} - Grupo {selectedMatch.copa_groups?.name}
+                              </p>
                             </div>
-                            {homeGoals.map((goal, index) => (
-                              <div key={index} className="flex gap-2 items-end">
-                                <div className="flex-1">
-                                  <Select
-                                    value={goal.player}
-                                    onValueChange={(value) => updateIncident("goal", "home", index, "player", value)}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Seleccionar jugador" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {players
-                                        .filter((p) =>
-                                          teams.some(
-                                            (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
-                                          ),
-                                        )
-                                        .map((player) => (
-                                          <SelectItem key={player.id} value={`${player.name} (CI: ${player.ci})`}>
-                                            {player.name} - CI: {player.ci}
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="w-20">
-                                  <Input
-                                    placeholder="Min"
-                                    value={goal.minute}
-                                    onChange={(e) => updateIncident("goal", "home", index, "minute", e.target.value)}
-                                  />
-                                </div>
+
+                            {/* Goleadores Local */}
+                            <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/30">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-base font-semibold text-primary">
+                                  ⚽ Goleadores {selectedMatch.home_team?.name}
+                                </Label>
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => removeIncident("goal", "home", index)}
-                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                  onClick={() => addIncident("goal", "home")}
+                                  className="border-primary/30 text-primary hover:bg-primary/10"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Agregar Gol
                                 </Button>
                               </div>
-                            ))}
-                          </div>
-
-                          {/* Tarjetas Amarillas Local */}
-                          <div className="space-y-3 p-4 bg-yellow-500/5 rounded-lg border border-yellow-500/30">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold text-yellow-500">
-                                🟨 Tarjetas Amarillas {selectedMatch.home_team?.name}
-                              </Label>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addIncident("yellow", "home")}
-                                className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
-                              >
-                                <Plus className="w-4 h-4 mr-1" />
-                                Agregar Amarilla
-                              </Button>
-                            </div>
-                            {homeYellowCards.map((card, index) => (
-                              <div key={index} className="flex gap-2 items-end">
-                                <div className="flex-1">
-                                  <Select
-                                    value={card.player}
-                                    onValueChange={(value) => updateIncident("yellow", "home", index, "player", value)}
+                              {homeGoals.map((goal, index) => (
+                                <div key={index} className="flex gap-2 items-end">
+                                  <div className="flex-1">
+                                    <Select
+                                      value={goal.player}
+                                      onValueChange={(value) => updateIncident("goal", "home", index, "player", value)}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Seleccionar jugador" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {players
+                                          .filter((p) =>
+                                            teams.some(
+                                              (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
+                                            ),
+                                          )
+                                          .map((player) => (
+                                            <SelectItem key={player.id} value={player.id.toString()}>
+                                              {player.name}
+                                            </SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="w-20">
+                                    <Input
+                                      placeholder="Min"
+                                      value={goal.minute}
+                                      onChange={(e) => updateIncident("goal", "home", index, "minute", e.target.value)}
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeIncident("goal", "home", index)}
+                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                   >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Seleccionar jugador" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {players
-                                        .filter((p) =>
-                                          teams.some(
-                                            (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
-                                          ),
-                                        )
-                                        .map((player) => (
-                                          <SelectItem key={player.id} value={`${player.name} (CI: ${player.ci})`}>
-                                            {player.name} - CI: {player.ci}
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
                                 </div>
-                                <div className="w-20">
-                                  <Input
-                                    placeholder="Min"
-                                    value={card.minute}
-                                    onChange={(e) => updateIncident("yellow", "home", index, "minute", e.target.value)}
-                                  />
-                                </div>
+                              ))}
+                            </div>
+
+                            {/* Tarjetas Amarillas Local */}
+                            <div className="space-y-3 p-4 bg-yellow-500/5 rounded-lg border border-yellow-500/30">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-base font-semibold text-yellow-500">
+                                  🟨 Tarjetas Amarillas {selectedMatch.home_team?.name}
+                                </Label>
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => removeIncident("yellow", "home", index)}
-                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                  onClick={() => addIncident("yellow", "home")}
+                                  className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Agregar Amarilla
                                 </Button>
                               </div>
-                            ))}
-                          </div>
-
-                          {/* Tarjetas Rojas Local */}
-                          <div className="space-y-3 p-4 bg-red-500/5 rounded-lg border border-red-500/30">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold text-red-500">
-                                🟥 Tarjetas Rojas {selectedMatch.home_team?.name}
-                              </Label>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addIncident("red", "home")}
-                                className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                              >
-                                <Plus className="w-4 h-4 mr-1" />
-                                Agregar Roja
-                              </Button>
-                            </div>
-                            {homeRedCards.map((card, index) => (
-                              <div key={index} className="flex gap-2 items-end">
-                                <div className="flex-1">
-                                  <Select
-                                    value={card.player}
-                                    onValueChange={(value) => updateIncident("red", "home", index, "player", value)}
+                              {homeYellowCards.map((card, index) => (
+                                <div key={index} className="flex gap-2 items-end">
+                                  <div className="flex-1">
+                                    <Select
+                                      value={card.player}
+                                      onValueChange={(value) =>
+                                        updateIncident("yellow", "home", index, "player", value)
+                                      }
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Seleccionar jugador" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {players
+                                          .filter((p) =>
+                                            teams.some(
+                                              (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
+                                            ),
+                                          )
+                                          .map((player) => (
+                                            <SelectItem key={player.id} value={player.id.toString()}>
+                                              {player.name}
+                                            </SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="w-20">
+                                    <Input
+                                      placeholder="Min"
+                                      value={card.minute}
+                                      onChange={(e) =>
+                                        updateIncident("yellow", "home", index, "minute", e.target.value)
+                                      }
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeIncident("yellow", "home", index)}
+                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                   >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Seleccionar jugador" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {players
-                                        .filter((p) =>
-                                          teams.some(
-                                            (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
-                                          ),
-                                        )
-                                        .map((player) => (
-                                          <SelectItem key={player.id} value={`${player.name} (CI: ${player.ci})`}>
-                                            {player.name} - CI: {player.ci}
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
                                 </div>
-                                <div className="w-20">
-                                  <Input
-                                    placeholder="Min"
-                                    value={card.minute}
-                                    onChange={(e) => updateIncident("red", "home", index, "minute", e.target.value)}
-                                  />
-                                </div>
+                              ))}
+                            </div>
+
+                            {/* Tarjetas Rojas Local */}
+                            <div className="space-y-3 p-4 bg-red-500/5 rounded-lg border border-red-500/30">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-base font-semibold text-red-500">
+                                  🟥 Tarjetas Rojas {selectedMatch.home_team?.name}
+                                </Label>
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => removeIncident("red", "home", index)}
+                                  onClick={() => addIncident("red", "home")}
                                   className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Agregar Roja
                                 </Button>
                               </div>
-                            ))}
-                          </div>
-
-                          {/* Goleadores Visitante */}
-                          <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/30">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold text-primary">
-                                ⚽ Goleadores {selectedMatch.away_team?.name}
-                              </Label>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addIncident("goal", "away")}
-                                className="border-primary/30 text-primary hover:bg-primary/10"
-                              >
-                                <Plus className="w-4 h-4 mr-1" />
-                                Agregar Gol
-                              </Button>
-                            </div>
-                            {awayGoals.map((goal, index) => (
-                              <div key={index} className="flex gap-2 items-end">
-                                <div className="flex-1">
-                                  <Select
-                                    value={goal.player}
-                                    onValueChange={(value) => updateIncident("goal", "away", index, "player", value)}
+                              {homeRedCards.map((card, index) => (
+                                <div key={index} className="flex gap-2 items-end">
+                                  <div className="flex-1">
+                                    <Select
+                                      value={card.player}
+                                      onValueChange={(value) => updateIncident("red", "home", index, "player", value)}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Seleccionar jugador" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {players
+                                          .filter((p) =>
+                                            teams.some(
+                                              (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
+                                            ),
+                                          )
+                                          .map((player) => (
+                                            <SelectItem key={player.id} value={player.id.toString()}>
+                                              {player.name}
+                                            </SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="w-20">
+                                    <Input
+                                      placeholder="Min"
+                                      value={card.minute}
+                                      onChange={(e) => updateIncident("red", "home", index, "minute", e.target.value)}
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeIncident("red", "home", index)}
+                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                   >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Seleccionar jugador" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {players
-                                        .filter((p) =>
-                                          teams.some(
-                                            (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
-                                          ),
-                                        )
-                                        .map((player) => (
-                                          <SelectItem key={player.id} value={`${player.name} (CI: ${player.ci})`}>
-                                            {player.name} - CI: {player.ci}
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
                                 </div>
-                                <div className="w-20">
-                                  <Input
-                                    placeholder="Min"
-                                    value={goal.minute}
-                                    onChange={(e) => updateIncident("goal", "away", index, "minute", e.target.value)}
-                                  />
-                                </div>
+                              ))}
+                            </div>
+
+                            {/* Goleadores Visitante */}
+                            <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/30">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-base font-semibold text-primary">
+                                  ⚽ Goleadores {selectedMatch.away_team?.name}
+                                </Label>
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => removeIncident("goal", "away", index)}
-                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                  onClick={() => addIncident("goal", "away")}
+                                  className="border-primary/30 text-primary hover:bg-primary/10"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Agregar Gol
                                 </Button>
                               </div>
-                            ))}
-                          </div>
-
-                          {/* Tarjetas Amarillas Visitante */}
-                          <div className="space-y-3 p-4 bg-yellow-500/5 rounded-lg border border-yellow-500/30">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold text-yellow-500">
-                                🟨 Tarjetas Amarillas {selectedMatch.away_team?.name}
-                              </Label>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addIncident("yellow", "away")}
-                                className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
-                              >
-                                <Plus className="w-4 h-4 mr-1" />
-                                Agregar Amarilla
-                              </Button>
-                            </div>
-                            {awayYellowCards.map((card, index) => (
-                              <div key={index} className="flex gap-2 items-end">
-                                <div className="flex-1">
-                                  <Select
-                                    value={card.player}
-                                    onValueChange={(value) => updateIncident("yellow", "away", index, "player", value)}
+                              {awayGoals.map((goal, index) => (
+                                <div key={index} className="flex gap-2 items-end">
+                                  <div className="flex-1">
+                                    <Select
+                                      value={goal.player}
+                                      onValueChange={(value) => updateIncident("goal", "away", index, "player", value)}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Seleccionar jugador" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {players
+                                          .filter((p) =>
+                                            teams.some(
+                                              (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
+                                            ),
+                                          )
+                                          .map((player) => (
+                                            <SelectItem key={player.id} value={player.id.toString()}>
+                                              {player.name}
+                                            </SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="w-20">
+                                    <Input
+                                      placeholder="Min"
+                                      value={goal.minute}
+                                      onChange={(e) => updateIncident("goal", "away", index, "minute", e.target.value)}
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeIncident("goal", "away", index)}
+                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                   >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Seleccionar jugador" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {players
-                                        .filter((p) =>
-                                          teams.some(
-                                            (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
-                                          ),
-                                        )
-                                        .map((player) => (
-                                          <SelectItem key={player.id} value={`${player.name} (CI: ${player.ci})`}>
-                                            {player.name} - CI: {player.ci}
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
                                 </div>
-                                <div className="w-20">
-                                  <Input
-                                    placeholder="Min"
-                                    value={card.minute}
-                                    onChange={(e) => updateIncident("yellow", "away", index, "minute", e.target.value)}
-                                  />
-                                </div>
+                              ))}
+                            </div>
+
+                            {/* Tarjetas Amarillas Visitante */}
+                            <div className="space-y-3 p-4 bg-yellow-500/5 rounded-lg border border-yellow-500/30">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-base font-semibold text-yellow-500">
+                                  🟨 Tarjetas Amarillas {selectedMatch.away_team?.name}
+                                </Label>
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => removeIncident("yellow", "away", index)}
-                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                  onClick={() => addIncident("yellow", "away")}
+                                  className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Agregar Amarilla
                                 </Button>
                               </div>
-                            ))}
-                          </div>
-
-                          {/* Tarjetas Rojas Visitante */}
-                          <div className="space-y-3 p-4 bg-red-500/5 rounded-lg border border-red-500/30">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold text-red-500">
-                                🟥 Tarjetas Rojas {selectedMatch.away_team?.name}
-                              </Label>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addIncident("red", "away")}
-                                className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                              >
-                                <Plus className="w-4 h-4 mr-1" />
-                                Agregar Roja
-                              </Button>
-                            </div>
-                            {awayRedCards.map((card, index) => (
-                              <div key={index} className="flex gap-2 items-end">
-                                <div className="flex-1">
-                                  <Select
-                                    value={card.player}
-                                    onValueChange={(value) => updateIncident("red", "away", index, "player", value)}
+                              {awayYellowCards.map((card, index) => (
+                                <div key={index} className="flex gap-2 items-end">
+                                  <div className="flex-1">
+                                    <Select
+                                      value={card.player}
+                                      onValueChange={(value) =>
+                                        updateIncident("yellow", "away", index, "player", value)
+                                      }
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Seleccionar jugador" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {players
+                                          .filter((p) =>
+                                            teams.some(
+                                              (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
+                                            ),
+                                          )
+                                          .map((player) => (
+                                            <SelectItem key={player.id} value={player.id.toString()}>
+                                              {player.name}
+                                            </SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="w-20">
+                                    <Input
+                                      placeholder="Min"
+                                      value={card.minute}
+                                      onChange={(e) =>
+                                        updateIncident("yellow", "away", index, "minute", e.target.value)
+                                      }
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeIncident("yellow", "away", index)}
+                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                   >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Seleccionar jugador" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {players
-                                        .filter((p) =>
-                                          teams.some(
-                                            (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
-                                          ),
-                                        )
-                                        .map((player) => (
-                                          <SelectItem key={player.id} value={`${player.name} (CI: ${player.ci})`}>
-                                            {player.name} - CI: {player.ci}
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
                                 </div>
-                                <div className="w-20">
-                                  <Input
-                                    placeholder="Min"
-                                    value={card.minute}
-                                    onChange={(e) => updateIncident("red", "away", index, "minute", e.target.value)}
-                                  />
-                                </div>
+                              ))}
+                            </div>
+
+                            {/* Tarjetas Rojas Visitante */}
+                            <div className="space-y-3 p-4 bg-red-500/5 rounded-lg border border-red-500/30">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-base font-semibold text-red-500">
+                                  🟥 Tarjetas Rojas {selectedMatch.away_team?.name}
+                                </Label>
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => removeIncident("red", "away", index)}
+                                  onClick={() => addIncident("red", "away")}
                                   className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Agregar Roja
                                 </Button>
                               </div>
-                            ))}
-                          </div>
+                              {awayRedCards.map((card, index) => (
+                                <div key={index} className="flex gap-2 items-end">
+                                  <div className="flex-1">
+                                    <Select
+                                      value={card.player}
+                                      onValueChange={(value) => updateIncident("red", "away", index, "player", value)}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Seleccionar jugador" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {players
+                                          .filter((p) =>
+                                            teams.some(
+                                              (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
+                                            ),
+                                          )
+                                          .map((player) => (
+                                            <SelectItem key={player.id} value={player.id.toString()}>
+                                              {player.name}
+                                            </SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="w-20">
+                                    <Input
+                                      placeholder="Min"
+                                      value={card.minute}
+                                      onChange={(e) => updateIncident("red", "away", index, "minute", e.target.value)}
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeIncident("red", "away", index)}
+                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
 
-                          <Button
-                            onClick={() => setShowResultConfirm(true)}
-                            className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                          >
-                            <Save className="w-4 h-4 mr-2" />
-                            Guardar Resultado y Actualizar Tablas
-                          </Button>
-                        </>
+                            <Button
+                              onClick={() => setShowResultConfirm(true)}
+                              className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                            >
+                              <Save className="w-4 h-4 mr-2" />
+                              Guardar Resultado y Actualizar Tablas
+                            </Button>
+                          </>
+                        )
                       )}
                     </>
                   )}
