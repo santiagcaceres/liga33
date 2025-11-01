@@ -27,6 +27,12 @@ export default function FixturesSystem() {
       console.log("[v0] Loading matches for fixtures...")
       const supabase = createClient()
 
+      const today = new Date()
+      today.setHours(0, 0, 0, 0) // Resetear a medianoche
+      const todayISO = today.toISOString()
+
+      console.log("[v0] Filtering matches from:", todayISO)
+
       const { data, error } = await supabase
         .from("matches")
         .select(
@@ -42,6 +48,8 @@ export default function FixturesSystem() {
           copa_groups(name)
         `,
         )
+        .eq("played", false)
+        .gte("match_date", todayISO)
         .order("match_date", { ascending: true })
         .order("round", { ascending: true })
 
@@ -58,8 +66,7 @@ export default function FixturesSystem() {
     loadMatches()
   }, [])
 
-  const upcomingMatches = matches.filter((m) => !m.played)
-  console.log("[v0] Upcoming matches:", { total: upcomingMatches.length, matches: upcomingMatches })
+  console.log("[v0] Upcoming matches to display:", { total: matches.length, matches })
 
   if (loading) {
     return (
@@ -71,7 +78,7 @@ export default function FixturesSystem() {
     )
   }
 
-  if (upcomingMatches.length === 0) {
+  if (matches.length === 0) {
     return (
       <Card className="border-primary/30 bg-card">
         <CardHeader>
@@ -84,9 +91,7 @@ export default function FixturesSystem() {
           <div className="text-center py-12 text-muted-foreground">
             <Calendar className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary" />
             <p className="text-lg">No hay partidos próximos</p>
-            <p className="text-sm">
-              {matches.length === 0 ? "No hay partidos creados aún" : "Todos los partidos han sido jugados"}
-            </p>
+            <p className="text-sm">No hay partidos programados desde hoy en adelante</p>
           </div>
         </CardContent>
       </Card>
@@ -104,13 +109,13 @@ export default function FixturesSystem() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {Array.from(new Set(upcomingMatches.map((m) => m.round)))
+            {Array.from(new Set(matches.map((m) => m.round)))
               .sort((a, b) => a - b)
               .map((round) => (
                 <div key={round} className="space-y-2">
                   <h3 className="font-semibold text-primary">Fecha {round}</h3>
                   <div className="grid gap-3">
-                    {upcomingMatches
+                    {matches
                       .filter((m) => m.round === round)
                       .map((match) => (
                         <Card key={match.id} className="border-primary/30 bg-primary/5">
