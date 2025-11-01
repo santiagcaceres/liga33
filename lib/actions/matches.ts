@@ -4,38 +4,65 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 export async function createMatch(formData: FormData) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const home_team_id = Number.parseInt(formData.get("home_team_id") as string)
-  const away_team_id = Number.parseInt(formData.get("away_team_id") as string)
-  const group_id = Number.parseInt(formData.get("group_id") as string)
-  const round = Number.parseInt(formData.get("round") as string)
-  const match_date = formData.get("match_date") as string
+    const home_team_id = Number.parseInt(formData.get("home_team_id") as string)
+    const away_team_id = Number.parseInt(formData.get("away_team_id") as string)
+    const group_id = Number.parseInt(formData.get("group_id") as string)
+    const round = Number.parseInt(formData.get("round") as string)
+    const match_date = formData.get("match_date") as string
 
-  const { data, error } = await supabase
-    .from("matches")
-    .insert([
-      {
-        home_team_id,
-        away_team_id,
-        group_id,
-        round,
-        match_date,
-        home_score: 0,
-        away_score: 0,
-        played: false,
-      },
-    ])
-    .select()
-    .single()
+    if (home_team_id === away_team_id) {
+      return { success: false, error: "Un equipo no puede jugar contra sí mismo" }
+    }
 
-  if (error) {
-    console.error("[v0] Error creating match:", error)
-    throw new Error(error.message)
+    const { data: homeTeamGroup } = await supabase
+      .from("team_groups")
+      .select("group_id")
+      .eq("team_id", home_team_id)
+      .eq("group_id", group_id)
+      .single()
+
+    const { data: awayTeamGroup } = await supabase
+      .from("team_groups")
+      .select("group_id")
+      .eq("team_id", away_team_id)
+      .eq("group_id", group_id)
+      .single()
+
+    if (!homeTeamGroup || !awayTeamGroup) {
+      return { success: false, error: "Ambos equipos deben pertenecer al mismo grupo" }
+    }
+
+    const { data, error } = await supabase
+      .from("matches")
+      .insert([
+        {
+          home_team_id,
+          away_team_id,
+          group_id,
+          round,
+          match_date,
+          home_score: 0,
+          away_score: 0,
+          played: false,
+        },
+      ])
+      .select()
+      .single()
+
+    if (error) {
+      console.error("[v0] Error creating match:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/")
+    return { success: true, data }
+  } catch (error: any) {
+    console.error("[v0] Error in createMatch:", error)
+    return { success: false, error: error.message || "Error al crear el partido" }
   }
-
-  revalidatePath("/")
-  return data
 }
 
 export async function getMatches(groupId?: number, round?: number) {
@@ -244,4 +271,28 @@ async function updateTeamStandings(
   await supabase.from("team_groups").update(homeUpdates).eq("team_id", homeTeamId).eq("group_id", groupId)
 
   await supabase.from("team_groups").update(awayUpdates).eq("team_id", awayTeamId).eq("group_id", groupId)
+}
+
+export async function deleteMatch(matchId: number) {
+  try {
+    const supabase = await createClient()
+
+    // Delete associated goals and cards first
+    await supabase.from("goals").delete().eq("match_id", matchId)
+    await supabase.from("cards").delete().eq("match_id", matchId)
+
+    // Delete the match
+    const { error } = await supabase.from("matches").delete().eq("id", matchId)
+
+    if (error) {
+      console.error("[v0] Error deleting match:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/")
+    return { success: true }
+  } catch (error: any) {
+    console.error("[v0] Error in deleteMatch:", error)
+    return { success: false, error: error.message || "Error al eliminar el partido" }
+  }
 }

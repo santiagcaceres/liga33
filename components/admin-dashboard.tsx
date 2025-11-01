@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { Badge } from "@/components/ui/badge"
+import { Calendar } from "lucide-react" // Import Calendar icon
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -43,6 +44,7 @@ import { createTeam, getTeams, deleteTeam, updateTeam } from "@/lib/actions/team
 import { createPlayer, getPlayers, deletePlayer } from "@/lib/actions/players"
 import { createNews, getNews, deleteNews } from "@/lib/actions/news"
 import { useToast } from "@/hooks/use-toast"
+import { createMatch, getMatches, deleteMatch } from "@/lib/actions/matches" // Import match actions
 
 interface Match {
   id: number
@@ -51,6 +53,17 @@ interface Match {
   home: string
   away: string
   date: string
+  // Added properties for match creation and display
+  group_id?: number
+  home_team_id?: number
+  away_team_id?: number
+  match_date?: string
+  home_score?: number
+  away_score?: number
+  played?: boolean
+  home_team?: { name: string; id: number }
+  away_team?: { name: string; id: number }
+  copa_groups?: { name: string; id: number }
 }
 
 interface Team {
@@ -101,7 +114,8 @@ export default function AdminDashboard() {
   })
   const [newsImageFile, setNewsImageFile] = useState<File | null>(null)
 
-  const fixtures: Match[] = []
+  // Remove fixtures array as it's not used
+  // const fixtures: Match[] = []
 
   const [homeScore, setHomeScore] = useState("")
   const [awayScore, setAwayScore] = useState("")
@@ -143,6 +157,17 @@ export default function AdminDashboard() {
   const [selectedTeamForAssignment, setSelectedTeamForAssignment] = useState("")
   const [groupStandings, setGroupStandings] = useState<any[]>([])
 
+  const [matches, setMatches] = useState<any[]>([])
+  const [isLoadingMatches, setIsLoadingMatches] = useState(false)
+  const [newMatch, setNewMatch] = useState({
+    group_id: "",
+    home_team_id: "",
+    away_team_id: "",
+    round: "",
+    match_date: "",
+  })
+  const [selectedGroupForMatch, setSelectedGroupForMatch] = useState("")
+
   useEffect(() => {
     loadTeams()
     loadGroups() // Load groups on mount
@@ -156,6 +181,92 @@ export default function AdminDashboard() {
       loadNews()
     }
   }, [activeTab])
+
+  const loadMatches = async () => {
+    setIsLoadingMatches(true)
+    const matchesData = await getMatches()
+    setMatches(matchesData)
+    setIsLoadingMatches(false)
+  }
+
+  const handleCreateMatch = async () => {
+    if (
+      !newMatch.group_id ||
+      !newMatch.home_team_id ||
+      !newMatch.away_team_id ||
+      !newMatch.round ||
+      !newMatch.match_date
+    ) {
+      toast({
+        title: "❌ Campos incompletos",
+        description: "Por favor completa todos los campos para crear el partido.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const formData = new FormData()
+    formData.append("group_id", newMatch.group_id)
+    formData.append("home_team_id", newMatch.home_team_id)
+    formData.append("away_team_id", newMatch.away_team_id)
+    formData.append("round", newMatch.round)
+    formData.append("match_date", newMatch.match_date)
+
+    const result = await createMatch(formData)
+
+    if (result.success) {
+      toast({
+        title: "✅ ¡Partido creado exitosamente!",
+        description: "El partido ha sido agregado al calendario.",
+        className: "bg-green-50 border-green-200",
+      })
+      setNewMatch({
+        group_id: "",
+        home_team_id: "",
+        away_team_id: "",
+        round: "",
+        match_date: "",
+      })
+      setSelectedGroupForMatch("")
+      await loadMatches()
+    } else {
+      toast({
+        title: `❌ Error al crear partido`,
+        description: result.error || "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteMatch = async (matchId: number, homeTeam: string, awayTeam: string) => {
+    if (!confirm(`¿Estás seguro de eliminar el partido ${homeTeam} vs ${awayTeam}?`)) {
+      return
+    }
+
+    const result = await deleteMatch(matchId)
+
+    if (result.success) {
+      toast({
+        title: "✅ ¡Partido eliminado!",
+        description: `El partido ${homeTeam} vs ${awayTeam} ha sido eliminado.`,
+        className: "bg-green-50 border-green-200",
+      })
+      await loadMatches()
+    } else {
+      toast({
+        title: `❌ Error al eliminar partido`,
+        description: result.error || "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const teamsInSelectedGroup = selectedGroupForMatch
+    ? groupStandings
+        .filter((s: any) => s.copa_groups?.id === Number.parseInt(selectedGroupForMatch))
+        .map((s: any) => s.teams)
+        .filter(Boolean)
+    : []
 
   const loadTeams = async () => {
     setIsLoadingTeams(true)
@@ -244,6 +355,16 @@ export default function AdminDashboard() {
     setIsAuthenticated(false)
     setPassword("")
   }
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadTeams()
+      loadPlayers()
+      loadGroups()
+      loadNews()
+      loadMatches()
+    }
+  }, [isAuthenticated])
 
   useEffect(() => {
     if (selectedMatchId !== null) {
@@ -343,8 +464,16 @@ export default function AdminDashboard() {
   }
 
   const handleSubmitResult = () => {
-    const selectedMatch = fixtures.find((m) => m.id === selectedMatchId)
-    if (!selectedMatch) return
+    // Find the match in the fetched matches list, not the fixtures array
+    const selectedMatch = matches.find((m) => m.id === selectedMatchId)
+    if (!selectedMatch) {
+      toast({
+        title: "Error",
+        description: "Partido no encontrado.",
+        variant: "destructive",
+      })
+      return
+    }
 
     console.log("[v0] Submitting match result:", {
       match: selectedMatch,
@@ -422,11 +551,17 @@ export default function AdminDashboard() {
     try {
       const formData = new FormData()
       formData.append("name", newTeam.name.trim())
-      formData.append("logo_url", newTeam.logo_url)
+      // Assuming logo_url is a data URL, it needs to be handled appropriately on the backend
+      // If backend expects a file, this needs adjustment. For now, passing as is.
+      if (teamLogoFile) {
+        formData.append("logo", teamLogoFile) // Assuming backend expects 'logo' for file upload
+      } else {
+        formData.append("logo_url", newTeam.logo_url) // Fallback if no file is selected but logo_url exists
+      }
 
       if (editingTeam) {
         // Update existing team
-        await updateTeam(editingTeam.id, formData)
+        await updateTeam(editingTeam.id, formData) // Pass formData to updateTeam
         toast({
           title: "✅ ¡Equipo actualizado exitosamente!",
           description: `${newTeam.name} ha sido actualizado`,
@@ -435,7 +570,7 @@ export default function AdminDashboard() {
         setEditingTeam(null)
       } else {
         // Create new team
-        await createTeam(formData)
+        await createTeam(formData) // Pass formData to createTeam
         toast({
           title: "✅ ¡Equipo creado exitosamente!",
           description: `${newTeam.name} ha sido agregado a la base de datos`,
@@ -791,6 +926,10 @@ export default function AdminDashboard() {
       description: "El sorteo se realizará con los datos reales de los clasificados",
     })
     setShowDrawConfirm(false)
+    // Implement actual draw logic here if needed
+    // For now, it's just a confirmation placeholder
+    setDrawResults(["Equipo A vs Equipo B", "Equipo C vs Equipo D"]) // Example results
+    setShowDraw(true)
   }
 
   const handleDeleteTeam = async (teamId: number, teamName: string) => {
@@ -868,8 +1007,9 @@ export default function AdminDashboard() {
     return matchesTeam && matchesSearch
   })
 
-  const roundMatches = fixtures.filter((m) => m.round === Number.parseInt(selectedRound))
-  const selectedMatch = fixtures.find((m) => m.id === selectedMatchId)
+  // Filter matches by selected round for results tab
+  const roundMatches = matches.filter((m) => m.round === Number.parseInt(selectedRound))
+  const selectedMatch = matches.find((m) => m.id === selectedMatchId) // Use fetched matches
 
   if (!isAuthenticated) {
     return (
@@ -935,9 +1075,10 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="news">Noticias</TabsTrigger>
               <TabsTrigger value="groups">Grupos</TabsTrigger>
+              <TabsTrigger value="matches">Partidos</TabsTrigger>
               <TabsTrigger value="results">Resultados</TabsTrigger>
               <TabsTrigger value="draw">Sorteo</TabsTrigger>
               <TabsTrigger value="teams">Equipos</TabsTrigger>
@@ -1218,6 +1359,198 @@ export default function AdminDashboard() {
               </Card>
             </TabsContent>
 
+            <TabsContent value="matches" className="space-y-6">
+              <Card className="border-primary/30 bg-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-primary">
+                    <Calendar className="w-5 h-5" />
+                    Gestión de Partidos
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Crea los partidos de cada fecha. Solo pueden enfrentarse equipos del mismo grupo.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Create Match Section */}
+                  <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
+                    <h3 className="font-semibold">Crear Nuevo Partido</h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Seleccionar Grupo *</Label>
+                        <Select
+                          value={selectedGroupForMatch}
+                          onValueChange={(value) => {
+                            setSelectedGroupForMatch(value)
+                            setNewMatch({ ...newMatch, group_id: value, home_team_id: "", away_team_id: "" })
+                          }}
+                          disabled={groups.length === 0}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar grupo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {groups.map((group) => (
+                              <SelectItem key={group.id} value={group.id.toString()}>
+                                {group.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Jornada/Fecha *</Label>
+                        <Input
+                          type="number"
+                          value={newMatch.round}
+                          onChange={(e) => setNewMatch({ ...newMatch, round: e.target.value })}
+                          placeholder="Ej: 1"
+                          min="1"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Equipo Local *</Label>
+                        <Select
+                          value={newMatch.home_team_id}
+                          onValueChange={(value) => setNewMatch({ ...newMatch, home_team_id: value })}
+                          disabled={!selectedGroupForMatch || teamsInSelectedGroup.length === 0}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar equipo local" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teamsInSelectedGroup.map((team: any) => (
+                              <SelectItem key={team.id} value={team.id.toString()}>
+                                {team.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Equipo Visitante *</Label>
+                        <Select
+                          value={newMatch.away_team_id}
+                          onValueChange={(value) => setNewMatch({ ...newMatch, away_team_id: value })}
+                          disabled={!selectedGroupForMatch || teamsInSelectedGroup.length === 0}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar equipo visitante" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teamsInSelectedGroup
+                              .filter((team: any) => team.id.toString() !== newMatch.home_team_id)
+                              .map((team: any) => (
+                                <SelectItem key={team.id} value={team.id.toString()}>
+                                  {team.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Fecha del Partido *</Label>
+                        <Input
+                          type="date"
+                          value={newMatch.match_date}
+                          onChange={(e) => setNewMatch({ ...newMatch, match_date: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={handleCreateMatch}
+                      className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                      disabled={
+                        !newMatch.group_id ||
+                        !newMatch.home_team_id ||
+                        !newMatch.away_team_id ||
+                        !newMatch.round ||
+                        !newMatch.match_date
+                      }
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Crear Partido
+                    </Button>
+                  </div>
+
+                  {/* Display Matches */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Partidos Creados ({matches.length})</h3>
+                    {isLoadingMatches ? (
+                      <div className="text-center py-8 text-muted-foreground">Cargando partidos...</div>
+                    ) : matches.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
+                        <p>No hay partidos creados</p>
+                        <p className="text-sm">Crea partidos usando el formulario de arriba</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {/* Group matches by round */}
+                        {Array.from(new Set(matches.map((m) => m.round)))
+                          .sort((a, b) => a - b)
+                          .map((round) => (
+                            <div key={round} className="space-y-2">
+                              <h4 className="font-semibold text-sm text-primary">Fecha {round}</h4>
+                              <div className="grid gap-2">
+                                {matches
+                                  .filter((m) => m.round === round)
+                                  .map((match) => (
+                                    <Card key={match.id} className="border-primary/30">
+                                      <CardContent className="p-4">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-semibold">
+                                                {match.home_team?.name} vs {match.away_team?.name}
+                                              </span>
+                                              <Badge variant="outline" className="text-xs">
+                                                {match.copa_groups?.name}
+                                              </Badge>
+                                              {match.played && (
+                                                <Badge className="bg-green-600 text-xs">
+                                                  {match.home_score} - {match.away_score}
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">
+                                              {new Date(match.match_date).toLocaleDateString("es-ES", {
+                                                weekday: "long",
+                                                year: "numeric",
+                                                month: "long",
+                                                day: "numeric",
+                                              })}
+                                            </p>
+                                          </div>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                              handleDeleteMatch(match.id, match.home_team?.name, match.away_team?.name)
+                                            }
+                                            className="border-red-300 text-red-600 hover:bg-red-50"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </Button>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             <TabsContent value="results" className="space-y-6">
               <Card className="border-primary/30 bg-card">
                 <CardHeader>
@@ -1230,7 +1563,7 @@ export default function AdminDashboard() {
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {fixtures.length === 0 ? (
+                  {matches.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
                       <Trophy className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary" />
                       <p className="text-lg">No hay partidos cargados</p>
@@ -1253,9 +1586,12 @@ export default function AdminDashboard() {
                             <SelectValue placeholder="Seleccionar fecha" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="1">Fecha 1</SelectItem>
-                            <SelectItem value="2">Fecha 2</SelectItem>
-                            <SelectItem value="3">Fecha 3</SelectItem>
+                            {/* Dynamically generate SelectItems based on available rounds */}
+                            {Array.from(new Set(matches.map((m) => m.round))).map((round) => (
+                              <SelectItem key={round} value={round.toString()}>
+                                Fecha {round}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1277,10 +1613,10 @@ export default function AdminDashboard() {
                               <div className="flex flex-col items-start w-full">
                                 <div className="flex items-center justify-between w-full">
                                   <span className="font-semibold">
-                                    {match.home} vs {match.away}
+                                    {match.home_team?.name} vs {match.away_team?.name}
                                   </span>
                                   <Badge variant="outline" className="ml-2">
-                                    Grupo {match.group}
+                                    Grupo {match.copa_groups?.name}
                                   </Badge>
                                 </div>
                                 <span className="text-xs opacity-80">{match.date}</span>
@@ -1294,16 +1630,16 @@ export default function AdminDashboard() {
                         <>
                           <div className="p-4 bg-primary/10 rounded-lg border border-primary/30">
                             <h3 className="font-semibold text-lg text-center mb-2">
-                              {selectedMatch.home} vs {selectedMatch.away}
+                              {selectedMatch.home_team?.name} vs {selectedMatch.away_team?.name}
                             </h3>
                             <p className="text-sm text-center text-gray-600">
-                              Fecha {selectedMatch.round} - Grupo {selectedMatch.group}
+                              Fecha {selectedMatch.round} - Grupo {selectedMatch.copa_groups?.name}
                             </p>
                           </div>
 
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label>Goles {selectedMatch.home}</Label>
+                              <Label>Goles {selectedMatch.home_team?.name}</Label>
                               <Input
                                 type="number"
                                 value={homeScore}
@@ -1313,7 +1649,7 @@ export default function AdminDashboard() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label>Goles {selectedMatch.away}</Label>
+                              <Label>Goles {selectedMatch.away_team?.name}</Label>
                               <Input
                                 type="number"
                                 value={awayScore}
@@ -1327,7 +1663,9 @@ export default function AdminDashboard() {
                           {/* Goleadores Local */}
                           <div className="space-y-3 p-4 bg-green-50 rounded-lg border border-green-200">
                             <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold">⚽ Goleadores {selectedMatch.home}</Label>
+                              <Label className="text-base font-semibold">
+                                ⚽ Goleadores {selectedMatch.home_team?.name}
+                              </Label>
                               <Button
                                 type="button"
                                 variant="outline"
@@ -1352,7 +1690,9 @@ export default function AdminDashboard() {
                                     <SelectContent>
                                       {players
                                         .filter((p) =>
-                                          teams.some((t) => t.id === p.team_id && t.name === selectedMatch.home),
+                                          teams.some(
+                                            (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
+                                          ),
                                         )
                                         .map((player) => (
                                           <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
@@ -1386,7 +1726,7 @@ export default function AdminDashboard() {
                           <div className="space-y-3 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                             <div className="flex items-center justify-between">
                               <Label className="text-base font-semibold">
-                                🟨 Tarjetas Amarillas {selectedMatch.home}
+                                🟨 Tarjetas Amarillas {selectedMatch.home_team?.name}
                               </Label>
                               <Button
                                 type="button"
@@ -1412,7 +1752,9 @@ export default function AdminDashboard() {
                                     <SelectContent>
                                       {players
                                         .filter((p) =>
-                                          teams.some((t) => t.id === p.team_id && t.name === selectedMatch.home),
+                                          teams.some(
+                                            (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
+                                          ),
                                         )
                                         .map((player) => (
                                           <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
@@ -1445,7 +1787,9 @@ export default function AdminDashboard() {
                           {/* Tarjetas Rojas Local */}
                           <div className="space-y-3 p-4 bg-red-50 rounded-lg border border-red-200">
                             <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold">🟥 Tarjetas Rojas {selectedMatch.home}</Label>
+                              <Label className="text-base font-semibold">
+                                🟥 Tarjetas Rojas {selectedMatch.home_team?.name}
+                              </Label>
                               <Button
                                 type="button"
                                 variant="outline"
@@ -1470,7 +1814,9 @@ export default function AdminDashboard() {
                                     <SelectContent>
                                       {players
                                         .filter((p) =>
-                                          teams.some((t) => t.id === p.team_id && t.name === selectedMatch.home),
+                                          teams.some(
+                                            (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
+                                          ),
                                         )
                                         .map((player) => (
                                           <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
@@ -1503,7 +1849,9 @@ export default function AdminDashboard() {
                           {/* Goleadores Visitante */}
                           <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
                             <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold">⚽ Goleadores {selectedMatch.away}</Label>
+                              <Label className="text-base font-semibold">
+                                ⚽ Goleadores {selectedMatch.away_team?.name}
+                              </Label>
                               <Button
                                 type="button"
                                 variant="outline"
@@ -1528,7 +1876,9 @@ export default function AdminDashboard() {
                                     <SelectContent>
                                       {players
                                         .filter((p) =>
-                                          teams.some((t) => t.id === p.team_id && t.name === selectedMatch.away),
+                                          teams.some(
+                                            (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
+                                          ),
                                         )
                                         .map((player) => (
                                           <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
@@ -1562,7 +1912,7 @@ export default function AdminDashboard() {
                           <div className="space-y-3 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                             <div className="flex items-center justify-between">
                               <Label className="text-base font-semibold">
-                                🟨 Tarjetas Amarillas {selectedMatch.away}
+                                🟨 Tarjetas Amarillas {selectedMatch.away_team?.name}
                               </Label>
                               <Button
                                 type="button"
@@ -1588,7 +1938,9 @@ export default function AdminDashboard() {
                                     <SelectContent>
                                       {players
                                         .filter((p) =>
-                                          teams.some((t) => t.id === p.team_id && t.name === selectedMatch.away),
+                                          teams.some(
+                                            (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
+                                          ),
                                         )
                                         .map((player) => (
                                           <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
@@ -1621,7 +1973,9 @@ export default function AdminDashboard() {
                           {/* Tarjetas Rojas Visitante */}
                           <div className="space-y-3 p-4 bg-red-50 rounded-lg border border-red-200">
                             <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold">🟥 Tarjetas Rojas {selectedMatch.away}</Label>
+                              <Label className="text-base font-semibold">
+                                🟥 Tarjetas Rojas {selectedMatch.away_team?.name}
+                              </Label>
                               <Button
                                 type="button"
                                 variant="outline"
@@ -1646,7 +2000,9 @@ export default function AdminDashboard() {
                                     <SelectContent>
                                       {players
                                         .filter((p) =>
-                                          teams.some((t) => t.id === p.team_id && t.name === selectedMatch.away),
+                                          teams.some(
+                                            (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
+                                          ),
                                         )
                                         .map((player) => (
                                           <SelectItem key={player.id} value={`${player.name} (${player.id})`}>

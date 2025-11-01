@@ -4,23 +4,40 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 export async function createGroup(name: string) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const { data: existing } = await supabase.from("copa_groups").select("id").eq("name", name).single()
+    const { data: existing } = await supabase.from("copa_groups").select("id").eq("name", name).single()
 
-  if (existing) {
-    throw new Error(`El grupo "${name}" ya existe`)
+    if (existing) {
+      return {
+        success: false,
+        error: `El grupo "${name}" ya existe`,
+      }
+    }
+
+    const { data, error } = await supabase.from("copa_groups").insert([{ name }]).select().single()
+
+    if (error) {
+      console.error("[v0] Error creating group:", error)
+      return {
+        success: false,
+        error: error.message,
+      }
+    }
+
+    revalidatePath("/")
+    return {
+      success: true,
+      data,
+    }
+  } catch (error) {
+    console.error("[v0] Unexpected error creating group:", error)
+    return {
+      success: false,
+      error: "Error inesperado al crear el grupo",
+    }
   }
-
-  const { data, error } = await supabase.from("copa_groups").insert([{ name }]).select().single()
-
-  if (error) {
-    console.error("[v0] Error creating group:", error)
-    throw new Error(error.message)
-  }
-
-  revalidatePath("/")
-  return data
 }
 
 export async function getGroups() {
