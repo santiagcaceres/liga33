@@ -543,7 +543,22 @@ export default function AdminDashboard() {
     })
 
     try {
-      await updateMatchResult(selectedMatch.id, calculatedHomeScore, calculatedAwayScore, goalsData, cardsData)
+      const result = await updateMatchResult(
+        selectedMatch.id,
+        calculatedHomeScore,
+        calculatedAwayScore,
+        goalsData,
+        cardsData,
+      )
+
+      if (!result.success) {
+        toast({
+          title: "Error",
+          description: result.error || "Error al guardar el resultado.",
+          variant: "destructive",
+        })
+        return
+      }
 
       toast({
         title: "✅ Resultado guardado",

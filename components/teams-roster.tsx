@@ -140,7 +140,6 @@ export default function TeamsRoster() {
                             <th className="text-left p-3">#</th>
                             <th className="text-left p-3">Jugador</th>
                             <th className="text-left p-3">CI</th>
-                            <th className="text-center p-3">Edad</th>
                             <th className="text-center p-3">⚽</th>
                             <th className="text-center p-3">🟨</th>
                             <th className="text-center p-3">🟥</th>
@@ -158,7 +157,6 @@ export default function TeamsRoster() {
                               <td className="p-3 font-semibold">{player.number}</td>
                               <td className="p-3">{player.name}</td>
                               <td className="p-3 text-sm text-muted-foreground">{player.cedula}</td>
-                              <td className="p-3 text-center">{player.age}</td>
                               <td className="p-3 text-center font-semibold">{player.goals}</td>
                               <td className="p-3 text-center">
                                 <span
