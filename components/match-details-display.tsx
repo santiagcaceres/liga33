@@ -10,20 +10,14 @@ interface MatchDetailsDisplayProps {
 interface Goal {
   id: number
   minute: number
-  players: {
-    name: string
-    ci: string
-  }
+  player_name: string
 }
 
 interface Card {
   id: number
   minute: number
   card_type: string
-  players: {
-    name: string
-    ci: string
-  }
+  player_name: string
 }
 
 export default function MatchDetailsDisplay({ matchId }: MatchDetailsDisplayProps) {
@@ -35,19 +29,49 @@ export default function MatchDetailsDisplay({ matchId }: MatchDetailsDisplayProp
     const loadDetails = async () => {
       const supabase = await createClient()
 
-      const { data: goalsData } = await supabase
+      const { data: goalsData, error: goalsError } = await supabase
         .from("goals")
-        .select("id, minute, players(name, ci)")
+        .select(`
+          id,
+          minute,
+          players!player_id (
+            name
+          )
+        `)
         .eq("match_id", matchId)
 
-      const { data: cardsData } = await supabase
+      console.log("[v0] Goals query result:", { goalsData, goalsError })
+
+      const { data: cardsData, error: cardsError } = await supabase
         .from("cards")
-        .select("id, minute, card_type, players(name, ci)")
+        .select(`
+          id,
+          minute,
+          card_type,
+          players!player_id (
+            name
+          )
+        `)
         .eq("match_id", matchId)
         .eq("card_type", "yellow")
 
-      setGoals(goalsData || [])
-      setCards(cardsData || [])
+      console.log("[v0] Cards query result:", { cardsData, cardsError })
+
+      const transformedGoals = (goalsData || []).map((g: any) => ({
+        id: g.id,
+        minute: g.minute,
+        player_name: g.players?.name || "Desconocido",
+      }))
+
+      const transformedCards = (cardsData || []).map((c: any) => ({
+        id: c.id,
+        minute: c.minute,
+        card_type: c.card_type,
+        player_name: c.players?.name || "Desconocido",
+      }))
+
+      setGoals(transformedGoals)
+      setCards(transformedCards)
       setLoading(false)
     }
 
@@ -64,7 +88,7 @@ export default function MatchDetailsDisplay({ matchId }: MatchDetailsDisplayProp
         <div className="flex items-start gap-1">
           <span className="text-primary">⚽</span>
           <span className="text-muted-foreground">
-            {goals.map((g) => `${g.players.name} (${g.minute}')`).join(", ")}
+            {goals.map((g) => `${g.player_name} (${g.minute}')`).join(", ")}
           </span>
         </div>
       )}
@@ -72,7 +96,7 @@ export default function MatchDetailsDisplay({ matchId }: MatchDetailsDisplayProp
         <div className="flex items-start gap-1">
           <span className="text-yellow-500">🟨</span>
           <span className="text-muted-foreground">
-            {cards.map((c) => `${c.players.name} (${c.minute}')`).join(", ")}
+            {cards.map((c) => `${c.player_name} (${c.minute}')`).join(", ")}
           </span>
         </div>
       )}

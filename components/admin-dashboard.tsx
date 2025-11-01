@@ -60,6 +60,8 @@ interface Match {
   home_team_id?: number
   away_team_id?: number
   match_date?: string
+  match_time?: string // Added match_time
+  field?: string // Added field
   home_score?: number
   away_score?: number
   played?: boolean
@@ -80,10 +82,12 @@ interface Player {
   name: string
   cedula: string
   number: number
-  age: number
   team_id: number
-  ci?: string // Added CI to player interface
-  teams?: { name: string }
+  teams?: { name: string; id: number }
+  goals?: number
+  yellow_cards?: number
+  red_cards?: number
+  suspended?: boolean
 }
 
 interface News {
@@ -168,6 +172,8 @@ export default function AdminDashboard() {
     away_team_id: "",
     round: "",
     match_date: "",
+    match_time: "",
+    field: "",
   })
   const [selectedGroupForMatch, setSelectedGroupForMatch] = useState("")
 
@@ -224,6 +230,8 @@ export default function AdminDashboard() {
     formData.append("away_team_id", newMatch.away_team_id)
     formData.append("round", newMatch.round)
     formData.append("match_date", newMatch.match_date)
+    if (newMatch.match_time) formData.append("match_time", newMatch.match_time)
+    if (newMatch.field) formData.append("field", newMatch.field)
 
     const result = await createMatch(formData)
 
@@ -239,6 +247,8 @@ export default function AdminDashboard() {
         away_team_id: "",
         round: "",
         match_date: "",
+        match_time: "",
+        field: "",
       })
       setSelectedGroupForMatch("")
       await loadMatches()
@@ -492,8 +502,8 @@ export default function AdminDashboard() {
 
     const getPlayerCI = (playerId: string): string | null => {
       const player = players.find((p) => p.id.toString() === playerId)
-      console.log("[v0] Getting CI for player ID:", playerId, "Found:", player?.ci)
-      return player?.ci || null
+      console.log("[v0] Getting cedula for player ID:", playerId, "Found:", player?.cedula)
+      return player?.cedula || null
     }
 
     const goalsData = [
@@ -1572,12 +1582,32 @@ export default function AdminDashboard() {
                         </Select>
                       </div>
 
-                      <div className="space-y-2 md:col-span-2">
+                      <div className="space-y-2">
                         <Label>Fecha del Partido *</Label>
                         <Input
                           type="date"
                           value={newMatch.match_date}
                           onChange={(e) => setNewMatch({ ...newMatch, match_date: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Hora del Partido</Label>
+                        <Input
+                          type="time"
+                          value={newMatch.match_time}
+                          onChange={(e) => setNewMatch({ ...newMatch, match_time: e.target.value })}
+                          placeholder="Ej: 17:00"
+                        />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Cancha</Label>
+                        <Input
+                          type="text"
+                          value={newMatch.field}
+                          onChange={(e) => setNewMatch({ ...newMatch, field: e.target.value })}
+                          placeholder="Ej: Cancha 1, Cancha Principal"
                         />
                       </div>
                     </div>
@@ -1829,6 +1859,16 @@ export default function AdminDashboard() {
                               <p className="text-sm text-center text-muted-foreground">
                                 Fecha {selectedMatch.round} - Grupo {selectedMatch.copa_groups?.name}
                               </p>
+                              {selectedMatch.field && (
+                                <p className="text-sm text-center text-muted-foreground">
+                                  Cancha: {selectedMatch.field}
+                                </p>
+                              )}
+                              {selectedMatch.match_time && (
+                                <p className="text-sm text-center text-muted-foreground">
+                                  Hora: {selectedMatch.match_time}
+                                </p>
+                              )}
                             </div>
 
                             {/* Goleadores Local */}

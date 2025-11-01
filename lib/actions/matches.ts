@@ -12,6 +12,8 @@ export async function createMatch(formData: FormData) {
     const group_id = Number.parseInt(formData.get("group_id") as string)
     const round = Number.parseInt(formData.get("round") as string)
     const match_date = formData.get("match_date") as string
+    const match_time = formData.get("match_time") as string | null
+    const field = formData.get("field") as string | null
 
     if (home_team_id === away_team_id) {
       return { success: false, error: "Un equipo no puede jugar contra sí mismo" }
@@ -35,22 +37,21 @@ export async function createMatch(formData: FormData) {
       return { success: false, error: "Ambos equipos deben pertenecer al mismo grupo" }
     }
 
-    const { data, error } = await supabase
-      .from("matches")
-      .insert([
-        {
-          home_team_id,
-          away_team_id,
-          group_id,
-          round,
-          match_date,
-          home_score: 0,
-          away_score: 0,
-          played: false,
-        },
-      ])
-      .select()
-      .single()
+    const matchData: any = {
+      home_team_id,
+      away_team_id,
+      group_id,
+      round,
+      match_date,
+      home_score: 0,
+      away_score: 0,
+      played: false,
+    }
+
+    if (match_time) matchData.match_time = match_time
+    if (field) matchData.field = field
+
+    const { data, error } = await supabase.from("matches").insert([matchData]).select().single()
 
     if (error) {
       console.error("[v0] Error creating match:", error)
@@ -130,15 +131,15 @@ export async function updateMatchResult(
         const { data: player, error: playerError } = await supabase
           .from("players")
           .select("id, goals")
-          .eq("ci", goal.player_ci)
+          .eq("cedula", goal.player_ci)
           .single()
 
         if (playerError || !player) {
-          console.error("[v0] Error finding player by CI:", goal.player_ci, playerError)
+          console.error("[v0] Error finding player by cedula:", goal.player_ci, playerError)
           continue
         }
 
-        console.log("[v0] Found player by CI:", { ci: goal.player_ci, playerId: player.id })
+        console.log("[v0] Found player by cedula:", { cedula: goal.player_ci, playerId: player.id })
 
         const { error: goalError } = await supabase.from("goals").insert({
           match_id: matchId,
@@ -165,16 +166,16 @@ export async function updateMatchResult(
         const { data: player, error: playerError } = await supabase
           .from("players")
           .select("id, yellow_cards, red_cards")
-          .eq("ci", card.player_ci)
+          .eq("cedula", card.player_ci)
           .single()
 
         if (playerError || !player) {
-          console.error("[v0] Error finding player by CI:", card.player_ci, playerError)
+          console.error("[v0] Error finding player by cedula:", card.player_ci, playerError)
           continue
         }
 
-        console.log("[v0] Found player by CI:", {
-          ci: card.player_ci,
+        console.log("[v0] Found player by cedula:", {
+          cedula: card.player_ci,
           playerId: player.id,
           currentYellowCards: player.yellow_cards,
           currentRedCards: player.red_cards,
@@ -200,39 +201,17 @@ export async function updateMatchResult(
         if (card.card_type === "yellow") {
           const newYellowCards = (player.yellow_cards || 0) + 1
           updates.yellow_cards = newYellowCards
-          console.log("[v0] Updating yellow cards:", {
-            playerId: player.id,
-            oldCount: player.yellow_cards,
-            newCount: newYellowCards,
-          })
 
           if (newYellowCards >= 2) {
             updates.suspended = true
-            console.log("[v0] Player suspended due to 2 yellow cards:", player.id)
           }
         } else if (card.card_type === "red") {
-          const newRedCards = (player.red_cards || 0) + 1
-          updates.red_cards = newRedCards
+          updates.red_cards = (player.red_cards || 0) + 1
           updates.suspended = true
-          console.log("[v0] Updating red cards and suspending player:", {
-            playerId: player.id,
-            oldCount: player.red_cards,
-            newCount: newRedCards,
-          })
         }
 
-        console.log("[v0] About to update player with:", { playerId: player.id, updates })
-        const { error: updateError, data: updatedPlayer } = await supabase
-          .from("players")
-          .update(updates)
-          .eq("id", player.id)
-          .select()
-
-        if (updateError) {
-          console.error("[v0] ERROR updating player cards:", { playerId: player.id, error: updateError })
-        } else {
-          console.log("[v0] Player cards updated successfully:", { playerId: player.id, updatedData: updatedPlayer })
-        }
+        console.log("[v0] Updating player cards:", { playerId: player.id, updates })
+        await supabase.from("players").update(updates).eq("id", player.id)
       }
     }
 

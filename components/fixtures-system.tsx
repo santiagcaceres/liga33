@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar } from "lucide-react"
+import { Calendar, MapPin, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 
 interface Match {
   id: number
-  home_team: { name: string }
-  away_team: { name: string }
+  home_team: { name: string; logo_url: string }
+  away_team: { name: string; logo_url: string }
   match_date: string
+  match_time?: string
+  field?: string
   round: number
   played: boolean
   home_score?: number
@@ -28,7 +30,7 @@ export default function FixturesSystem() {
       const supabase = createClient()
 
       const today = new Date()
-      today.setHours(0, 0, 0, 0) // Resetear a medianoche
+      today.setHours(0, 0, 0, 0)
       const todayISO = today.toISOString()
 
       console.log("[v0] Filtering matches from:", todayISO)
@@ -39,12 +41,14 @@ export default function FixturesSystem() {
           `
           id,
           match_date,
+          match_time,
+          field,
           round,
           played,
           home_score,
           away_score,
-          home_team:teams!matches_home_team_id_fkey(name),
-          away_team:teams!matches_away_team_id_fkey(name),
+          home_team:teams!matches_home_team_id_fkey(name, logo_url),
+          away_team:teams!matches_away_team_id_fkey(name, logo_url),
           copa_groups(name)
         `,
         )
@@ -65,8 +69,6 @@ export default function FixturesSystem() {
 
     loadMatches()
   }, [])
-
-  console.log("[v0] Upcoming matches to display:", { total: matches.length, matches })
 
   if (loading) {
     return (
@@ -120,25 +122,62 @@ export default function FixturesSystem() {
                       .map((match) => (
                         <Card key={match.id} className="border-primary/30 bg-primary/5">
                           <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-semibold">
-                                    {match.home_team.name} vs {match.away_team.name}
-                                  </span>
-                                  <Badge variant="outline" className="text-xs">
-                                    {match.copa_groups.name}
-                                  </Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-3 flex-1">
+                                {match.home_team.logo_url && (
+                                  <img
+                                    src={match.home_team.logo_url || "/placeholder.svg"}
+                                    alt={match.home_team.name}
+                                    className="w-12 h-12 object-contain"
+                                  />
+                                )}
+                                <span className="font-semibold text-sm md:text-base">{match.home_team.name}</span>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className="text-primary font-bold text-lg">VS</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {match.copa_groups.name}
+                                </Badge>
+                              </div>
+
+                              <div className="flex items-center gap-3 flex-1 justify-end">
+                                <span className="font-semibold text-sm md:text-base text-right">
+                                  {match.away_team.name}
+                                </span>
+                                {match.away_team.logo_url && (
+                                  <img
+                                    src={match.away_team.logo_url || "/placeholder.svg"}
+                                    alt={match.away_team.name}
+                                    className="w-12 h-12 object-contain"
+                                  />
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-3 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                <span>
                                   {new Date(match.match_date).toLocaleDateString("es-ES", {
                                     weekday: "long",
-                                    year: "numeric",
-                                    month: "long",
                                     day: "numeric",
+                                    month: "long",
                                   })}
-                                </p>
+                                </span>
                               </div>
+                              {match.match_time && (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-4 h-4" />
+                                  <span>{match.match_time}</span>
+                                </div>
+                              )}
+                              {match.field && (
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="w-4 h-4" />
+                                  <span>{match.field}</span>
+                                </div>
+                              )}
                             </div>
                           </CardContent>
                         </Card>

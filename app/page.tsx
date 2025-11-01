@@ -61,7 +61,7 @@ export default function HomePage() {
               onClick={() => setActiveSection("inicio")}
               className="flex items-center gap-3 hover:opacity-80 transition-opacity"
             >
-              <img src="/logo-liga33.png" alt="Liga 33" className="w-16 h-16 md:w-20 md:h-20 object-contain" />
+              <img src="/logo-liga33.png" alt="Liga 33" className="w-20 h-20 md:w-28 md:h-28 object-contain" />
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold leading-tight text-primary">Liga 33</h1>
                 <p className="text-gray-300 text-sm md:text-base">Sábados 17:00-21:00</p>
