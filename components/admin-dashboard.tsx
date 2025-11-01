@@ -44,7 +44,7 @@ import { createTeam, getTeams, deleteTeam, updateTeam } from "@/lib/actions/team
 import { createPlayer, getPlayers, deletePlayer } from "@/lib/actions/players"
 import { createNews, getNews, deleteNews } from "@/lib/actions/news"
 import { useToast } from "@/hooks/use-toast"
-import { createMatch, getMatches, deleteMatch } from "@/lib/actions/matches" // Import match actions
+import { createMatch, getMatches, deleteMatch, updateMatchResult } from "@/lib/actions/matches" // Import match actions
 
 interface Match {
   id: number
@@ -463,8 +463,7 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleSubmitResult = () => {
-    // Find the match in the fetched matches list, not the fixtures array
+  const handleSubmitResult = async () => {
     const selectedMatch = matches.find((m) => m.id === selectedMatchId)
     if (!selectedMatch) {
       toast({
@@ -475,33 +474,101 @@ export default function AdminDashboard() {
       return
     }
 
+    const calculatedHomeScore = homeGoals.filter((g) => g.player).length
+    const calculatedAwayScore = awayGoals.filter((g) => g.player).length
+
+    const extractPlayerId = (playerString: string): number | null => {
+      const match = playerString.match(/$$(\d+)$$/)
+      return match ? Number.parseInt(match[1]) : null
+    }
+
+    const goalsData = [
+      ...homeGoals
+        .filter((g) => g.player && g.minute)
+        .map((g) => ({
+          player_id: extractPlayerId(g.player)!,
+          team_id: selectedMatch.home_team_id,
+          minute: Number.parseInt(g.minute),
+        })),
+      ...awayGoals
+        .filter((g) => g.player && g.minute)
+        .map((g) => ({
+          player_id: extractPlayerId(g.player)!,
+          team_id: selectedMatch.away_team_id,
+          minute: Number.parseInt(g.minute),
+        })),
+    ]
+
+    const cardsData = [
+      ...homeYellowCards
+        .filter((c) => c.player && c.minute)
+        .map((c) => ({
+          player_id: extractPlayerId(c.player)!,
+          team_id: selectedMatch.home_team_id,
+          card_type: "yellow",
+          minute: Number.parseInt(c.minute),
+        })),
+      ...awayYellowCards
+        .filter((c) => c.player && c.minute)
+        .map((c) => ({
+          player_id: extractPlayerId(c.player)!,
+          team_id: selectedMatch.away_team_id,
+          card_type: "yellow",
+          minute: Number.parseInt(c.minute),
+        })),
+      ...homeRedCards
+        .filter((c) => c.player && c.minute)
+        .map((c) => ({
+          player_id: extractPlayerId(c.player)!,
+          team_id: selectedMatch.home_team_id,
+          card_type: "red",
+          minute: Number.parseInt(c.minute),
+        })),
+      ...awayRedCards
+        .filter((c) => c.player && c.minute)
+        .map((c) => ({
+          player_id: extractPlayerId(c.player)!,
+          team_id: selectedMatch.away_team_id,
+          card_type: "red",
+          minute: Number.parseInt(c.minute),
+        })),
+    ]
+
     console.log("[v0] Submitting match result:", {
-      match: selectedMatch,
-      homeScore,
-      awayScore,
-      homeGoals,
-      awayGoals,
-      homeYellowCards,
-      awayYellowCards,
-      homeRedCards,
-      awayRedCards,
+      matchId: selectedMatch.id,
+      homeScore: calculatedHomeScore,
+      awayScore: calculatedAwayScore,
+      goals: goalsData,
+      cards: cardsData,
     })
 
-    toast({
-      title: "Resultado guardado",
-      description: "Las estadísticas se actualizaron automáticamente",
-    })
+    try {
+      await updateMatchResult(selectedMatch.id, calculatedHomeScore, calculatedAwayScore, goalsData, cardsData)
 
-    setShowResultConfirm(false)
-    setSelectedMatchId(null)
-    setHomeScore("")
-    setAwayScore("")
-    setHomeGoals([{ player: "", minute: "" }])
-    setAwayGoals([{ player: "", minute: "" }])
-    setHomeYellowCards([{ player: "", minute: "" }])
-    setAwayYellowCards([{ player: "", minute: "" }])
-    setHomeRedCards([{ player: "", minute: "" }])
-    setAwayRedCards([{ player: "", minute: "" }])
+      toast({
+        title: "✅ Resultado guardado",
+        description: `${selectedMatch.home_team?.name} ${calculatedHomeScore} - ${calculatedAwayScore} ${selectedMatch.away_team?.name}. Las estadísticas se actualizaron automáticamente.`,
+      })
+
+      await loadMatches()
+      await loadPlayers()
+
+      setShowResultConfirm(false)
+      setSelectedMatchId(null)
+      setHomeGoals([{ player: "", minute: "" }])
+      setAwayGoals([{ player: "", minute: "" }])
+      setHomeYellowCards([{ player: "", minute: "" }])
+      setAwayYellowCards([{ player: "", minute: "" }])
+      setHomeRedCards([{ player: "", minute: "" }])
+      setAwayRedCards([{ player: "", minute: "" }])
+    } catch (error: any) {
+      console.error("[v0] Error saving match result:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Error al guardar el resultado",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleNewsImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1559,7 +1626,7 @@ export default function AdminDashboard() {
                     Cargar Resultado de Partido
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Selecciona una fecha y partido. Los goles y tarjetas se sumarán automáticamente a las tablas
+                    Agrega los goleadores y tarjetas. Los goles se calcularán automáticamente.
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -1618,6 +1685,11 @@ export default function AdminDashboard() {
                                   <Badge variant="outline" className="ml-2">
                                     Grupo {match.copa_groups?.name}
                                   </Badge>
+                                  {match.played && (
+                                    <Badge className="bg-green-600 text-xs">
+                                      {match.home_score} - {match.away_score}
+                                    </Badge>
+                                  )}
                                 </div>
                                 <span className="text-xs opacity-80">{match.date}</span>
                               </div>
@@ -1632,38 +1704,15 @@ export default function AdminDashboard() {
                             <h3 className="font-semibold text-lg text-center mb-2">
                               {selectedMatch.home_team?.name} vs {selectedMatch.away_team?.name}
                             </h3>
-                            <p className="text-sm text-center text-gray-600">
+                            <p className="text-sm text-center text-muted-foreground">
                               Fecha {selectedMatch.round} - Grupo {selectedMatch.copa_groups?.name}
                             </p>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Goles {selectedMatch.home_team?.name}</Label>
-                              <Input
-                                type="number"
-                                value={homeScore}
-                                onChange={(e) => setHomeScore(e.target.value)}
-                                placeholder="0"
-                                min="0"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Goles {selectedMatch.away_team?.name}</Label>
-                              <Input
-                                type="number"
-                                value={awayScore}
-                                onChange={(e) => setAwayScore(e.target.value)}
-                                placeholder="0"
-                                min="0"
-                              />
-                            </div>
-                          </div>
-
                           {/* Goleadores Local */}
-                          <div className="space-y-3 p-4 bg-green-50 rounded-lg border border-green-200">
+                          <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/30">
                             <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold">
+                              <Label className="text-base font-semibold text-primary">
                                 ⚽ Goleadores {selectedMatch.home_team?.name}
                               </Label>
                               <Button
@@ -1671,7 +1720,7 @@ export default function AdminDashboard() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => addIncident("goal", "home")}
-                                className="border-green-300 text-green-600 hover:bg-green-100"
+                                className="border-primary/30 text-primary hover:bg-primary/10"
                               >
                                 <Plus className="w-4 h-4 mr-1" />
                                 Agregar Gol
@@ -1714,7 +1763,7 @@ export default function AdminDashboard() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => removeIncident("goal", "home", index)}
-                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -1723,9 +1772,9 @@ export default function AdminDashboard() {
                           </div>
 
                           {/* Tarjetas Amarillas Local */}
-                          <div className="space-y-3 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                          <div className="space-y-3 p-4 bg-yellow-500/5 rounded-lg border border-yellow-500/30">
                             <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold">
+                              <Label className="text-base font-semibold text-yellow-500">
                                 🟨 Tarjetas Amarillas {selectedMatch.home_team?.name}
                               </Label>
                               <Button
@@ -1733,7 +1782,7 @@ export default function AdminDashboard() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => addIncident("yellow", "home")}
-                                className="border-yellow-300 text-yellow-600 hover:bg-yellow-100"
+                                className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
                               >
                                 <Plus className="w-4 h-4 mr-1" />
                                 Agregar Amarilla
@@ -1776,7 +1825,7 @@ export default function AdminDashboard() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => removeIncident("yellow", "home", index)}
-                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -1785,9 +1834,9 @@ export default function AdminDashboard() {
                           </div>
 
                           {/* Tarjetas Rojas Local */}
-                          <div className="space-y-3 p-4 bg-red-50 rounded-lg border border-red-200">
+                          <div className="space-y-3 p-4 bg-red-500/5 rounded-lg border border-red-500/30">
                             <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold">
+                              <Label className="text-base font-semibold text-red-500">
                                 🟥 Tarjetas Rojas {selectedMatch.home_team?.name}
                               </Label>
                               <Button
@@ -1795,7 +1844,7 @@ export default function AdminDashboard() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => addIncident("red", "home")}
-                                className="border-red-300 text-red-600 hover:bg-red-100"
+                                className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                               >
                                 <Plus className="w-4 h-4 mr-1" />
                                 Agregar Roja
@@ -1838,7 +1887,7 @@ export default function AdminDashboard() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => removeIncident("red", "home", index)}
-                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -1847,9 +1896,9 @@ export default function AdminDashboard() {
                           </div>
 
                           {/* Goleadores Visitante */}
-                          <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/30">
                             <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold">
+                              <Label className="text-base font-semibold text-primary">
                                 ⚽ Goleadores {selectedMatch.away_team?.name}
                               </Label>
                               <Button
@@ -1857,7 +1906,7 @@ export default function AdminDashboard() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => addIncident("goal", "away")}
-                                className="border-blue-300 text-blue-600 hover:bg-blue-100"
+                                className="border-primary/30 text-primary hover:bg-primary/10"
                               >
                                 <Plus className="w-4 h-4 mr-1" />
                                 Agregar Gol
@@ -1900,7 +1949,7 @@ export default function AdminDashboard() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => removeIncident("goal", "away", index)}
-                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -1909,9 +1958,9 @@ export default function AdminDashboard() {
                           </div>
 
                           {/* Tarjetas Amarillas Visitante */}
-                          <div className="space-y-3 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                          <div className="space-y-3 p-4 bg-yellow-500/5 rounded-lg border border-yellow-500/30">
                             <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold">
+                              <Label className="text-base font-semibold text-yellow-500">
                                 🟨 Tarjetas Amarillas {selectedMatch.away_team?.name}
                               </Label>
                               <Button
@@ -1919,7 +1968,7 @@ export default function AdminDashboard() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => addIncident("yellow", "away")}
-                                className="border-yellow-300 text-yellow-600 hover:bg-yellow-100"
+                                className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
                               >
                                 <Plus className="w-4 h-4 mr-1" />
                                 Agregar Amarilla
@@ -1962,7 +2011,7 @@ export default function AdminDashboard() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => removeIncident("yellow", "away", index)}
-                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -1971,9 +2020,9 @@ export default function AdminDashboard() {
                           </div>
 
                           {/* Tarjetas Rojas Visitante */}
-                          <div className="space-y-3 p-4 bg-red-50 rounded-lg border border-red-200">
+                          <div className="space-y-3 p-4 bg-red-500/5 rounded-lg border border-red-500/30">
                             <div className="flex items-center justify-between">
-                              <Label className="text-base font-semibold">
+                              <Label className="text-base font-semibold text-red-500">
                                 🟥 Tarjetas Rojas {selectedMatch.away_team?.name}
                               </Label>
                               <Button
@@ -1981,7 +2030,7 @@ export default function AdminDashboard() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => addIncident("red", "away")}
-                                className="border-red-300 text-red-600 hover:bg-red-100"
+                                className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                               >
                                 <Plus className="w-4 h-4 mr-1" />
                                 Agregar Roja
@@ -2024,7 +2073,7 @@ export default function AdminDashboard() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => removeIncident("red", "away", index)}
-                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -2035,7 +2084,6 @@ export default function AdminDashboard() {
                           <Button
                             onClick={() => setShowResultConfirm(true)}
                             className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                            disabled={!homeScore || !awayScore}
                           >
                             <Save className="w-4 h-4 mr-2" />
                             Guardar Resultado y Actualizar Tablas
