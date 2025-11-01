@@ -101,8 +101,8 @@ export async function updateMatchResult(
   matchId: number,
   homeScore: number,
   awayScore: number,
-  goals: Array<{ player_id: number; team_id: number; minute: number }>,
-  cards: Array<{ player_id: number; team_id: number; card_type: string; minute: number }>,
+  goals: Array<{ player_ci: string; team_id: number; minute: number }>,
+  cards: Array<{ player_ci: string; team_id: number; card_type: string; minute: number }>,
 ) {
   try {
     const supabase = await createClient()
@@ -126,77 +126,86 @@ export async function updateMatchResult(
     console.log("[v0] Match updated successfully")
 
     if (goals.length > 0) {
-      const goalsToInsert = goals.map((goal) => ({
-        ...goal,
-        match_id: matchId,
-      }))
-
-      console.log("[v0] Inserting goals:", goalsToInsert)
-
-      const { error: goalsError } = await supabase.from("goals").insert(goalsToInsert)
-
-      if (goalsError) {
-        console.error("[v0] Error inserting goals:", goalsError)
-        return { success: false, error: goalsError.message }
-      }
-
-      console.log("[v0] Goals inserted successfully")
-
-      // Update player goal counts
       for (const goal of goals) {
-        const { data: player } = await supabase.from("players").select("goals").eq("id", goal.player_id).single()
+        const { data: player, error: playerError } = await supabase
+          .from("players")
+          .select("id, goals")
+          .eq("ci", goal.player_ci)
+          .single()
 
-        if (player) {
-          const newGoals = (player.goals || 0) + 1
-          console.log("[v0] Updating player goals:", { playerId: goal.player_id, newGoals })
-          await supabase.from("players").update({ goals: newGoals }).eq("id", goal.player_id)
+        if (playerError || !player) {
+          console.error("[v0] Error finding player by CI:", goal.player_ci, playerError)
+          continue
         }
+
+        console.log("[v0] Found player by CI:", { ci: goal.player_ci, playerId: player.id })
+
+        const { error: goalError } = await supabase.from("goals").insert({
+          match_id: matchId,
+          player_id: player.id,
+          team_id: goal.team_id,
+          minute: goal.minute,
+        })
+
+        if (goalError) {
+          console.error("[v0] Error inserting goal:", goalError)
+          continue
+        }
+
+        console.log("[v0] Goal inserted successfully")
+
+        const newGoals = (player.goals || 0) + 1
+        console.log("[v0] Updating player goals:", { playerId: player.id, newGoals })
+        await supabase.from("players").update({ goals: newGoals }).eq("id", player.id)
       }
     }
 
     if (cards.length > 0) {
-      const cardsToInsert = cards.map((card) => ({
-        ...card,
-        match_id: matchId,
-      }))
-
-      console.log("[v0] Inserting cards:", cardsToInsert)
-
-      const { error: cardsError } = await supabase.from("cards").insert(cardsToInsert)
-
-      if (cardsError) {
-        console.error("[v0] Error inserting cards:", cardsError)
-        return { success: false, error: cardsError.message }
-      }
-
-      console.log("[v0] Cards inserted successfully")
-
-      // Update player card counts and suspension status
       for (const card of cards) {
-        const { data: player } = await supabase
+        const { data: player, error: playerError } = await supabase
           .from("players")
-          .select("yellow_cards, red_cards")
-          .eq("id", card.player_id)
+          .select("id, yellow_cards, red_cards")
+          .eq("ci", card.player_ci)
           .single()
 
-        if (player) {
-          const updates: any = {}
+        if (playerError || !player) {
+          console.error("[v0] Error finding player by CI:", card.player_ci, playerError)
+          continue
+        }
 
-          if (card.card_type === "yellow") {
-            const newYellowCards = (player.yellow_cards || 0) + 1
-            updates.yellow_cards = newYellowCards
+        console.log("[v0] Found player by CI:", { ci: card.player_ci, playerId: player.id })
 
-            if (newYellowCards >= 2) {
-              updates.suspended = true
-            }
-          } else if (card.card_type === "red") {
-            updates.red_cards = (player.red_cards || 0) + 1
+        const { error: cardError } = await supabase.from("cards").insert({
+          match_id: matchId,
+          player_id: player.id,
+          team_id: card.team_id,
+          card_type: card.card_type,
+          minute: card.minute,
+        })
+
+        if (cardError) {
+          console.error("[v0] Error inserting card:", cardError)
+          continue
+        }
+
+        console.log("[v0] Card inserted successfully")
+
+        const updates: any = {}
+
+        if (card.card_type === "yellow") {
+          const newYellowCards = (player.yellow_cards || 0) + 1
+          updates.yellow_cards = newYellowCards
+
+          if (newYellowCards >= 2) {
             updates.suspended = true
           }
-
-          console.log("[v0] Updating player cards:", { playerId: card.player_id, updates })
-          await supabase.from("players").update(updates).eq("id", card.player_id)
+        } else if (card.card_type === "red") {
+          updates.red_cards = (player.red_cards || 0) + 1
+          updates.suspended = true
         }
+
+        console.log("[v0] Updating player cards:", { playerId: player.id, updates })
+        await supabase.from("players").update(updates).eq("id", player.id)
       }
     }
 
@@ -235,24 +244,37 @@ async function updateTeamStandings(
 ) {
   const supabase = await createClient()
 
-  // Get current standings
-  const { data: homeStanding } = await supabase
+  console.log("[v0] Starting updateTeamStandings:", { homeTeamId, awayTeamId, homeScore, awayScore, groupId })
+
+  const { data: homeStanding, error: homeError } = await supabase
     .from("team_groups")
     .select("*")
     .eq("team_id", homeTeamId)
     .eq("group_id", groupId)
     .single()
 
-  const { data: awayStanding } = await supabase
+  if (homeError) {
+    console.error("[v0] Error fetching home team standing:", homeError)
+  }
+  console.log("[v0] Home team standing:", homeStanding)
+
+  const { data: awayStanding, error: awayError } = await supabase
     .from("team_groups")
     .select("*")
     .eq("team_id", awayTeamId)
     .eq("group_id", groupId)
     .single()
 
-  if (!homeStanding || !awayStanding) return
+  if (awayError) {
+    console.error("[v0] Error fetching away team standing:", awayError)
+  }
+  console.log("[v0] Away team standing:", awayStanding)
 
-  // Calculate updates
+  if (!homeStanding || !awayStanding) {
+    console.error("[v0] Missing team standings - cannot update")
+    return
+  }
+
   const homeUpdates: any = {
     played: homeStanding.played + 1,
     goals_for: homeStanding.goals_for + homeScore,
@@ -269,35 +291,58 @@ async function updateTeamStandings(
     homeUpdates.won = homeStanding.won + 1
     homeUpdates.points = homeStanding.points + 3
     awayUpdates.lost = awayStanding.lost + 1
+    console.log("[v0] Home team wins")
   } else if (homeScore < awayScore) {
     awayUpdates.won = awayStanding.won + 1
     awayUpdates.points = awayStanding.points + 3
     homeUpdates.lost = homeStanding.lost + 1
+    console.log("[v0] Away team wins")
   } else {
     homeUpdates.drawn = homeStanding.drawn + 1
     homeUpdates.points = homeStanding.points + 1
     awayUpdates.drawn = awayStanding.drawn + 1
     awayUpdates.points = awayStanding.points + 1
+    console.log("[v0] Draw")
   }
 
   homeUpdates.goal_difference = homeUpdates.goals_for - homeUpdates.goals_against
   awayUpdates.goal_difference = awayUpdates.goals_for - awayUpdates.goals_against
 
-  // Update standings
-  await supabase.from("team_groups").update(homeUpdates).eq("team_id", homeTeamId).eq("group_id", groupId)
+  console.log("[v0] Home team updates:", homeUpdates)
+  console.log("[v0] Away team updates:", awayUpdates)
 
-  await supabase.from("team_groups").update(awayUpdates).eq("team_id", awayTeamId).eq("group_id", groupId)
+  const { error: homeUpdateError } = await supabase
+    .from("team_groups")
+    .update(homeUpdates)
+    .eq("team_id", homeTeamId)
+    .eq("group_id", groupId)
+
+  if (homeUpdateError) {
+    console.error("[v0] Error updating home team standing:", homeUpdateError)
+  } else {
+    console.log("[v0] Home team standing updated successfully")
+  }
+
+  const { error: awayUpdateError } = await supabase
+    .from("team_groups")
+    .update(awayUpdates)
+    .eq("team_id", awayTeamId)
+    .eq("group_id", groupId)
+
+  if (awayUpdateError) {
+    console.error("[v0] Error updating away team standing:", awayUpdateError)
+  } else {
+    console.log("[v0] Away team standing updated successfully")
+  }
 }
 
 export async function deleteMatch(matchId: number) {
   try {
     const supabase = await createClient()
 
-    // Delete associated goals and cards first
     await supabase.from("goals").delete().eq("match_id", matchId)
     await supabase.from("cards").delete().eq("match_id", matchId)
 
-    // Delete the match
     const { error } = await supabase.from("matches").delete().eq("id", matchId)
 
     if (error) {

@@ -477,61 +477,87 @@ export default function AdminDashboard() {
     const calculatedHomeScore = homeGoals.filter((g) => g.player).length
     const calculatedAwayScore = awayGoals.filter((g) => g.player).length
 
-    const extractPlayerId = (playerString: string): number | null => {
-      const match = playerString.match(/$$(\d+)$$/)
-      return match ? Number.parseInt(match[1]) : null
+    const extractPlayerCI = (playerString: string): string | null => {
+      const match = playerString.match(/CI:\s*(\d+)/)
+      const ci = match ? match[1] : null
+      console.log("[v0] Extracting CI from:", playerString, "Result:", ci)
+      return ci
     }
 
     const goalsData = [
       ...homeGoals
         .filter((g) => g.player && g.minute)
-        .map((g) => ({
-          player_id: extractPlayerId(g.player)!,
-          team_id: selectedMatch.home_team_id,
-          minute: Number.parseInt(g.minute),
-        })),
+        .map((g) => {
+          const player_ci = extractPlayerCI(g.player)
+          console.log("[v0] Processing home goal:", { player: g.player, player_ci, minute: g.minute })
+          return {
+            player_ci: player_ci!,
+            team_id: selectedMatch.home_team_id,
+            minute: Number.parseInt(g.minute),
+          }
+        }),
       ...awayGoals
         .filter((g) => g.player && g.minute)
-        .map((g) => ({
-          player_id: extractPlayerId(g.player)!,
-          team_id: selectedMatch.away_team_id,
-          minute: Number.parseInt(g.minute),
-        })),
+        .map((g) => {
+          const player_ci = extractPlayerCI(g.player)
+          console.log("[v0] Processing away goal:", { player: g.player, player_ci, minute: g.minute })
+          return {
+            player_ci: player_ci!,
+            team_id: selectedMatch.away_team_id,
+            minute: Number.parseInt(g.minute),
+          }
+        }),
     ]
 
     const cardsData = [
       ...homeYellowCards
         .filter((c) => c.player && c.minute)
-        .map((c) => ({
-          player_id: extractPlayerId(c.player)!,
-          team_id: selectedMatch.home_team_id,
-          card_type: "yellow",
-          minute: Number.parseInt(c.minute),
-        })),
+        .map((c) => {
+          const player_ci = extractPlayerCI(c.player)
+          console.log("[v0] Processing home yellow card:", { player: c.player, player_ci, minute: c.minute })
+          return {
+            player_ci: player_ci!,
+            team_id: selectedMatch.home_team_id,
+            card_type: "yellow",
+            minute: Number.parseInt(c.minute),
+          }
+        }),
       ...awayYellowCards
         .filter((c) => c.player && c.minute)
-        .map((c) => ({
-          player_id: extractPlayerId(c.player)!,
-          team_id: selectedMatch.away_team_id,
-          card_type: "yellow",
-          minute: Number.parseInt(c.minute),
-        })),
+        .map((c) => {
+          const player_ci = extractPlayerCI(c.player)
+          console.log("[v0] Processing away yellow card:", { player: c.player, player_ci, minute: c.minute })
+          return {
+            player_ci: player_ci!,
+            team_id: selectedMatch.away_team_id,
+            card_type: "yellow",
+            minute: Number.parseInt(c.minute),
+          }
+        }),
       ...homeRedCards
         .filter((c) => c.player && c.minute)
-        .map((c) => ({
-          player_id: extractPlayerId(c.player)!,
-          team_id: selectedMatch.home_team_id,
-          card_type: "red",
-          minute: Number.parseInt(c.minute),
-        })),
+        .map((c) => {
+          const player_ci = extractPlayerCI(c.player)
+          console.log("[v0] Processing home red card:", { player: c.player, player_ci, minute: c.minute })
+          return {
+            player_ci: player_ci!,
+            team_id: selectedMatch.home_team_id,
+            card_type: "red",
+            minute: Number.parseInt(c.minute),
+          }
+        }),
       ...awayRedCards
         .filter((c) => c.player && c.minute)
-        .map((c) => ({
-          player_id: extractPlayerId(c.player)!,
-          team_id: selectedMatch.away_team_id,
-          card_type: "red",
-          minute: Number.parseInt(c.minute),
-        })),
+        .map((c) => {
+          const player_ci = extractPlayerCI(c.player)
+          console.log("[v0] Processing away red card:", { player: c.player, player_ci, minute: c.minute })
+          return {
+            player_ci: player_ci!,
+            team_id: selectedMatch.away_team_id,
+            card_type: "red",
+            minute: Number.parseInt(c.minute),
+          }
+        }),
     ]
 
     console.log("[v0] Submitting match result:", {
@@ -1759,8 +1785,8 @@ export default function AdminDashboard() {
                                           ),
                                         )
                                         .map((player) => (
-                                          <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
-                                            {player.name}
+                                          <SelectItem key={player.id} value={`${player.name} (CI: ${player.ci})`}>
+                                            {player.name} - CI: {player.ci}
                                           </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -1821,8 +1847,8 @@ export default function AdminDashboard() {
                                           ),
                                         )
                                         .map((player) => (
-                                          <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
-                                            {player.name}
+                                          <SelectItem key={player.id} value={`${player.name} (CI: ${player.ci})`}>
+                                            {player.name} - CI: {player.ci}
                                           </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -1883,8 +1909,8 @@ export default function AdminDashboard() {
                                           ),
                                         )
                                         .map((player) => (
-                                          <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
-                                            {player.name}
+                                          <SelectItem key={player.id} value={`${player.name} (CI: ${player.ci})`}>
+                                            {player.name} - CI: {player.ci}
                                           </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -1945,8 +1971,8 @@ export default function AdminDashboard() {
                                           ),
                                         )
                                         .map((player) => (
-                                          <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
-                                            {player.name}
+                                          <SelectItem key={player.id} value={`${player.name} (CI: ${player.ci})`}>
+                                            {player.name} - CI: {player.ci}
                                           </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -2007,8 +2033,8 @@ export default function AdminDashboard() {
                                           ),
                                         )
                                         .map((player) => (
-                                          <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
-                                            {player.name}
+                                          <SelectItem key={player.id} value={`${player.name} (CI: ${player.ci})`}>
+                                            {player.name} - CI: {player.ci}
                                           </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -2069,8 +2095,8 @@ export default function AdminDashboard() {
                                           ),
                                         )
                                         .map((player) => (
-                                          <SelectItem key={player.id} value={`${player.name} (${player.id})`}>
-                                            {player.name}
+                                          <SelectItem key={player.id} value={`${player.name} (CI: ${player.ci})`}>
+                                            {player.name} - CI: {player.ci}
                                           </SelectItem>
                                         ))}
                                     </SelectContent>
