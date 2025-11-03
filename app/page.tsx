@@ -65,7 +65,6 @@ export default function HomePage() {
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold leading-tight text-primary">Liga 33</h1>
                 <p className="text-sm md:text-base text-primary/80 font-semibold">Copa Libertadores</p>
-                <p className="text-gray-300 text-xs md:text-sm">Sábados 17:00-21:00</p>
               </div>
             </button>
 
