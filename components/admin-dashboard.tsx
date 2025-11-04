@@ -500,20 +500,14 @@ export default function AdminDashboard() {
     const calculatedHomeScore = homeGoals.filter((g) => g.player).length
     const calculatedAwayScore = awayGoals.filter((g) => g.player).length
 
-    const getPlayerCI = (playerId: string): string | null => {
-      const player = players.find((p) => p.id.toString() === playerId)
-      console.log("[v0] Getting cedula for player ID:", playerId, "Found:", player?.cedula)
-      return player?.cedula || null
-    }
-
     const goalsData = [
       ...homeGoals
         .filter((g) => g.player && g.minute)
         .map((g) => {
-          const player_ci = getPlayerCI(g.player)
-          console.log("[v0] Processing home goal:", { playerId: g.player, player_ci, minute: g.minute })
+          const player_id = Number.parseInt(g.player)
+          console.log("[v0] Processing home goal:", { player_id, minute: g.minute })
           return {
-            player_ci: player_ci!,
+            player_id,
             team_id: selectedMatch.home_team_id,
             minute: Number.parseInt(g.minute),
           }
@@ -521,10 +515,10 @@ export default function AdminDashboard() {
       ...awayGoals
         .filter((g) => g.player && g.minute)
         .map((g) => {
-          const player_ci = getPlayerCI(g.player)
-          console.log("[v0] Processing away goal:", { playerId: g.player, player_ci, minute: g.minute })
+          const player_id = Number.parseInt(g.player)
+          console.log("[v0] Processing away goal:", { player_id, minute: g.minute })
           return {
-            player_ci: player_ci!,
+            player_id,
             team_id: selectedMatch.away_team_id,
             minute: Number.parseInt(g.minute),
           }
@@ -535,10 +529,10 @@ export default function AdminDashboard() {
       ...homeYellowCards
         .filter((c) => c.player && c.minute)
         .map((c) => {
-          const player_ci = getPlayerCI(c.player)
-          console.log("[v0] Processing home yellow card:", { playerId: c.player, player_ci, minute: c.minute })
+          const player_id = Number.parseInt(c.player)
+          console.log("[v0] Processing home yellow card:", { player_id, minute: c.minute })
           return {
-            player_ci: player_ci!,
+            player_id,
             team_id: selectedMatch.home_team_id,
             card_type: "yellow" as const,
             minute: Number.parseInt(c.minute),
@@ -547,10 +541,10 @@ export default function AdminDashboard() {
       ...awayYellowCards
         .filter((c) => c.player && c.minute)
         .map((c) => {
-          const player_ci = getPlayerCI(c.player)
-          console.log("[v0] Processing away yellow card:", { playerId: c.player, player_ci, minute: c.minute })
+          const player_id = Number.parseInt(c.player)
+          console.log("[v0] Processing away yellow card:", { player_id, minute: c.minute })
           return {
-            player_ci: player_ci!,
+            player_id,
             team_id: selectedMatch.away_team_id,
             card_type: "yellow" as const,
             minute: Number.parseInt(c.minute),
@@ -559,10 +553,10 @@ export default function AdminDashboard() {
       ...homeRedCards
         .filter((c) => c.player && c.minute)
         .map((c) => {
-          const player_ci = getPlayerCI(c.player)
-          console.log("[v0] Processing home red card:", { playerId: c.player, player_ci, minute: c.minute })
+          const player_id = Number.parseInt(c.player)
+          console.log("[v0] Processing home red card:", { player_id, minute: c.minute })
           return {
-            player_ci: player_ci!,
+            player_id,
             team_id: selectedMatch.home_team_id,
             card_type: "red" as const,
             minute: Number.parseInt(c.minute),
@@ -571,10 +565,10 @@ export default function AdminDashboard() {
       ...awayRedCards
         .filter((c) => c.player && c.minute)
         .map((c) => {
-          const player_ci = getPlayerCI(c.player)
-          console.log("[v0] Processing away red card:", { playerId: c.player, player_ci, minute: c.minute })
+          const player_id = Number.parseInt(c.player)
+          console.log("[v0] Processing away red card:", { player_id, minute: c.minute })
           return {
-            player_ci: player_ci!,
+            player_id,
             team_id: selectedMatch.away_team_id,
             card_type: "red" as const,
             minute: Number.parseInt(c.minute),
