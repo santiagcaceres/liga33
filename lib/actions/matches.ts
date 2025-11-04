@@ -126,8 +126,20 @@ export async function updateMatchResult(
 
     console.log("[v0] Match updated successfully")
 
+    const results = {
+      goalsInserted: 0,
+      goalsFailed: 0,
+      cardsInserted: 0,
+      cardsFailed: 0,
+      playersUpdated: 0,
+      playersFailed: 0,
+    }
+
     if (goals.length > 0) {
+      console.log("[v0] Processing", goals.length, "goals")
       for (const goal of goals) {
+        console.log("[v0] Processing goal for player_id:", goal.player_id)
+
         const { data: player, error: playerError } = await supabase
           .from("players")
           .select("id, goals")
@@ -136,33 +148,51 @@ export async function updateMatchResult(
 
         if (playerError || !player) {
           console.error("[v0] Error finding player by ID:", goal.player_id, playerError)
+          results.goalsFailed++
           continue
         }
 
-        console.log("[v0] Found player by ID:", { playerId: player.id, currentGoals: player.goals })
+        console.log("[v0] Found player:", { playerId: player.id, currentGoals: player.goals })
 
-        const { error: goalError } = await supabase.from("goals").insert({
-          match_id: matchId,
-          player_id: player.id,
-          team_id: goal.team_id,
-          minute: goal.minute,
-        })
+        const { data: goalData, error: goalError } = await supabase
+          .from("goals")
+          .insert({
+            match_id: matchId,
+            player_id: player.id,
+            team_id: goal.team_id,
+            minute: goal.minute,
+          })
+          .select()
 
         if (goalError) {
           console.error("[v0] Error inserting goal:", goalError)
+          results.goalsFailed++
           continue
         }
 
-        console.log("[v0] Goal inserted successfully")
+        console.log("[v0] Goal inserted successfully:", goalData)
+        results.goalsInserted++
 
         const newGoals = (player.goals || 0) + 1
-        console.log("[v0] Updating player goals:", { playerId: player.id, newGoals })
-        await supabase.from("players").update({ goals: newGoals }).eq("id", player.id)
+        console.log("[v0] Updating player goals from", player.goals, "to", newGoals)
+
+        const { error: updateError } = await supabase.from("players").update({ goals: newGoals }).eq("id", player.id)
+
+        if (updateError) {
+          console.error("[v0] Error updating player goals:", updateError)
+          results.playersFailed++
+        } else {
+          console.log("[v0] Player goals updated successfully")
+          results.playersUpdated++
+        }
       }
     }
 
     if (cards.length > 0) {
+      console.log("[v0] Processing", cards.length, "cards")
       for (const card of cards) {
+        console.log("[v0] Processing card for player_id:", card.player_id)
+
         const { data: player, error: playerError } = await supabase
           .from("players")
           .select("id, yellow_cards, red_cards")
@@ -171,29 +201,35 @@ export async function updateMatchResult(
 
         if (playerError || !player) {
           console.error("[v0] Error finding player by ID:", card.player_id, playerError)
+          results.cardsFailed++
           continue
         }
 
-        console.log("[v0] Found player by ID:", {
+        console.log("[v0] Found player:", {
           playerId: player.id,
           currentYellowCards: player.yellow_cards,
           currentRedCards: player.red_cards,
         })
 
-        const { error: cardError } = await supabase.from("cards").insert({
-          match_id: matchId,
-          player_id: player.id,
-          team_id: card.team_id,
-          card_type: card.card_type,
-          minute: card.minute,
-        })
+        const { data: cardData, error: cardError } = await supabase
+          .from("cards")
+          .insert({
+            match_id: matchId,
+            player_id: player.id,
+            team_id: card.team_id,
+            card_type: card.card_type,
+            minute: card.minute,
+          })
+          .select()
 
         if (cardError) {
           console.error("[v0] Error inserting card:", cardError)
+          results.cardsFailed++
           continue
         }
 
-        console.log("[v0] Card inserted successfully for player:", player.id)
+        console.log("[v0] Card inserted successfully:", cardData)
+        results.cardsInserted++
 
         const updates: any = {}
 
@@ -210,7 +246,16 @@ export async function updateMatchResult(
         }
 
         console.log("[v0] Updating player cards:", { playerId: player.id, updates })
-        await supabase.from("players").update(updates).eq("id", player.id)
+
+        const { error: updateError } = await supabase.from("players").update(updates).eq("id", player.id)
+
+        if (updateError) {
+          console.error("[v0] Error updating player cards:", updateError)
+          results.playersFailed++
+        } else {
+          console.log("[v0] Player cards updated successfully")
+          results.playersUpdated++
+        }
       }
     }
 
@@ -232,8 +277,8 @@ export async function updateMatchResult(
     }
 
     revalidatePath("/")
-    console.log("[v0] Match result updated successfully")
-    return { success: true }
+    console.log("[v0] Match result updated successfully. Results:", results)
+    return { success: true, results }
   } catch (error: any) {
     console.error("[v0] Error in updateMatchResult:", error)
     return { success: false, error: error.message || "Error al actualizar el resultado del partido" }

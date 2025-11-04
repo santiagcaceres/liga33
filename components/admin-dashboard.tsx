@@ -606,6 +606,17 @@ export default function AdminDashboard() {
         cardsData,
       )
 
+      console.log("[v0] updateMatchResult response:", result)
+
+      if (result.results) {
+        console.log("[v0] ✅ Goals inserted:", result.results.goalsInserted)
+        console.log("[v0] ❌ Goals failed:", result.results.goalsFailed)
+        console.log("[v0] ✅ Cards inserted:", result.results.cardsInserted)
+        console.log("[v0] ❌ Cards failed:", result.results.cardsFailed)
+        console.log("[v0] ✅ Players updated:", result.results.playersUpdated)
+        console.log("[v0] ❌ Players failed:", result.results.playersFailed)
+      }
+
       if (!result.success) {
         toast({
           title: "Error",
