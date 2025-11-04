@@ -455,45 +455,23 @@ export default function AdminDashboard() {
   }, [selectedMatch])
 
   const addHomeGoal = () => {
-    if (homeGoalPlayer && homeGoalMinute) {
-      const playerId = Number.parseInt(homeGoalPlayer)
-      console.log("[v0] Adding home goal for player ID:", playerId)
-      setHomeGoals([...homeGoals, { player_id: playerId, minute: homeGoalMinute }])
-      setHomeGoalPlayer("")
-      setHomeGoalMinute("")
-    }
+    console.log("[v0] Adding empty home goal row")
+    setHomeGoals([...homeGoals, { player_id: 0, minute: "" }])
   }
 
   const addAwayGoal = () => {
-    if (awayGoalPlayer && awayGoalMinute) {
-      const playerId = Number.parseInt(awayGoalPlayer)
-      console.log("[v0] Adding away goal for player ID:", playerId)
-      setAwayGoals([...awayGoals, { player_id: playerId, minute: awayGoalMinute }])
-      setAwayGoalPlayer("")
-      setAwayGoalMinute("")
-    }
+    console.log("[v0] Adding empty away goal row")
+    setAwayGoals([...awayGoals, { player_id: 0, minute: "" }])
   }
 
   const addHomeCard = () => {
-    if (homeCardPlayer && homeCardType && homeCardMinute) {
-      const playerId = Number.parseInt(homeCardPlayer)
-      console.log("[v0] Adding home card for player ID:", playerId)
-      setHomeCards([...homeCards, { player_id: playerId, card_type: homeCardType, minute: homeCardMinute }])
-      setHomeCardPlayer("")
-      setHomeCardType("")
-      setHomeCardMinute("")
-    }
+    console.log("[v0] Adding empty home card row")
+    setHomeCards([...homeCards, { player_id: 0, card_type: "yellow", minute: "" }])
   }
 
   const addAwayCard = () => {
-    if (awayCardPlayer && awayCardType && awayCardMinute) {
-      const playerId = Number.parseInt(awayCardPlayer)
-      console.log("[v0] Adding away card for player ID:", playerId)
-      setAwayCards([...awayCards, { player_id: playerId, card_type: awayCardType, minute: awayCardMinute }])
-      setAwayCardPlayer("")
-      setAwayCardType("")
-      setAwayCardMinute("")
-    }
+    console.log("[v0] Adding empty away card row")
+    setAwayCards([...awayCards, { player_id: 0, card_type: "yellow", minute: "" }])
   }
 
   const removeHomeGoal = (index: number) => {
