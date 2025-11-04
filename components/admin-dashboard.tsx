@@ -489,23 +489,43 @@ export default function AdminDashboard() {
 
   const handleSubmitResult = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedMatch) return
+    const allGoals = [
+      ...homeGoals.map((g) => ({
+        player_id: g.player_id,
+        team_id: selectedMatch!.home_team_id,
+        minute: g.minute,
+      })),
+      ...awayGoals.map((g) => ({
+        player_id: g.player_id,
+        team_id: selectedMatch!.away_team_id,
+        minute: g.minute,
+      })),
+    ].filter((g) => g.player_id > 0) // Filter out empty rows
 
-    console.log("[v0] Submitting result for match:", selectedMatch.id)
-    console.log("[v0] Home goals:", homeGoals)
-    console.log("[v0] Away goals:", awayGoals)
-    console.log("[v0] Home cards:", homeCards)
-    console.log("[v0] Away cards:", awayCards)
+    const allCards = [
+      ...homeCards.map((c) => ({
+        player_id: c.player_id,
+        team_id: selectedMatch!.home_team_id,
+        card_type: c.card_type,
+        minute: c.minute,
+      })),
+      ...awayCards.map((c) => ({
+        player_id: c.player_id,
+        team_id: selectedMatch!.away_team_id,
+        card_type: c.card_type,
+        minute: c.minute,
+      })),
+    ].filter((c) => c.player_id > 0) // Filter out empty rows
+
+    console.log("[v0] Submitting result with goals:", allGoals, "and cards:", allCards)
 
     try {
       const result = await updateMatchResult(
         selectedMatch.id,
         Number.parseInt(homeScore),
         Number.parseInt(awayScore),
-        homeGoals,
-        awayGoals,
-        homeCards,
-        awayCards,
+        allGoals,
+        allCards,
       )
 
       if (!result.success) {
@@ -1816,12 +1836,9 @@ export default function AdminDashboard() {
                               {homeGoals.map((goal, index) => (
                                 <div key={index} className="flex gap-2 items-end">
                                   <div className="flex-1">
-                                    {/* Actualizando los selects para que el value sea el ID del jugador como string */}
                                     <Select
-                                      value={homeGoalPlayer}
+                                      value={goal.player_id > 0 ? goal.player_id.toString() : ""}
                                       onValueChange={(value) => {
-                                        setHomeGoalPlayer(value)
-                                        // Update the goal object immediately if player is selected
                                         if (value) {
                                           const updatedGoals = [...homeGoals]
                                           updatedGoals[index] = {
@@ -1885,68 +1902,64 @@ export default function AdminDashboard() {
                                   Agregar Amarilla
                                 </Button>
                               </div>
-                              {homeCards.map((card, index) => (
-                                <div key={index} className="flex gap-2 items-end">
-                                  <div className="flex-1">
-                                    <Select
-                                      value={homeCardPlayer}
-                                      onValueChange={(value) => {
-                                        setHomeCardPlayer(value)
-                                        if (value) {
-                                          const updatedCards = [...homeCards]
-                                          updatedCards[index] = {
-                                            ...updatedCards[index],
-                                            player_id: Number.parseInt(value),
-                                          }
-                                          setHomeCards(updatedCards)
-                                        }
-                                      }}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar jugador" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {selectedMatch?.home_team?.players?.map((player: Player) => (
-                                          <SelectItem key={player.id} value={player.id.toString()}>
-                                            {player.name}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="w-24">
-                                    <Select value={homeCardType} onValueChange={setHomeCardType} defaultValue="yellow">
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Tipo" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="yellow">Amarilla</SelectItem>
-                                        <SelectItem value="red">Roja</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="w-20">
-                                    <Input
-                                      placeholder="Min"
-                                      value={card.minute}
-                                      onChange={(e) => {
-                                        const updatedCards = [...homeCards]
-                                        updatedCards[index] = { ...updatedCards[index], minute: e.target.value }
-                                        setHomeCards(updatedCards)
-                                      }}
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeHomeCard(index)}
-                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              ))}
+                              {homeCards
+                                .filter((c) => c.card_type === "yellow")
+                                .map((card, index) => {
+                                  const originalIndex = homeCards.findIndex((c) => c === card)
+                                  return (
+                                    <div key={index} className="flex gap-2 items-end">
+                                      <div className="flex-1">
+                                        <Select
+                                          value={card.player_id > 0 ? card.player_id.toString() : ""}
+                                          onValueChange={(value) => {
+                                            if (value) {
+                                              const updatedCards = [...homeCards]
+                                              updatedCards[originalIndex] = {
+                                                ...updatedCards[originalIndex],
+                                                player_id: Number.parseInt(value),
+                                              }
+                                              setHomeCards(updatedCards)
+                                            }
+                                          }}
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Seleccionar jugador" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {selectedMatch?.home_team?.players?.map((player: Player) => (
+                                              <SelectItem key={player.id} value={player.id.toString()}>
+                                                {player.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="w-20">
+                                        <Input
+                                          placeholder="Min"
+                                          value={card.minute}
+                                          onChange={(e) => {
+                                            const updatedCards = [...homeCards]
+                                            updatedCards[originalIndex] = {
+                                              ...updatedCards[originalIndex],
+                                              minute: e.target.value,
+                                            }
+                                            setHomeCards(updatedCards)
+                                          }}
+                                        />
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => removeHomeCard(originalIndex)}
+                                        className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  )
+                                })}
                             </div>
 
                             {/* Tarjetas Rojas Local */}
@@ -1966,98 +1979,86 @@ export default function AdminDashboard() {
                                   Agregar Roja
                                 </Button>
                               </div>
-                              {/* Re-using homeCards state for red cards for simplicity */}
                               {homeCards
-                                .filter((card) => card.card_type === "red")
-                                .map((card, index) => (
-                                  <div key={index} className="flex gap-2 items-end">
-                                    <div className="flex-1">
-                                      <Select
-                                        value={homeCardPlayer}
-                                        onValueChange={(value) => {
-                                          setHomeCardPlayer(value)
-                                          if (value) {
-                                            const updatedCards = [...homeCards]
-                                            const originalIndex = homeCards.findIndex(
-                                              (c) =>
-                                                c.player_id === card.player_id &&
-                                                c.minute === card.minute &&
-                                                c.card_type === "red",
-                                            )
-                                            if (originalIndex !== -1) {
+                                .filter((c) => c.card_type === "red")
+                                .map((card, index) => {
+                                  const originalIndex = homeCards.findIndex((c) => c === card)
+                                  return (
+                                    <div key={index} className="flex gap-2 items-end">
+                                      <div className="flex-1">
+                                        <Select
+                                          value={card.player_id > 0 ? card.player_id.toString() : ""}
+                                          onValueChange={(value) => {
+                                            if (value) {
+                                              const updatedCards = [...homeCards]
                                               updatedCards[originalIndex] = {
                                                 ...updatedCards[originalIndex],
                                                 player_id: Number.parseInt(value),
                                               }
                                               setHomeCards(updatedCards)
                                             }
-                                          }
-                                        }}
-                                      >
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Seleccionar jugador" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {selectedMatch?.home_team?.players?.map((player: Player) => (
-                                            <SelectItem key={player.id} value={player.id.toString()}>
-                                              {player.name}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <div className="w-24">
-                                      <Select value={homeCardType} onValueChange={setHomeCardType} defaultValue="red">
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Tipo" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="yellow">Amarilla</SelectItem>
-                                          <SelectItem value="red">Roja</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <div className="w-20">
-                                      <Input
-                                        placeholder="Min"
-                                        value={card.minute}
-                                        onChange={(e) => {
-                                          const updatedCards = [...homeCards]
-                                          const originalIndex = homeCards.findIndex(
-                                            (c) =>
-                                              c.player_id === card.player_id &&
-                                              c.minute === card.minute &&
-                                              c.card_type === "red",
-                                          )
-                                          if (originalIndex !== -1) {
+                                          }}
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Seleccionar jugador" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {selectedMatch?.home_team?.players?.map((player: Player) => (
+                                              <SelectItem key={player.id} value={player.id.toString()}>
+                                                {player.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="w-24">
+                                        <Select
+                                          value={card.card_type}
+                                          onValueChange={(value) => {
+                                            const updatedCards = [...homeCards]
+                                            updatedCards[originalIndex] = {
+                                              ...updatedCards[originalIndex],
+                                              card_type: value,
+                                            }
+                                            setHomeCards(updatedCards)
+                                          }}
+                                          defaultValue="red"
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Tipo" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="yellow">Amarilla</SelectItem>
+                                            <SelectItem value="red">Roja</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="w-20">
+                                        <Input
+                                          placeholder="Min"
+                                          value={card.minute}
+                                          onChange={(e) => {
+                                            const updatedCards = [...homeCards]
                                             updatedCards[originalIndex] = {
                                               ...updatedCards[originalIndex],
                                               minute: e.target.value,
                                             }
                                             setHomeCards(updatedCards)
-                                          }
-                                        }}
-                                      />
+                                          }}
+                                        />
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => removeHomeCard(originalIndex)}
+                                        className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
                                     </div>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        const originalIndex = homeCards.findIndex(
-                                          (c) =>
-                                            c.player_id === card.player_id &&
-                                            c.minute === card.minute &&
-                                            c.card_type === "red",
-                                        )
-                                        if (originalIndex !== -1) removeHomeCard(originalIndex)
-                                      }}
-                                      className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                ))}
+                                  )
+                                })}
                             </div>
 
                             {/* Goleadores Visitante */}
@@ -2081,9 +2082,8 @@ export default function AdminDashboard() {
                                 <div key={index} className="flex gap-2 items-end">
                                   <div className="flex-1">
                                     <Select
-                                      value={awayGoalPlayer}
+                                      value={goal.player_id > 0 ? goal.player_id.toString() : ""}
                                       onValueChange={(value) => {
-                                        setAwayGoalPlayer(value)
                                         if (value) {
                                           const updatedGoals = [...awayGoals]
                                           updatedGoals[index] = {
@@ -2147,68 +2147,64 @@ export default function AdminDashboard() {
                                   Agregar Amarilla
                                 </Button>
                               </div>
-                              {awayCards.map((card, index) => (
-                                <div key={index} className="flex gap-2 items-end">
-                                  <div className="flex-1">
-                                    <Select
-                                      value={awayCardPlayer}
-                                      onValueChange={(value) => {
-                                        setAwayCardPlayer(value)
-                                        if (value) {
-                                          const updatedCards = [...awayCards]
-                                          updatedCards[index] = {
-                                            ...updatedCards[index],
-                                            player_id: Number.parseInt(value),
-                                          }
-                                          setAwayCards(updatedCards)
-                                        }
-                                      }}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar jugador" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {selectedMatch?.away_team?.players?.map((player: Player) => (
-                                          <SelectItem key={player.id} value={player.id.toString()}>
-                                            {player.name}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="w-24">
-                                    <Select value={awayCardType} onValueChange={setAwayCardType} defaultValue="yellow">
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Tipo" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="yellow">Amarilla</SelectItem>
-                                        <SelectItem value="red">Roja</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="w-20">
-                                    <Input
-                                      placeholder="Min"
-                                      value={card.minute}
-                                      onChange={(e) => {
-                                        const updatedCards = [...awayCards]
-                                        updatedCards[index] = { ...updatedCards[index], minute: e.target.value }
-                                        setAwayCards(updatedCards)
-                                      }}
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeAwayCard(index)}
-                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              ))}
+                              {awayCards
+                                .filter((c) => c.card_type === "yellow")
+                                .map((card, index) => {
+                                  const originalIndex = awayCards.findIndex((c) => c === card)
+                                  return (
+                                    <div key={index} className="flex gap-2 items-end">
+                                      <div className="flex-1">
+                                        <Select
+                                          value={card.player_id > 0 ? card.player_id.toString() : ""}
+                                          onValueChange={(value) => {
+                                            if (value) {
+                                              const updatedCards = [...awayCards]
+                                              updatedCards[originalIndex] = {
+                                                ...updatedCards[originalIndex],
+                                                player_id: Number.parseInt(value),
+                                              }
+                                              setAwayCards(updatedCards)
+                                            }
+                                          }}
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Seleccionar jugador" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {selectedMatch?.away_team?.players?.map((player: Player) => (
+                                              <SelectItem key={player.id} value={player.id.toString()}>
+                                                {player.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="w-20">
+                                        <Input
+                                          placeholder="Min"
+                                          value={card.minute}
+                                          onChange={(e) => {
+                                            const updatedCards = [...awayCards]
+                                            updatedCards[originalIndex] = {
+                                              ...updatedCards[originalIndex],
+                                              minute: e.target.value,
+                                            }
+                                            setAwayCards(updatedCards)
+                                          }}
+                                        />
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => removeAwayCard(originalIndex)}
+                                        className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  )
+                                })}
                             </div>
 
                             {/* Tarjetas Rojas Visitante */}
@@ -2228,98 +2224,86 @@ export default function AdminDashboard() {
                                   Agregar Roja
                                 </Button>
                               </div>
-                              {/* Re-using awayCards state for red cards for simplicity */}
                               {awayCards
-                                .filter((card) => card.card_type === "red")
-                                .map((card, index) => (
-                                  <div key={index} className="flex gap-2 items-end">
-                                    <div className="flex-1">
-                                      <Select
-                                        value={awayCardPlayer}
-                                        onValueChange={(value) => {
-                                          setAwayCardPlayer(value)
-                                          if (value) {
-                                            const updatedCards = [...awayCards]
-                                            const originalIndex = awayCards.findIndex(
-                                              (c) =>
-                                                c.player_id === card.player_id &&
-                                                c.minute === card.minute &&
-                                                c.card_type === "red",
-                                            )
-                                            if (originalIndex !== -1) {
+                                .filter((c) => c.card_type === "red")
+                                .map((card, index) => {
+                                  const originalIndex = awayCards.findIndex((c) => c === card)
+                                  return (
+                                    <div key={index} className="flex gap-2 items-end">
+                                      <div className="flex-1">
+                                        <Select
+                                          value={card.player_id > 0 ? card.player_id.toString() : ""}
+                                          onValueChange={(value) => {
+                                            if (value) {
+                                              const updatedCards = [...awayCards]
                                               updatedCards[originalIndex] = {
                                                 ...updatedCards[originalIndex],
                                                 player_id: Number.parseInt(value),
                                               }
                                               setAwayCards(updatedCards)
                                             }
-                                          }
-                                        }}
-                                      >
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Seleccionar jugador" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {selectedMatch?.away_team?.players?.map((player: Player) => (
-                                            <SelectItem key={player.id} value={player.id.toString()}>
-                                              {player.name}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <div className="w-24">
-                                      <Select value={awayCardType} onValueChange={setAwayCardType} defaultValue="red">
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Tipo" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="yellow">Amarilla</SelectItem>
-                                          <SelectItem value="red">Roja</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <div className="w-20">
-                                      <Input
-                                        placeholder="Min"
-                                        value={card.minute}
-                                        onChange={(e) => {
-                                          const updatedCards = [...awayCards]
-                                          const originalIndex = awayCards.findIndex(
-                                            (c) =>
-                                              c.player_id === card.player_id &&
-                                              c.minute === card.minute &&
-                                              c.card_type === "red",
-                                          )
-                                          if (originalIndex !== -1) {
+                                          }}
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Seleccionar jugador" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {selectedMatch?.away_team?.players?.map((player: Player) => (
+                                              <SelectItem key={player.id} value={player.id.toString()}>
+                                                {player.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="w-24">
+                                        <Select
+                                          value={card.card_type}
+                                          onValueChange={(value) => {
+                                            const updatedCards = [...awayCards]
+                                            updatedCards[originalIndex] = {
+                                              ...updatedCards[originalIndex],
+                                              card_type: value,
+                                            }
+                                            setAwayCards(updatedCards)
+                                          }}
+                                          defaultValue="red"
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Tipo" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="yellow">Amarilla</SelectItem>
+                                            <SelectItem value="red">Roja</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="w-20">
+                                        <Input
+                                          placeholder="Min"
+                                          value={card.minute}
+                                          onChange={(e) => {
+                                            const updatedCards = [...awayCards]
                                             updatedCards[originalIndex] = {
                                               ...updatedCards[originalIndex],
                                               minute: e.target.value,
                                             }
                                             setAwayCards(updatedCards)
-                                          }
-                                        }}
-                                      />
+                                          }}
+                                        />
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => removeAwayCard(originalIndex)}
+                                        className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
                                     </div>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        const originalIndex = awayCards.findIndex(
-                                          (c) =>
-                                            c.player_id === card.player_id &&
-                                            c.minute === card.minute &&
-                                            c.card_type === "red",
-                                        )
-                                        if (originalIndex !== -1) removeAwayCard(originalIndex)
-                                      }}
-                                      className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                ))}
+                                  )
+                                })}
                             </div>
 
                             <Button
