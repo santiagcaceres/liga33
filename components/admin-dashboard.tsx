@@ -509,76 +509,82 @@ export default function AdminDashboard() {
 
     const goalsData = [
       ...homeGoals
-        .filter((g) => g.player && g.minute)
+        .filter((g) => g.player)
         .map((g) => {
           const player_id = Number.parseInt(g.player)
-          console.log("[v0] Processing home goal:", { player_id, minute: g.minute })
+          const minute = g.minute ? Number.parseInt(g.minute) : 0
+          console.log("[v0] Processing home goal:", { player_id, minute })
           return {
             player_id,
             team_id: selectedMatch.home_team_id,
-            minute: Number.parseInt(g.minute),
+            minute,
           }
         }),
       ...awayGoals
-        .filter((g) => g.player && g.minute)
+        .filter((g) => g.player)
         .map((g) => {
           const player_id = Number.parseInt(g.player)
-          console.log("[v0] Processing away goal:", { player_id, minute: g.minute })
+          const minute = g.minute ? Number.parseInt(g.minute) : 0
+          console.log("[v0] Processing away goal:", { player_id, minute })
           return {
             player_id,
             team_id: selectedMatch.away_team_id,
-            minute: Number.parseInt(g.minute),
+            minute,
           }
         }),
     ]
 
     const cardsData = [
       ...homeYellowCards
-        .filter((c) => c.player && c.minute)
+        .filter((c) => c.player)
         .map((c) => {
           const player_id = Number.parseInt(c.player)
-          console.log("[v0] Processing home yellow card:", { player_id, minute: c.minute })
+          const minute = c.minute ? Number.parseInt(c.minute) : 0
+          console.log("[v0] Processing home yellow card:", { player_id, minute })
           return {
             player_id,
             team_id: selectedMatch.home_team_id,
             card_type: "yellow" as const,
-            minute: Number.parseInt(c.minute),
+            minute,
           }
         }),
       ...awayYellowCards
-        .filter((c) => c.player && c.minute)
+        .filter((c) => c.player)
         .map((c) => {
           const player_id = Number.parseInt(c.player)
-          console.log("[v0] Processing away yellow card:", { player_id, minute: c.minute })
+          const minute = c.minute ? Number.parseInt(c.minute) : 0
+          console.log("[v0] Processing away yellow card:", { player_id, minute })
           return {
             player_id,
             team_id: selectedMatch.away_team_id,
             card_type: "yellow" as const,
-            minute: Number.parseInt(c.minute),
+            minute,
           }
         }),
       ...homeRedCards
-        .filter((c) => c.player && c.minute)
+        .filter((c) => c.player)
         .map((c) => {
           const player_id = Number.parseInt(c.player)
-          console.log("[v0] Processing home red card:", { player_id, minute: c.minute })
+          const minute = c.minute ? Number.parseInt(c.minute) : 0
+          console.log("[v0] Processing home red card:", { player_id, minute })
           return {
             player_id,
             team_id: selectedMatch.home_team_id,
             card_type: "red" as const,
-            minute: Number.parseInt(c.minute),
+            minute,
           }
         }),
       ...awayRedCards
-        .filter((c) => c.player && c.minute)
+        .filter((c) => c.player)
         .map((c) => {
           const player_id = Number.parseInt(c.player)
-          console.log("[v0] Processing away red card:", { player_id, minute: c.minute })
+          const minute = c.minute ? Number.parseInt(c.minute) : 0
+          console.log("[v0] Processing away red card:", { player_id, minute })
           return {
             player_id,
             team_id: selectedMatch.away_team_id,
             card_type: "red" as const,
-            minute: Number.parseInt(c.minute),
+            minute,
           }
         }),
     ]
