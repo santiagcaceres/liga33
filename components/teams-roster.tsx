@@ -17,7 +17,6 @@ interface Player {
   yellow_cards: number
   red_cards: number
   suspended: boolean
-  team_id: number
 }
 
 interface Team {
@@ -32,42 +31,21 @@ export default function TeamsRoster() {
   const [teams, setTeams] = useState<Team[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingPlayers, setIsLoadingPlayers] = useState(false)
 
   useEffect(() => {
-    loadTeams()
+    loadData()
   }, [])
 
-  const loadTeams = async () => {
+  const loadData = async () => {
     setIsLoading(true)
     try {
-      const teamsData = await getTeams()
+      const [teamsData, playersData] = await Promise.all([getTeams(), getPlayers()])
       setTeams(teamsData)
-    } catch (error) {
-      console.error("[v0] Error loading teams:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const loadPlayersForTeam = async (teamId: string) => {
-    setIsLoadingPlayers(true)
-    try {
-      const playersData = await getPlayers(Number.parseInt(teamId))
       setPlayers(playersData)
     } catch (error) {
-      console.error("[v0] Error loading players:", error)
+      console.error("[v0] Error loading teams and players:", error)
     } finally {
-      setIsLoadingPlayers(false)
-    }
-  }
-
-  const handleTeamChange = (teamId: string) => {
-    setSelectedTeam(teamId)
-    if (teamId) {
-      loadPlayersForTeam(teamId)
-    } else {
-      setPlayers([])
+      setIsLoading(false)
     }
   }
 
@@ -113,7 +91,7 @@ export default function TeamsRoster() {
           ) : (
             <>
               <div className="mb-6">
-                <Select value={selectedTeam} onValueChange={handleTeamChange}>
+                <Select value={selectedTeam} onValueChange={setSelectedTeam}>
                   <SelectTrigger className="w-full max-w-md border-primary/30">
                     <SelectValue placeholder="Selecciona un equipo" />
                   </SelectTrigger>
@@ -149,12 +127,7 @@ export default function TeamsRoster() {
                     </div>
                   </div>
 
-                  {isLoadingPlayers ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Users className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary animate-pulse" />
-                      <p>Cargando jugadores...</p>
-                    </div>
-                  ) : currentTeamPlayers.length === 0 ? (
+                  {currentTeamPlayers.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Users className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
                       <p>Este equipo no tiene jugadores registrados</p>
