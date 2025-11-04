@@ -65,8 +65,8 @@ interface Match {
   home_score?: number
   away_score?: number
   played?: boolean
-  home_team?: { name: string; id: number; ci: string } // Added CI to player interface for fetching
-  away_team?: { name: string; id: number; ci: string } // Added CI to player interface for fetching
+  home_team?: { name: string; id: number; ci: string; players?: Player[] } // Added CI to player interface for fetching
+  away_team?: { name: string; id: number; ci: string; players?: Player[] } // Added CI to player interface for fetching
   copa_groups?: { name: string; id: number }
 }
 
@@ -107,6 +107,7 @@ export default function AdminDashboard() {
 
   const [selectedRound, setSelectedRound] = useState("1")
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null) // Added to hold selected match details
 
   const [showDrawConfirm, setShowDrawConfirm] = useState(false)
   const [showResultConfirm, setShowResultConfirm] = useState(false)
@@ -126,12 +127,23 @@ export default function AdminDashboard() {
 
   const [homeScore, setHomeScore] = useState("")
   const [awayScore, setAwayScore] = useState("")
-  const [homeGoals, setHomeGoals] = useState([{ player: "", minute: "" }])
-  const [awayGoals, setAwayGoals] = useState([{ player: "", minute: "" }])
-  const [homeYellowCards, setHomeYellowCards] = useState([{ player: "", minute: "" }])
-  const [awayYellowCards, setAwayYellowCards] = useState([{ player: "", minute: "" }])
-  const [homeRedCards, setHomeRedCards] = useState([{ player: "", minute: "" }])
-  const [awayRedCards, setAwayRedCards] = useState([{ player: "", minute: "" }])
+
+  const [homeGoals, setHomeGoals] = useState<Array<{ player_id: number; minute: string }>>([])
+  const [awayGoals, setAwayGoals] = useState<Array<{ player_id: number; minute: string }>>([])
+  const [homeCards, setHomeCards] = useState<Array<{ player_id: number; card_type: string; minute: string }>>([])
+  const [awayCards, setAwayCards] = useState<Array<{ player_id: number; card_type: string; minute: string }>>([])
+
+  // State for selecting players for goals/cards
+  const [homeGoalPlayer, setHomeGoalPlayer] = useState<string>("")
+  const [homeGoalMinute, setHomeGoalMinute] = useState<string>("")
+  const [awayGoalPlayer, setAwayGoalPlayer] = useState<string>("")
+  const [awayGoalMinute, setAwayGoalMinute] = useState<string>("")
+  const [homeCardPlayer, setHomeCardPlayer] = useState<string>("")
+  const [homeCardType, setHomeCardType] = useState<string>("")
+  const [homeCardMinute, setHomeCardMinute] = useState<string>("")
+  const [awayCardPlayer, setAwayCardPlayer] = useState<string>("")
+  const [awayCardType, setAwayCardType] = useState<string>("")
+  const [awayCardMinute, setAwayCardMinute] = useState<string>("")
 
   const [newTeam, setNewTeam] = useState({ name: "", logo_url: "" })
   const [teams, setTeams] = useState<Team[]>([])
@@ -389,246 +401,178 @@ export default function AdminDashboard() {
     }
   }, [isAuthenticated])
 
+  // Fetch match details when selectedMatchId changes
   useEffect(() => {
-    if (selectedMatchId !== null) {
+    const fetchSelectedMatchDetails = async () => {
+      if (selectedMatchId === null) {
+        setSelectedMatch(null)
+        return
+      }
+      const match = matches.find((m) => m.id === selectedMatchId)
+      if (match) {
+        // Fetch players for the selected match's teams
+        const supabase = await createClient()
+        const { data: homeTeamPlayers } = await supabase
+          .from("players")
+          .select("id, name, number, cedula, team_id")
+          .eq("team_id", match.home_team_id!)
+        const { data: awayTeamPlayers } = await supabase
+          .from("players")
+          .select("id, name, number, cedula, team_id")
+          .eq("team_id", match.away_team_id!)
+
+        setSelectedMatch({
+          ...match,
+          home_team: { ...match.home_team!, players: homeTeamPlayers || [] },
+          away_team: { ...match.away_team!, players: awayTeamPlayers || [] },
+        })
+      }
+    }
+    fetchSelectedMatchDetails()
+  }, [selectedMatchId, matches])
+
+  useEffect(() => {
+    if (selectedMatch !== null) {
+      // Reset form fields when a new match is selected
       setHomeScore("")
       setAwayScore("")
-      setHomeGoals([{ player: "", minute: "" }])
-      setAwayGoals([{ player: "", minute: "" }])
-      setHomeYellowCards([{ player: "", minute: "" }])
-      setAwayYellowCards([{ player: "", minute: "" }])
-      setHomeRedCards([{ player: "", minute: "" }])
-      setAwayRedCards([{ player: "", minute: "" }])
+      setHomeGoals([])
+      setAwayGoals([])
+      setHomeCards([])
+      setAwayCards([])
+      // Reset individual player/card inputs
+      setHomeGoalPlayer("")
+      setHomeGoalMinute("")
+      setAwayGoalPlayer("")
+      setAwayGoalMinute("")
+      setHomeCardPlayer("")
+      setHomeCardType("")
+      setHomeCardMinute("")
+      setAwayCardPlayer("")
+      setAwayCardType("")
+      setAwayCardMinute("")
     }
-  }, [selectedMatchId])
+  }, [selectedMatch])
 
-  const addIncident = (type: "goal" | "yellow" | "red", team: "home" | "away") => {
-    if (type === "goal") {
-      if (team === "home") {
-        setHomeGoals([...homeGoals, { player: "", minute: "" }])
-      } else {
-        setAwayGoals([...awayGoals, { player: "", minute: "" }])
-      }
-    } else if (type === "yellow") {
-      if (team === "home") {
-        setHomeYellowCards([...homeYellowCards, { player: "", minute: "" }])
-      } else {
-        setAwayYellowCards([...awayYellowCards, { player: "", minute: "" }])
-      }
-    } else if (type === "red") {
-      if (team === "home") {
-        setHomeRedCards([...homeRedCards, { player: "", minute: "" }])
-      } else {
-        setAwayRedCards([...awayRedCards, { player: "", minute: "" }])
-      }
+  const addHomeGoal = () => {
+    if (homeGoalPlayer && homeGoalMinute) {
+      const playerId = Number.parseInt(homeGoalPlayer)
+      console.log("[v0] Adding home goal for player ID:", playerId)
+      setHomeGoals([...homeGoals, { player_id: playerId, minute: homeGoalMinute }])
+      setHomeGoalPlayer("")
+      setHomeGoalMinute("")
     }
   }
 
-  const removeIncident = (type: "goal" | "yellow" | "red", team: "home" | "away", index: number) => {
-    if (type === "goal") {
-      if (team === "home") {
-        setHomeGoals(homeGoals.filter((_, i) => i !== index))
-      } else {
-        setAwayGoals(awayGoals.filter((_, i) => i !== index))
-      }
-    } else if (type === "yellow") {
-      if (team === "home") {
-        setHomeYellowCards(homeYellowCards.filter((_, i) => i !== index))
-      } else {
-        setAwayYellowCards(awayYellowCards.filter((_, i) => i !== index))
-      }
-    } else if (type === "red") {
-      if (team === "home") {
-        setHomeRedCards(homeRedCards.filter((_, i) => i !== index))
-      } else {
-        setAwayRedCards(awayRedCards.filter((_, i) => i !== index))
-      }
+  const addAwayGoal = () => {
+    if (awayGoalPlayer && awayGoalMinute) {
+      const playerId = Number.parseInt(awayGoalPlayer)
+      console.log("[v0] Adding away goal for player ID:", playerId)
+      setAwayGoals([...awayGoals, { player_id: playerId, minute: awayGoalMinute }])
+      setAwayGoalPlayer("")
+      setAwayGoalMinute("")
     }
   }
 
-  const updateIncident = (
-    type: "goal" | "yellow" | "red",
-    team: "home" | "away",
-    index: number,
-    field: "player" | "minute",
-    value: string,
-  ) => {
-    if (type === "goal") {
-      if (team === "home") {
-        const updated = [...homeGoals]
-        updated[index][field] = value
-        setHomeGoals(updated)
-      } else {
-        const updated = [...awayGoals]
-        updated[index][field] = value
-        setAwayGoals(updated)
-      }
-    } else if (type === "yellow") {
-      if (team === "home") {
-        const updated = [...homeYellowCards]
-        updated[index][field] = value
-        setHomeYellowCards(updated)
-      } else {
-        const updated = [...awayYellowCards]
-        updated[index][field] = value
-        setAwayYellowCards(updated)
-      }
-    } else if (type === "red") {
-      if (team === "home") {
-        const updated = [...homeRedCards]
-        updated[index][field] = value
-        setHomeRedCards(updated)
-      } else {
-        const updated = [...awayRedCards]
-        updated[index][field] = value
-        setAwayRedCards(updated)
-      }
+  const addHomeCard = () => {
+    if (homeCardPlayer && homeCardType && homeCardMinute) {
+      const playerId = Number.parseInt(homeCardPlayer)
+      console.log("[v0] Adding home card for player ID:", playerId)
+      setHomeCards([...homeCards, { player_id: playerId, card_type: homeCardType, minute: homeCardMinute }])
+      setHomeCardPlayer("")
+      setHomeCardType("")
+      setHomeCardMinute("")
     }
   }
 
-  const handleSubmitResult = async () => {
-    const selectedMatch = matches.find((m) => m.id === selectedMatchId)
-    if (!selectedMatch) {
-      toast({
-        title: "Error",
-        description: "Partido no encontrado.",
-        variant: "destructive",
-      })
-      return
+  const addAwayCard = () => {
+    if (awayCardPlayer && awayCardType && awayCardMinute) {
+      const playerId = Number.parseInt(awayCardPlayer)
+      console.log("[v0] Adding away card for player ID:", playerId)
+      setAwayCards([...awayCards, { player_id: playerId, card_type: awayCardType, minute: awayCardMinute }])
+      setAwayCardPlayer("")
+      setAwayCardType("")
+      setAwayCardMinute("")
     }
+  }
 
-    const calculatedHomeScore = homeGoals.filter((g) => g.player).length
-    const calculatedAwayScore = awayGoals.filter((g) => g.player).length
+  const removeHomeGoal = (index: number) => {
+    setHomeGoals(homeGoals.filter((_, i) => i !== index))
+  }
+  const removeAwayGoal = (index: number) => {
+    setAwayGoals(awayGoals.filter((_, i) => i !== index))
+  }
+  const removeHomeCard = (index: number) => {
+    setHomeCards(homeCards.filter((_, i) => i !== index))
+  }
+  const removeAwayCard = (index: number) => {
+    setAwayCards(awayCards.filter((_, i) => i !== index))
+  }
 
-    const getPlayerCI = (playerId: string): string | null => {
-      const player = players.find((p) => p.id.toString() === playerId)
-      console.log("[v0] Getting cedula for player ID:", playerId, "Found:", player?.cedula)
-      return player?.cedula || null
-    }
+  const handleSubmitResult = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedMatch) return
 
-    const goalsData = [
-      ...homeGoals
-        .filter((g) => g.player && g.minute)
-        .map((g) => {
-          const player_ci = getPlayerCI(g.player)
-          console.log("[v0] Processing home goal:", { playerId: g.player, player_ci, minute: g.minute })
-          return {
-            player_ci: player_ci!,
-            team_id: selectedMatch.home_team_id,
-            minute: Number.parseInt(g.minute),
-          }
-        }),
-      ...awayGoals
-        .filter((g) => g.player && g.minute)
-        .map((g) => {
-          const player_ci = getPlayerCI(g.player)
-          console.log("[v0] Processing away goal:", { playerId: g.player, player_ci, minute: g.minute })
-          return {
-            player_ci: player_ci!,
-            team_id: selectedMatch.away_team_id,
-            minute: Number.parseInt(g.minute),
-          }
-        }),
-    ]
-
-    const cardsData = [
-      ...homeYellowCards
-        .filter((c) => c.player && c.minute)
-        .map((c) => {
-          const player_ci = getPlayerCI(c.player)
-          console.log("[v0] Processing home yellow card:", { playerId: c.player, player_ci, minute: c.minute })
-          return {
-            player_ci: player_ci!,
-            team_id: selectedMatch.home_team_id,
-            card_type: "yellow" as const,
-            minute: Number.parseInt(c.minute),
-          }
-        }),
-      ...awayYellowCards
-        .filter((c) => c.player && c.minute)
-        .map((c) => {
-          const player_ci = getPlayerCI(c.player)
-          console.log("[v0] Processing away yellow card:", { playerId: c.player, player_ci, minute: c.minute })
-          return {
-            player_ci: player_ci!,
-            team_id: selectedMatch.away_team_id,
-            card_type: "yellow" as const,
-            minute: Number.parseInt(c.minute),
-          }
-        }),
-      ...homeRedCards
-        .filter((c) => c.player && c.minute)
-        .map((c) => {
-          const player_ci = getPlayerCI(c.player)
-          console.log("[v0] Processing home red card:", { playerId: c.player, player_ci, minute: c.minute })
-          return {
-            player_ci: player_ci!,
-            team_id: selectedMatch.home_team_id,
-            card_type: "red" as const,
-            minute: Number.parseInt(c.minute),
-          }
-        }),
-      ...awayRedCards
-        .filter((c) => c.player && c.minute)
-        .map((c) => {
-          const player_ci = getPlayerCI(c.player)
-          console.log("[v0] Processing away red card:", { playerId: c.player, player_ci, minute: c.minute })
-          return {
-            player_ci: player_ci!,
-            team_id: selectedMatch.away_team_id,
-            card_type: "red" as const,
-            minute: Number.parseInt(c.minute),
-          }
-        }),
-    ]
-
-    console.log("[v0] Submitting match result:", {
-      matchId: selectedMatch.id,
-      homeScore: calculatedHomeScore,
-      awayScore: calculatedAwayScore,
-      goals: goalsData,
-      cards: cardsData,
-    })
+    console.log("[v0] Submitting result for match:", selectedMatch.id)
+    console.log("[v0] Home goals:", homeGoals)
+    console.log("[v0] Away goals:", awayGoals)
+    console.log("[v0] Home cards:", homeCards)
+    console.log("[v0] Away cards:", awayCards)
 
     try {
       const result = await updateMatchResult(
         selectedMatch.id,
-        calculatedHomeScore,
-        calculatedAwayScore,
-        goalsData,
-        cardsData,
+        Number.parseInt(homeScore),
+        Number.parseInt(awayScore),
+        homeGoals,
+        awayGoals,
+        homeCards,
+        awayCards,
       )
 
       if (!result.success) {
         toast({
           title: "Error",
-          description: result.error || "Error al guardar el resultado.",
+          description: result.error || "No se pudo guardar el resultado del partido.",
           variant: "destructive",
         })
         return
       }
 
       toast({
-        title: "✅ Resultado guardado",
-        description: `${selectedMatch.home_team?.name} ${calculatedHomeScore} - ${calculatedAwayScore} ${selectedMatch.away_team?.name}. Las estadísticas se actualizaron automáticamente.`,
+        title: "Resultado guardado",
+        description: "El resultado del partido se ha guardado correctamente.",
       })
 
-      await loadMatches()
-      await loadPlayers()
+      // Reset form
+      setSelectedMatchId(null) // Reset selected match ID
+      setSelectedMatch(null) // Clear selected match details
+      setHomeScore("")
+      setAwayScore("")
+      setHomeGoals([])
+      setAwayGoals([])
+      setHomeCards([])
+      setAwayCards([])
+      // Reset individual player/card inputs
+      setHomeGoalPlayer("")
+      setHomeGoalMinute("")
+      setAwayGoalPlayer("")
+      setAwayGoalMinute("")
+      setHomeCardPlayer("")
+      setHomeCardType("")
+      setHomeCardMinute("")
+      setAwayCardPlayer("")
+      setAwayCardType("")
+      setAwayCardMinute("")
 
-      setShowResultConfirm(false)
-      setSelectedMatchId(null)
-      setHomeGoals([{ player: "", minute: "" }])
-      setAwayGoals([{ player: "", minute: "" }])
-      setHomeYellowCards([{ player: "", minute: "" }])
-      setAwayYellowCards([{ player: "", minute: "" }])
-      setHomeRedCards([{ player: "", minute: "" }])
-      setAwayRedCards([{ player: "", minute: "" }])
-    } catch (error: any) {
-      console.error("[v0] Error saving match result:", error)
+      // Refresh matches
+      await loadMatches()
+      await loadPlayers() // Reload players to update stats
+    } catch (error) {
+      console.error("[v0] Error saving result:", error)
       toast({
         title: "Error",
-        description: error.message || "Error al guardar el resultado",
+        description: "No se pudo guardar el resultado del partido.",
         variant: "destructive",
       })
     }
@@ -1139,7 +1083,6 @@ export default function AdminDashboard() {
 
   // Filter matches by selected round for results tab
   const roundMatches = matches.filter((m) => m.round === Number.parseInt(selectedRound))
-  const selectedMatch = matches.find((m) => m.id === selectedMatchId) // Use fetched matches
 
   if (!isAuthenticated) {
     return (
@@ -1747,6 +1690,7 @@ export default function AdminDashboard() {
                                 onClick={() => {
                                   setSelectedRound(round.toString())
                                   setSelectedMatchId(null)
+                                  setSelectedMatch(null) // Clear selected match details
                                 }}
                               >
                                 Fecha {round}
@@ -1762,6 +1706,7 @@ export default function AdminDashboard() {
                             onClick={() => {
                               setSelectedRound("cuartos")
                               setSelectedMatchId(null)
+                              setSelectedMatch(null) // Clear selected match details
                             }}
                           >
                             Cuartos de Final
@@ -1776,6 +1721,7 @@ export default function AdminDashboard() {
                             onClick={() => {
                               setSelectedRound("semi")
                               setSelectedMatchId(null)
+                              setSelectedMatch(null) // Clear selected match details
                             }}
                           >
                             Semifinales
@@ -1790,6 +1736,7 @@ export default function AdminDashboard() {
                             onClick={() => {
                               setSelectedRound("final")
                               setSelectedMatchId(null)
+                              setSelectedMatch(null) // Clear selected match details
                             }}
                           >
                             Final
@@ -1881,8 +1828,8 @@ export default function AdminDashboard() {
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => addIncident("goal", "home")}
-                                  className="border-primary/30 text-primary hover:bg-primary/10"
+                                  onClick={addHomeGoal}
+                                  className="border-primary/30 text-primary hover:bg-primary/10 bg-transparent"
                                 >
                                   <Plus className="w-4 h-4 mr-1" />
                                   Agregar Gol
@@ -1891,25 +1838,31 @@ export default function AdminDashboard() {
                               {homeGoals.map((goal, index) => (
                                 <div key={index} className="flex gap-2 items-end">
                                   <div className="flex-1">
+                                    {/* Actualizando los selects para que el value sea el ID del jugador como string */}
                                     <Select
-                                      value={goal.player}
-                                      onValueChange={(value) => updateIncident("goal", "home", index, "player", value)}
+                                      value={homeGoalPlayer}
+                                      onValueChange={(value) => {
+                                        setHomeGoalPlayer(value)
+                                        // Update the goal object immediately if player is selected
+                                        if (value) {
+                                          const updatedGoals = [...homeGoals]
+                                          updatedGoals[index] = {
+                                            ...updatedGoals[index],
+                                            player_id: Number.parseInt(value),
+                                          }
+                                          setHomeGoals(updatedGoals)
+                                        }
+                                      }}
                                     >
                                       <SelectTrigger>
                                         <SelectValue placeholder="Seleccionar jugador" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        {players
-                                          .filter((p) =>
-                                            teams.some(
-                                              (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
-                                            ),
-                                          )
-                                          .map((player) => (
-                                            <SelectItem key={player.id} value={player.id.toString()}>
-                                              {player.name}
-                                            </SelectItem>
-                                          ))}
+                                        {selectedMatch?.home_team?.players?.map((player: Player) => (
+                                          <SelectItem key={player.id} value={player.id.toString()}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
                                       </SelectContent>
                                     </Select>
                                   </div>
@@ -1917,14 +1870,18 @@ export default function AdminDashboard() {
                                     <Input
                                       placeholder="Min"
                                       value={goal.minute}
-                                      onChange={(e) => updateIncident("goal", "home", index, "minute", e.target.value)}
+                                      onChange={(e) => {
+                                        const updatedGoals = [...homeGoals]
+                                        updatedGoals[index] = { ...updatedGoals[index], minute: e.target.value }
+                                        setHomeGoals(updatedGoals)
+                                      }}
                                     />
                                   </div>
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => removeIncident("goal", "home", index)}
+                                    onClick={() => removeHomeGoal(index)}
                                     className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                   >
                                     <Trash2 className="w-4 h-4" />
@@ -1943,37 +1900,50 @@ export default function AdminDashboard() {
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => addIncident("yellow", "home")}
-                                  className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
+                                  onClick={addHomeCard}
+                                  className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10 bg-transparent"
                                 >
                                   <Plus className="w-4 h-4 mr-1" />
                                   Agregar Amarilla
                                 </Button>
                               </div>
-                              {homeYellowCards.map((card, index) => (
+                              {homeCards.map((card, index) => (
                                 <div key={index} className="flex gap-2 items-end">
                                   <div className="flex-1">
                                     <Select
-                                      value={card.player}
-                                      onValueChange={(value) =>
-                                        updateIncident("yellow", "home", index, "player", value)
-                                      }
+                                      value={homeCardPlayer}
+                                      onValueChange={(value) => {
+                                        setHomeCardPlayer(value)
+                                        if (value) {
+                                          const updatedCards = [...homeCards]
+                                          updatedCards[index] = {
+                                            ...updatedCards[index],
+                                            player_id: Number.parseInt(value),
+                                          }
+                                          setHomeCards(updatedCards)
+                                        }
+                                      }}
                                     >
                                       <SelectTrigger>
                                         <SelectValue placeholder="Seleccionar jugador" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        {players
-                                          .filter((p) =>
-                                            teams.some(
-                                              (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
-                                            ),
-                                          )
-                                          .map((player) => (
-                                            <SelectItem key={player.id} value={player.id.toString()}>
-                                              {player.name}
-                                            </SelectItem>
-                                          ))}
+                                        {selectedMatch?.home_team?.players?.map((player: Player) => (
+                                          <SelectItem key={player.id} value={player.id.toString()}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="w-24">
+                                    <Select value={homeCardType} onValueChange={setHomeCardType} defaultValue="yellow">
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Tipo" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="yellow">Amarilla</SelectItem>
+                                        <SelectItem value="red">Roja</SelectItem>
                                       </SelectContent>
                                     </Select>
                                   </div>
@@ -1981,16 +1951,18 @@ export default function AdminDashboard() {
                                     <Input
                                       placeholder="Min"
                                       value={card.minute}
-                                      onChange={(e) =>
-                                        updateIncident("yellow", "home", index, "minute", e.target.value)
-                                      }
+                                      onChange={(e) => {
+                                        const updatedCards = [...homeCards]
+                                        updatedCards[index] = { ...updatedCards[index], minute: e.target.value }
+                                        setHomeCards(updatedCards)
+                                      }}
                                     />
                                   </div>
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => removeIncident("yellow", "home", index)}
+                                    onClick={() => removeHomeCard(index)}
                                     className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                   >
                                     <Trash2 className="w-4 h-4" />
@@ -2009,56 +1981,105 @@ export default function AdminDashboard() {
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => addIncident("red", "home")}
-                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                  onClick={addHomeCard}
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10 bg-transparent"
                                 >
                                   <Plus className="w-4 h-4 mr-1" />
                                   Agregar Roja
                                 </Button>
                               </div>
-                              {homeRedCards.map((card, index) => (
-                                <div key={index} className="flex gap-2 items-end">
-                                  <div className="flex-1">
-                                    <Select
-                                      value={card.player}
-                                      onValueChange={(value) => updateIncident("red", "home", index, "player", value)}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar jugador" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {players
-                                          .filter((p) =>
-                                            teams.some(
-                                              (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
-                                            ),
-                                          )
-                                          .map((player) => (
+                              {/* Re-using homeCards state for red cards for simplicity */}
+                              {homeCards
+                                .filter((card) => card.card_type === "red")
+                                .map((card, index) => (
+                                  <div key={index} className="flex gap-2 items-end">
+                                    <div className="flex-1">
+                                      <Select
+                                        value={homeCardPlayer}
+                                        onValueChange={(value) => {
+                                          setHomeCardPlayer(value)
+                                          if (value) {
+                                            const updatedCards = [...homeCards]
+                                            const originalIndex = homeCards.findIndex(
+                                              (c) =>
+                                                c.player_id === card.player_id &&
+                                                c.minute === card.minute &&
+                                                c.card_type === "red",
+                                            )
+                                            if (originalIndex !== -1) {
+                                              updatedCards[originalIndex] = {
+                                                ...updatedCards[originalIndex],
+                                                player_id: Number.parseInt(value),
+                                              }
+                                              setHomeCards(updatedCards)
+                                            }
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Seleccionar jugador" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {selectedMatch?.home_team?.players?.map((player: Player) => (
                                             <SelectItem key={player.id} value={player.id.toString()}>
                                               {player.name}
                                             </SelectItem>
                                           ))}
-                                      </SelectContent>
-                                    </Select>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="w-24">
+                                      <Select value={homeCardType} onValueChange={setHomeCardType} defaultValue="red">
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Tipo" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="yellow">Amarilla</SelectItem>
+                                          <SelectItem value="red">Roja</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="w-20">
+                                      <Input
+                                        placeholder="Min"
+                                        value={card.minute}
+                                        onChange={(e) => {
+                                          const updatedCards = [...homeCards]
+                                          const originalIndex = homeCards.findIndex(
+                                            (c) =>
+                                              c.player_id === card.player_id &&
+                                              c.minute === card.minute &&
+                                              c.card_type === "red",
+                                          )
+                                          if (originalIndex !== -1) {
+                                            updatedCards[originalIndex] = {
+                                              ...updatedCards[originalIndex],
+                                              minute: e.target.value,
+                                            }
+                                            setHomeCards(updatedCards)
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        const originalIndex = homeCards.findIndex(
+                                          (c) =>
+                                            c.player_id === card.player_id &&
+                                            c.minute === card.minute &&
+                                            c.card_type === "red",
+                                        )
+                                        if (originalIndex !== -1) removeHomeCard(originalIndex)
+                                      }}
+                                      className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
                                   </div>
-                                  <div className="w-20">
-                                    <Input
-                                      placeholder="Min"
-                                      value={card.minute}
-                                      onChange={(e) => updateIncident("red", "home", index, "minute", e.target.value)}
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeIncident("red", "home", index)}
-                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              ))}
+                                ))}
                             </div>
 
                             {/* Goleadores Visitante */}
@@ -2071,8 +2092,8 @@ export default function AdminDashboard() {
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => addIncident("goal", "away")}
-                                  className="border-primary/30 text-primary hover:bg-primary/10"
+                                  onClick={addAwayGoal}
+                                  className="border-primary/30 text-primary hover:bg-primary/10 bg-transparent"
                                 >
                                   <Plus className="w-4 h-4 mr-1" />
                                   Agregar Gol
@@ -2082,24 +2103,28 @@ export default function AdminDashboard() {
                                 <div key={index} className="flex gap-2 items-end">
                                   <div className="flex-1">
                                     <Select
-                                      value={goal.player}
-                                      onValueChange={(value) => updateIncident("goal", "away", index, "player", value)}
+                                      value={awayGoalPlayer}
+                                      onValueChange={(value) => {
+                                        setAwayGoalPlayer(value)
+                                        if (value) {
+                                          const updatedGoals = [...awayGoals]
+                                          updatedGoals[index] = {
+                                            ...updatedGoals[index],
+                                            player_id: Number.parseInt(value),
+                                          }
+                                          setAwayGoals(updatedGoals)
+                                        }
+                                      }}
                                     >
                                       <SelectTrigger>
                                         <SelectValue placeholder="Seleccionar jugador" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        {players
-                                          .filter((p) =>
-                                            teams.some(
-                                              (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
-                                            ),
-                                          )
-                                          .map((player) => (
-                                            <SelectItem key={player.id} value={player.id.toString()}>
-                                              {player.name}
-                                            </SelectItem>
-                                          ))}
+                                        {selectedMatch?.away_team?.players?.map((player: Player) => (
+                                          <SelectItem key={player.id} value={player.id.toString()}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
                                       </SelectContent>
                                     </Select>
                                   </div>
@@ -2107,14 +2132,18 @@ export default function AdminDashboard() {
                                     <Input
                                       placeholder="Min"
                                       value={goal.minute}
-                                      onChange={(e) => updateIncident("goal", "away", index, "minute", e.target.value)}
+                                      onChange={(e) => {
+                                        const updatedGoals = [...awayGoals]
+                                        updatedGoals[index] = { ...updatedGoals[index], minute: e.target.value }
+                                        setAwayGoals(updatedGoals)
+                                      }}
                                     />
                                   </div>
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => removeIncident("goal", "away", index)}
+                                    onClick={() => removeAwayGoal(index)}
                                     className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                   >
                                     <Trash2 className="w-4 h-4" />
@@ -2133,37 +2162,50 @@ export default function AdminDashboard() {
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => addIncident("yellow", "away")}
-                                  className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
+                                  onClick={addAwayCard}
+                                  className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10 bg-transparent"
                                 >
                                   <Plus className="w-4 h-4 mr-1" />
                                   Agregar Amarilla
                                 </Button>
                               </div>
-                              {awayYellowCards.map((card, index) => (
+                              {awayCards.map((card, index) => (
                                 <div key={index} className="flex gap-2 items-end">
                                   <div className="flex-1">
                                     <Select
-                                      value={card.player}
-                                      onValueChange={(value) =>
-                                        updateIncident("yellow", "away", index, "player", value)
-                                      }
+                                      value={awayCardPlayer}
+                                      onValueChange={(value) => {
+                                        setAwayCardPlayer(value)
+                                        if (value) {
+                                          const updatedCards = [...awayCards]
+                                          updatedCards[index] = {
+                                            ...updatedCards[index],
+                                            player_id: Number.parseInt(value),
+                                          }
+                                          setAwayCards(updatedCards)
+                                        }
+                                      }}
                                     >
                                       <SelectTrigger>
                                         <SelectValue placeholder="Seleccionar jugador" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        {players
-                                          .filter((p) =>
-                                            teams.some(
-                                              (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
-                                            ),
-                                          )
-                                          .map((player) => (
-                                            <SelectItem key={player.id} value={player.id.toString()}>
-                                              {player.name}
-                                            </SelectItem>
-                                          ))}
+                                        {selectedMatch?.away_team?.players?.map((player: Player) => (
+                                          <SelectItem key={player.id} value={player.id.toString()}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="w-24">
+                                    <Select value={awayCardType} onValueChange={setAwayCardType} defaultValue="yellow">
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Tipo" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="yellow">Amarilla</SelectItem>
+                                        <SelectItem value="red">Roja</SelectItem>
                                       </SelectContent>
                                     </Select>
                                   </div>
@@ -2171,16 +2213,18 @@ export default function AdminDashboard() {
                                     <Input
                                       placeholder="Min"
                                       value={card.minute}
-                                      onChange={(e) =>
-                                        updateIncident("yellow", "away", index, "minute", e.target.value)
-                                      }
+                                      onChange={(e) => {
+                                        const updatedCards = [...awayCards]
+                                        updatedCards[index] = { ...updatedCards[index], minute: e.target.value }
+                                        setAwayCards(updatedCards)
+                                      }}
                                     />
                                   </div>
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => removeIncident("yellow", "away", index)}
+                                    onClick={() => removeAwayCard(index)}
                                     className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                                   >
                                     <Trash2 className="w-4 h-4" />
@@ -2199,56 +2243,105 @@ export default function AdminDashboard() {
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => addIncident("red", "away")}
-                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                  onClick={addAwayCard}
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10 bg-transparent"
                                 >
                                   <Plus className="w-4 h-4 mr-1" />
                                   Agregar Roja
                                 </Button>
                               </div>
-                              {awayRedCards.map((card, index) => (
-                                <div key={index} className="flex gap-2 items-end">
-                                  <div className="flex-1">
-                                    <Select
-                                      value={card.player}
-                                      onValueChange={(value) => updateIncident("red", "away", index, "player", value)}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar jugador" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {players
-                                          .filter((p) =>
-                                            teams.some(
-                                              (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
-                                            ),
-                                          )
-                                          .map((player) => (
+                              {/* Re-using awayCards state for red cards for simplicity */}
+                              {awayCards
+                                .filter((card) => card.card_type === "red")
+                                .map((card, index) => (
+                                  <div key={index} className="flex gap-2 items-end">
+                                    <div className="flex-1">
+                                      <Select
+                                        value={awayCardPlayer}
+                                        onValueChange={(value) => {
+                                          setAwayCardPlayer(value)
+                                          if (value) {
+                                            const updatedCards = [...awayCards]
+                                            const originalIndex = awayCards.findIndex(
+                                              (c) =>
+                                                c.player_id === card.player_id &&
+                                                c.minute === card.minute &&
+                                                c.card_type === "red",
+                                            )
+                                            if (originalIndex !== -1) {
+                                              updatedCards[originalIndex] = {
+                                                ...updatedCards[originalIndex],
+                                                player_id: Number.parseInt(value),
+                                              }
+                                              setAwayCards(updatedCards)
+                                            }
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Seleccionar jugador" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {selectedMatch?.away_team?.players?.map((player: Player) => (
                                             <SelectItem key={player.id} value={player.id.toString()}>
                                               {player.name}
                                             </SelectItem>
                                           ))}
-                                      </SelectContent>
-                                    </Select>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="w-24">
+                                      <Select value={awayCardType} onValueChange={setAwayCardType} defaultValue="red">
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Tipo" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="yellow">Amarilla</SelectItem>
+                                          <SelectItem value="red">Roja</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="w-20">
+                                      <Input
+                                        placeholder="Min"
+                                        value={card.minute}
+                                        onChange={(e) => {
+                                          const updatedCards = [...awayCards]
+                                          const originalIndex = awayCards.findIndex(
+                                            (c) =>
+                                              c.player_id === card.player_id &&
+                                              c.minute === card.minute &&
+                                              c.card_type === "red",
+                                          )
+                                          if (originalIndex !== -1) {
+                                            updatedCards[originalIndex] = {
+                                              ...updatedCards[originalIndex],
+                                              minute: e.target.value,
+                                            }
+                                            setAwayCards(updatedCards)
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        const originalIndex = awayCards.findIndex(
+                                          (c) =>
+                                            c.player_id === card.player_id &&
+                                            c.minute === card.minute &&
+                                            c.card_type === "red",
+                                        )
+                                        if (originalIndex !== -1) removeAwayCard(originalIndex)
+                                      }}
+                                      className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
                                   </div>
-                                  <div className="w-20">
-                                    <Input
-                                      placeholder="Min"
-                                      value={card.minute}
-                                      onChange={(e) => updateIncident("red", "away", index, "minute", e.target.value)}
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeIncident("red", "away", index)}
-                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              ))}
+                                ))}
                             </div>
 
                             <Button

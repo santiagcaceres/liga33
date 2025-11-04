@@ -253,7 +253,17 @@ export default function HomePage() {
             </div>
           </div>
           <div className="border-t border-primary/30 mt-6 md:mt-8 pt-4 text-center text-gray-400 text-sm md:text-base">
-            <p>&copy; 2025 Liga 33. Todos los derechos reservados.</p>
+            <p>
+              © 2025 Liga 33. Todos los derechos reservados. Desarrollado por{" "}
+              <a
+                href="https://www.launchbyteuy.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 transition-colors underline"
+              >
+                LaunchByte
+              </a>
+            </p>
           </div>
         </div>
       </footer>

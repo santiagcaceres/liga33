@@ -102,13 +102,15 @@ export async function updateMatchResult(
   matchId: number,
   homeScore: number,
   awayScore: number,
-  goals: Array<{ player_ci: string; team_id: number; minute: number }>,
-  cards: Array<{ player_ci: string; team_id: number; card_type: string; minute: number }>,
+  goals: Array<{ player_id: number; team_id: number; minute: number }>,
+  cards: Array<{ player_id: number; team_id: number; card_type: string; minute: number }>,
 ) {
   try {
     const supabase = await createClient()
 
     console.log("[v0] Starting updateMatchResult:", { matchId, homeScore, awayScore, goals, cards })
+
+    console.log("[v0] Processing goals:", goals.length, "Processing cards:", cards.length)
 
     const { error: matchError } = await supabase
       .from("matches")
@@ -128,18 +130,20 @@ export async function updateMatchResult(
 
     if (goals.length > 0) {
       for (const goal of goals) {
+        console.log("[v0] Processing goal for player ID:", goal.player_id)
+
         const { data: player, error: playerError } = await supabase
           .from("players")
           .select("id, goals")
-          .eq("cedula", goal.player_ci)
+          .eq("id", goal.player_id)
           .single()
 
         if (playerError || !player) {
-          console.error("[v0] Error finding player by cedula:", goal.player_ci, playerError)
+          console.error("[v0] Error finding player by ID:", goal.player_id, playerError)
           continue
         }
 
-        console.log("[v0] Found player by cedula:", { cedula: goal.player_ci, playerId: player.id })
+        console.log("[v0] Found player:", { playerId: player.id, currentGoals: player.goals })
 
         const { error: goalError } = await supabase.from("goals").insert({
           match_id: matchId,
@@ -157,25 +161,33 @@ export async function updateMatchResult(
 
         const newGoals = (player.goals || 0) + 1
         console.log("[v0] Updating player goals:", { playerId: player.id, newGoals })
-        await supabase.from("players").update({ goals: newGoals }).eq("id", player.id)
+
+        const { error: updateError } = await supabase.from("players").update({ goals: newGoals }).eq("id", player.id)
+
+        if (updateError) {
+          console.error("[v0] Error updating player goals:", updateError)
+        } else {
+          console.log("[v0] Player goals updated successfully")
+        }
       }
     }
 
     if (cards.length > 0) {
       for (const card of cards) {
+        console.log("[v0] Processing card for player ID:", card.player_id, "Type:", card.card_type)
+
         const { data: player, error: playerError } = await supabase
           .from("players")
           .select("id, yellow_cards, red_cards")
-          .eq("cedula", card.player_ci)
+          .eq("id", card.player_id)
           .single()
 
         if (playerError || !player) {
-          console.error("[v0] Error finding player by cedula:", card.player_ci, playerError)
+          console.error("[v0] Error finding player by ID:", card.player_id, playerError)
           continue
         }
 
-        console.log("[v0] Found player by cedula:", {
-          cedula: card.player_ci,
+        console.log("[v0] Found player:", {
           playerId: player.id,
           currentYellowCards: player.yellow_cards,
           currentRedCards: player.red_cards,
@@ -211,7 +223,14 @@ export async function updateMatchResult(
         }
 
         console.log("[v0] Updating player cards:", { playerId: player.id, updates })
-        await supabase.from("players").update(updates).eq("id", player.id)
+
+        const { error: updateError } = await supabase.from("players").update(updates).eq("id", player.id)
+
+        if (updateError) {
+          console.error("[v0] Error updating player cards:", updateError)
+        } else {
+          console.log("[v0] Player cards updated successfully")
+        }
       }
     }
 
