@@ -128,10 +128,14 @@ export default function AdminDashboard() {
   const [homeScore, setHomeScore] = useState("")
   const [awayScore, setAwayScore] = useState("")
 
-  const [homeGoals, setHomeGoals] = useState<Array<{ player_id: number; minute: string }>>([])
-  const [awayGoals, setAwayGoals] = useState<Array<{ player_id: number; minute: string }>>([])
-  const [homeCards, setHomeCards] = useState<Array<{ player_id: number; card_type: string; minute: string }>>([])
-  const [awayCards, setAwayCards] = useState<Array<{ player_id: number; card_type: string; minute: string }>>([])
+  const [homeGoals, setHomeGoals] = useState<Array<{ id: number; player_id: number; minute: string }>>([])
+  const [awayGoals, setAwayGoals] = useState<Array<{ id: number; player_id: number; minute: string }>>([])
+  const [homeCards, setHomeCards] = useState<
+    Array<{ id: number; player_id: number; card_type: string; minute: string }>
+  >([])
+  const [awayCards, setAwayCards] = useState<
+    Array<{ id: number; player_id: number; card_type: string; minute: string }>
+  >([])
 
   // State for selecting players for goals/cards
   const [homeGoalPlayer, setHomeGoalPlayer] = useState<string>("")
@@ -456,22 +460,22 @@ export default function AdminDashboard() {
 
   const addHomeGoal = () => {
     console.log("[v0] Adding empty home goal row")
-    setHomeGoals([...homeGoals, { player_id: 0, minute: "" }])
+    setHomeGoals([...homeGoals, { id: Date.now(), player_id: 0, minute: "" }])
   }
 
   const addAwayGoal = () => {
     console.log("[v0] Adding empty away goal row")
-    setAwayGoals([...awayGoals, { player_id: 0, minute: "" }])
+    setAwayGoals([...awayGoals, { id: Date.now(), player_id: 0, minute: "" }])
   }
 
   const addHomeCard = () => {
     console.log("[v0] Adding empty home card row")
-    setHomeCards([...homeCards, { player_id: 0, card_type: "yellow", minute: "" }])
+    setHomeCards([...homeCards, { id: Date.now(), player_id: 0, card_type: "yellow", minute: "" }])
   }
 
   const addAwayCard = () => {
     console.log("[v0] Adding empty away card row")
-    setAwayCards([...awayCards, { player_id: 0, card_type: "yellow", minute: "" }])
+    setAwayCards([...awayCards, { id: Date.now(), player_id: 0, card_type: "yellow", minute: "" }])
   }
 
   const removeHomeGoal = (index: number) => {
@@ -1834,7 +1838,7 @@ export default function AdminDashboard() {
                                 </Button>
                               </div>
                               {homeGoals.map((goal, index) => (
-                                <div key={index} className="flex gap-2 items-end">
+                                <div key={goal.id || index} className="flex gap-2 items-end">
                                   <div className="flex-1">
                                     <Select
                                       value={goal.player_id > 0 ? goal.player_id.toString() : ""}
@@ -1907,7 +1911,7 @@ export default function AdminDashboard() {
                                 .map((card, index) => {
                                   const originalIndex = homeCards.findIndex((c) => c === card)
                                   return (
-                                    <div key={index} className="flex gap-2 items-end">
+                                    <div key={card.id || index} className="flex gap-2 items-end">
                                       <div className="flex-1">
                                         <Select
                                           value={card.player_id > 0 ? card.player_id.toString() : ""}
@@ -1984,7 +1988,7 @@ export default function AdminDashboard() {
                                 .map((card, index) => {
                                   const originalIndex = homeCards.findIndex((c) => c === card)
                                   return (
-                                    <div key={index} className="flex gap-2 items-end">
+                                    <div key={card.id || index} className="flex gap-2 items-end">
                                       <div className="flex-1">
                                         <Select
                                           value={card.player_id > 0 ? card.player_id.toString() : ""}
@@ -2079,7 +2083,7 @@ export default function AdminDashboard() {
                                 </Button>
                               </div>
                               {awayGoals.map((goal, index) => (
-                                <div key={index} className="flex gap-2 items-end">
+                                <div key={goal.id || index} className="flex gap-2 items-end">
                                   <div className="flex-1">
                                     <Select
                                       value={goal.player_id > 0 ? goal.player_id.toString() : ""}
@@ -2152,7 +2156,7 @@ export default function AdminDashboard() {
                                 .map((card, index) => {
                                   const originalIndex = awayCards.findIndex((c) => c === card)
                                   return (
-                                    <div key={index} className="flex gap-2 items-end">
+                                    <div key={card.id || index} className="flex gap-2 items-end">
                                       <div className="flex-1">
                                         <Select
                                           value={card.player_id > 0 ? card.player_id.toString() : ""}
@@ -2229,7 +2233,7 @@ export default function AdminDashboard() {
                                 .map((card, index) => {
                                   const originalIndex = awayCards.findIndex((c) => c === card)
                                   return (
-                                    <div key={index} className="flex gap-2 items-end">
+                                    <div key={card.id || index} className="flex gap-2 items-end">
                                       <div className="flex-1">
                                         <Select
                                           value={card.player_id > 0 ? card.player_id.toString() : ""}
