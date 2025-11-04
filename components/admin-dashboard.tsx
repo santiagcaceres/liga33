@@ -497,6 +497,13 @@ export default function AdminDashboard() {
       return
     }
 
+    console.log("[v0] DEBUG - homeGoals array:", homeGoals)
+    console.log("[v0] DEBUG - awayGoals array:", awayGoals)
+    console.log("[v0] DEBUG - homeYellowCards array:", homeYellowCards)
+    console.log("[v0] DEBUG - awayYellowCards array:", awayYellowCards)
+    console.log("[v0] DEBUG - homeRedCards array:", homeRedCards)
+    console.log("[v0] DEBUG - awayRedCards array:", awayRedCards)
+
     const calculatedHomeScore = homeGoals.filter((g) => g.player).length
     const calculatedAwayScore = awayGoals.filter((g) => g.player).length
 
