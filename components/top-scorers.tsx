@@ -113,49 +113,84 @@ export default function TopScorers() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-primary/30">
-                    <th className="text-left p-3 w-16">#</th>
-                    <th className="text-left p-3">Jugador</th>
-                    <th className="text-left p-3">Equipo</th>
-                    <th className="text-center p-3 w-24">Goles</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scorers.map((scorer, index) => (
-                    <tr
-                      key={scorer.player_id}
-                      className={`border-b border-primary/20 transition-colors ${
-                        index === 0
-                          ? "bg-gradient-to-r from-yellow-500/20 to-amber-500/20 hover:from-yellow-500/30 hover:to-amber-500/30"
-                          : "hover:bg-primary/5"
-                      }`}
-                    >
-                      <td className="p-3 font-semibold text-primary">
-                        {index === 0 ? <span className="text-2xl">👑</span> : index + 1}
-                      </td>
-                      <td className={`p-3 ${index === 0 ? "font-bold text-lg" : "font-medium"}`}>
-                        {scorer.player_name}
-                      </td>
-                      <td className="p-3 text-muted-foreground">{scorer.team_name}</td>
-                      <td className="p-3 text-center">
-                        <span
-                          className={`inline-flex items-center justify-center rounded-full font-bold ${
-                            index === 0
-                              ? "w-12 h-12 bg-gradient-to-br from-yellow-400 to-amber-500 text-white text-xl shadow-lg"
-                              : "w-10 h-10 bg-primary/20 text-primary"
-                          }`}
-                        >
-                          {scorer.goals}
-                        </span>
-                      </td>
+            <>
+              {/* Desktop view */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-primary/30">
+                      <th className="text-left p-3 w-16">#</th>
+                      <th className="text-left p-3">Jugador</th>
+                      <th className="text-left p-3">Equipo</th>
+                      <th className="text-center p-3 w-24">Goles</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {scorers.map((scorer, index) => (
+                      <tr
+                        key={scorer.player_id}
+                        className={`border-b border-primary/20 transition-colors ${
+                          index === 0
+                            ? "bg-gradient-to-r from-yellow-500/20 to-amber-500/20 hover:from-yellow-500/30 hover:to-amber-500/30"
+                            : "hover:bg-primary/5"
+                        }`}
+                      >
+                        <td className="p-3 font-semibold text-primary">{index + 1}</td>
+                        <td className={`p-3 ${index === 0 ? "font-bold text-lg" : "font-medium"}`}>
+                          {scorer.player_name}
+                        </td>
+                        <td className="p-3 text-muted-foreground">{scorer.team_name}</td>
+                        <td className="p-3 text-center">
+                          <span
+                            className={`inline-flex items-center justify-center rounded-full font-bold ${
+                              index === 0
+                                ? "w-12 h-12 bg-gradient-to-br from-yellow-400 to-amber-500 text-white text-xl shadow-lg"
+                                : "w-10 h-10 bg-primary/20 text-primary"
+                            }`}
+                          >
+                            {scorer.goals}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="md:hidden space-y-2">
+                {scorers.map((scorer, index) => (
+                  <div
+                    key={scorer.player_id}
+                    className={`p-3 rounded-lg border transition-colors ${
+                      index === 0
+                        ? "bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/30"
+                        : "border-primary/20 hover:bg-primary/5"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-sm font-semibold text-primary shrink-0">{index + 1}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className={`truncate ${index === 0 ? "font-bold text-sm" : "font-medium text-sm"}`}>
+                            {scorer.player_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">{scorer.team_name}</p>
+                        </div>
+                      </div>
+                      <span
+                        className={`shrink-0 inline-flex items-center justify-center rounded-full font-bold ${
+                          index === 0
+                            ? "w-10 h-10 bg-gradient-to-br from-yellow-400 to-amber-500 text-white text-base shadow-lg"
+                            : "w-8 h-8 bg-primary/20 text-primary text-sm"
+                        }`}
+                      >
+                        {scorer.goals}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

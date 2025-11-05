@@ -19,7 +19,7 @@ interface TeamStanding {
   goals_against: number
   goal_difference: number
   points: number
-  teams?: { id: number; name: string }
+  teams?: { id: number; name: string; logo_url?: string }
   copa_groups?: { id: number; name: string }
 }
 
@@ -122,6 +122,13 @@ export default function CopaLibertadores() {
                     </td>
                     <td className="p-2">
                       <div className="flex items-center gap-2">
+                        {team.teams?.logo_url && (
+                          <img
+                            src={team.teams.logo_url || "/placeholder.svg"}
+                            alt={team.teams?.name}
+                            className="w-6 h-6 object-contain"
+                          />
+                        )}
                         <span className="font-medium text-white">{team.teams?.name}</span>
                         {pos <= 2 && <Badge className="bg-green-600 text-white text-xs">{getPositionBadge(pos)}</Badge>}
                       </div>
@@ -170,7 +177,16 @@ export default function CopaLibertadores() {
                         {pos}
                       </Badge>
                       <div>
-                        <div className="font-semibold text-white">{team.teams?.name}</div>
+                        <div className="flex items-center gap-2">
+                          {team.teams?.logo_url && (
+                            <img
+                              src={team.teams.logo_url || "/placeholder.svg"}
+                              alt={team.teams?.name}
+                              className="w-5 h-5 object-contain"
+                            />
+                          )}
+                          <div className="font-semibold text-white">{team.teams?.name}</div>
+                        </div>
                         {pos <= 2 && (
                           <Badge className="bg-green-600 text-white text-xs mt-1">{getPositionBadge(pos)}</Badge>
                         )}
@@ -265,28 +281,6 @@ export default function CopaLibertadores() {
           </TabsContent>
         ))}
       </Tabs>
-
-      {/* Leyenda */}
-      <Card className="border-primary/30">
-        <CardHeader>
-          <CardTitle className="text-lg">Leyenda</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-600 rounded"></div>
-              <span className="text-sm">Clasificado directo (1° y 2°)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-gray-400 rounded"></div>
-              <span className="text-sm">Pendiente (3° y 4°)</span>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground mt-3">
-            Los 2 mejores terceros también clasificarán a la siguiente fase
-          </p>
-        </CardContent>
-      </Card>
     </div>
   )
 }

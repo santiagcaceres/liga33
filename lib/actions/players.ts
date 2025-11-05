@@ -89,7 +89,7 @@ export async function createPlayer(formData: FormData) {
 export async function getPlayers(teamId?: number) {
   const supabase = await createClient()
 
-  let query = supabase.from("players").select("*, teams(name)").order("name")
+  let query = supabase.from("players").select("*, teams(name)").order("team_id").order("number")
 
   if (teamId) {
     query = query.eq("team_id", teamId)

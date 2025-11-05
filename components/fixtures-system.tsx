@@ -193,16 +193,33 @@ export default function FixturesSystem() {
                               </div>
 
                               {match.played && (match.goals?.length > 0 || match.cards?.length > 0) && (
-                                <div className="mt-3 pt-3 border-t border-primary/20 text-xs text-muted-foreground space-y-1">
+                                <div className="mt-3 pt-3 border-t border-primary/20 space-y-1 text-sm text-muted-foreground">
                                   {match.goals && match.goals.length > 0 && (
                                     <div className="flex items-start gap-2">
                                       <span className="font-medium">⚽</span>
                                       <div className="flex-1">
-                                        {match.goals.map((goal, idx) => (
-                                          <span key={idx} className="inline-block mr-2">
-                                            {goal.players.name}
-                                          </span>
-                                        ))}
+                                        {(() => {
+                                          const goalsByPlayer = match.goals.reduce(
+                                            (acc: Record<string, { name: string; count: number }>, goal) => {
+                                              const playerId = goal.player_id.toString()
+                                              if (!acc[playerId]) {
+                                                acc[playerId] = { name: goal.players.name, count: 0 }
+                                              }
+                                              acc[playerId].count++
+                                              return acc
+                                            },
+                                            {},
+                                          )
+
+                                          return Object.values(goalsByPlayer).map((player, idx) => (
+                                            <span key={idx} className="inline-block mr-2">
+                                              {player.name}
+                                              {player.count > 1 && (
+                                                <span className="font-semibold"> x{player.count}</span>
+                                              )}
+                                            </span>
+                                          ))
+                                        })()}
                                       </div>
                                     </div>
                                   )}

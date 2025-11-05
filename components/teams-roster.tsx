@@ -17,6 +17,7 @@ interface Player {
   yellow_cards: number
   red_cards: number
   suspended: boolean
+  team_id: number
 }
 
 interface Team {
@@ -133,46 +134,90 @@ export default function TeamsRoster() {
                       <p>Este equipo no tiene jugadores registrados</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-primary/30">
-                            <th className="text-left p-3">#</th>
-                            <th className="text-left p-3">Jugador</th>
-                            <th className="text-left p-3">CI</th>
-                            <th className="text-center p-3">⚽</th>
-                            <th className="text-center p-3">🟨</th>
-                            <th className="text-center p-3">🟥</th>
-                            <th className="text-center p-3">Estado</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {currentTeamPlayers.map((player) => (
-                            <tr
-                              key={player.id}
-                              className={`border-b border-primary/20 ${
-                                player.suspended ? "bg-red-500/20 line-through" : ""
-                              }`}
-                            >
-                              <td className="p-3 font-semibold">{player.number}</td>
-                              <td className="p-3">{player.name}</td>
-                              <td className="p-3 text-sm text-muted-foreground">{player.cedula}</td>
-                              <td className="p-3 text-center font-semibold">{player.goals}</td>
-                              <td className="p-3 text-center">
-                                <span
-                                  className={`font-semibold ${
-                                    hasTwoYellowCards(player)
-                                      ? "text-red-600"
-                                      : player.yellow_cards === 1
-                                        ? "text-orange-600"
-                                        : ""
-                                  }`}
-                                >
-                                  {player.yellow_cards}
-                                </span>
-                              </td>
-                              <td className="p-3 text-center font-semibold">{player.red_cards}</td>
-                              <td className="p-3 text-center">
+                    <>
+                      <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-primary/30">
+                              <th className="text-left p-3">#</th>
+                              <th className="text-left p-3">Jugador</th>
+                              <th className="text-left p-3">CI</th>
+                              <th className="text-center p-3">⚽</th>
+                              <th className="text-center p-3">🟨</th>
+                              <th className="text-center p-3">🟥</th>
+                              <th className="text-center p-3">Estado</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {currentTeamPlayers.map((player) => (
+                              <tr
+                                key={player.id}
+                                className={`border-b border-primary/20 ${
+                                  player.suspended ? "bg-red-500/20 line-through" : ""
+                                }`}
+                              >
+                                <td className="p-3 font-semibold">{player.number}</td>
+                                <td className="p-3">{player.name}</td>
+                                <td className="p-3 text-sm text-muted-foreground">{player.cedula}</td>
+                                <td className="p-3 text-center font-semibold">{player.goals}</td>
+                                <td className="p-3 text-center">
+                                  <span
+                                    className={`font-semibold ${
+                                      hasTwoYellowCards(player)
+                                        ? "text-red-600"
+                                        : player.yellow_cards === 1
+                                          ? "text-orange-600"
+                                          : ""
+                                    }`}
+                                  >
+                                    {player.yellow_cards}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-center font-semibold">{player.red_cards}</td>
+                                <td className="p-3 text-center">
+                                  {player.suspended ? (
+                                    <span className="text-xs bg-red-600 text-white px-2 py-1 rounded">SUSPENDIDO</span>
+                                  ) : hasTwoYellowCards(player) ? (
+                                    <span className="text-xs bg-red-600 text-white px-2 py-1 rounded">
+                                      🔴 2 AMARILLAS
+                                    </span>
+                                  ) : player.yellow_cards === 1 ? (
+                                    <span className="text-xs bg-orange-500 text-white px-2 py-1 rounded">⚠️ RIESGO</span>
+                                  ) : (
+                                    <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">
+                                      HABILITADO
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="md:hidden space-y-2">
+                        {currentTeamPlayers.map((player) => (
+                          <div
+                            key={player.id}
+                            className={`p-3 rounded-lg border transition-colors ${
+                              player.suspended
+                                ? "bg-red-500/20 border-red-500/30"
+                                : "border-primary/20 hover:bg-primary/5"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <span className="text-base font-bold text-primary shrink-0">#{player.number}</span>
+                                <div className="min-w-0 flex-1">
+                                  <p
+                                    className={`text-sm font-semibold truncate ${player.suspended ? "line-through" : ""}`}
+                                  >
+                                    {player.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">CI: {player.cedula}</p>
+                                </div>
+                              </div>
+                              <div className="shrink-0">
                                 {player.suspended ? (
                                   <span className="text-xs bg-red-600 text-white px-2 py-1 rounded">SUSPENDIDO</span>
                                 ) : hasTwoYellowCards(player) ? (
@@ -184,12 +229,36 @@ export default function TeamsRoster() {
                                 ) : (
                                   <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">HABILITADO</span>
                                 )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 text-xs">
+                              <span className="flex items-center gap-1">
+                                <span className="font-semibold">⚽</span>
+                                <span>{player.goals}</span>
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="font-semibold">🟨</span>
+                                <span
+                                  className={
+                                    hasTwoYellowCards(player)
+                                      ? "text-red-600 font-bold"
+                                      : player.yellow_cards === 1
+                                        ? "text-orange-600 font-semibold"
+                                        : ""
+                                  }
+                                >
+                                  {player.yellow_cards}
+                                </span>
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="font-semibold">🟥</span>
+                                <span>{player.red_cards}</span>
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
               )}
