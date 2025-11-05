@@ -133,6 +133,7 @@ export async function updateMatchResult(
       cardsFailed: 0,
       playersUpdated: 0,
       playersFailed: 0,
+      errors: [] as string[], // Track specific errors
     }
 
     if (goals.length > 0) {
@@ -147,8 +148,10 @@ export async function updateMatchResult(
           .single()
 
         if (playerError || !player) {
-          console.error("[v0] Error finding player by ID:", goal.player_id, playerError)
+          const errorMsg = `Player ID ${goal.player_id} not found: ${playerError?.message || "No player data"}`
+          console.error("[v0]", errorMsg)
           results.goalsFailed++
+          results.errors.push(errorMsg)
           continue
         }
 
@@ -165,8 +168,10 @@ export async function updateMatchResult(
           .select()
 
         if (goalError) {
-          console.error("[v0] Error inserting goal:", goalError)
+          const errorMsg = `Failed to insert goal for player ${player.id}: ${goalError.message}`
+          console.error("[v0]", errorMsg)
           results.goalsFailed++
+          results.errors.push(errorMsg)
           continue
         }
 
@@ -179,8 +184,10 @@ export async function updateMatchResult(
         const { error: updateError } = await supabase.from("players").update({ goals: newGoals }).eq("id", player.id)
 
         if (updateError) {
-          console.error("[v0] Error updating player goals:", updateError)
+          const errorMsg = `Failed to update goals for player ${player.id}: ${updateError.message}`
+          console.error("[v0]", errorMsg)
           results.playersFailed++
+          results.errors.push(errorMsg)
         } else {
           console.log("[v0] Player goals updated successfully")
           results.playersUpdated++
@@ -200,8 +207,10 @@ export async function updateMatchResult(
           .single()
 
         if (playerError || !player) {
-          console.error("[v0] Error finding player by ID:", card.player_id, playerError)
+          const errorMsg = `Player ID ${card.player_id} not found: ${playerError?.message || "No player data"}`
+          console.error("[v0]", errorMsg)
           results.cardsFailed++
+          results.errors.push(errorMsg)
           continue
         }
 
@@ -223,8 +232,10 @@ export async function updateMatchResult(
           .select()
 
         if (cardError) {
-          console.error("[v0] Error inserting card:", cardError)
+          const errorMsg = `Failed to insert card for player ${player.id}: ${cardError.message}`
+          console.error("[v0]", errorMsg)
           results.cardsFailed++
+          results.errors.push(errorMsg)
           continue
         }
 
@@ -250,8 +261,10 @@ export async function updateMatchResult(
         const { error: updateError } = await supabase.from("players").update(updates).eq("id", player.id)
 
         if (updateError) {
-          console.error("[v0] Error updating player cards:", updateError)
+          const errorMsg = `Failed to update cards for player ${player.id}: ${updateError.message}`
+          console.error("[v0]", errorMsg)
           results.playersFailed++
+          results.errors.push(errorMsg)
         } else {
           console.log("[v0] Player cards updated successfully")
           results.playersUpdated++

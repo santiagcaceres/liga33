@@ -615,6 +615,17 @@ export default function AdminDashboard() {
         console.log("[v0] ❌ Cards failed:", result.results.cardsFailed)
         console.log("[v0] ✅ Players updated:", result.results.playersUpdated)
         console.log("[v0] ❌ Players failed:", result.results.playersFailed)
+        if (result.results.errors && result.results.errors.length > 0) {
+          console.log("[v0] 🔴 ERRORS:")
+          result.results.errors.forEach((error: string, index: number) => {
+            console.log(`[v0] Error ${index + 1}:`, error)
+            toast({
+              title: "Error en actualización",
+              description: `Hubo un problema al actualizar las estadísticas: ${error}`,
+              variant: "destructive",
+            })
+          })
+        }
       }
 
       if (!result.success) {
