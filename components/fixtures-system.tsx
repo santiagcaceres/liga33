@@ -18,6 +18,8 @@ interface Match {
   home_score?: number
   away_score?: number
   copa_groups: { name: string }
+  goals?: Array<{ player_id: number; players: { name: string }; team_id: number }>
+  cards?: Array<{ player_id: number; players: { name: string }; card_type: string; team_id: number }>
 }
 
 export default function FixturesSystem() {
@@ -49,7 +51,9 @@ export default function FixturesSystem() {
           away_score,
           home_team:teams!matches_home_team_id_fkey(name, logo_url),
           away_team:teams!matches_away_team_id_fkey(name, logo_url),
-          copa_groups(name)
+          copa_groups(name),
+          goals(player_id, team_id, players(name)),
+          cards(player_id, team_id, card_type, players(name))
         `,
         )
         .order("match_date", { ascending: false })
@@ -187,6 +191,51 @@ export default function FixturesSystem() {
                                   </div>
                                 )}
                               </div>
+
+                              {match.played && (match.goals?.length > 0 || match.cards?.length > 0) && (
+                                <div className="mt-3 pt-3 border-t border-primary/20 text-xs text-muted-foreground space-y-1">
+                                  {match.goals && match.goals.length > 0 && (
+                                    <div className="flex items-start gap-2">
+                                      <span className="font-medium">⚽</span>
+                                      <div className="flex-1">
+                                        {match.goals.map((goal, idx) => (
+                                          <span key={idx} className="inline-block mr-2">
+                                            {goal.players.name}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {match.cards && match.cards.filter((c) => c.card_type === "yellow").length > 0 && (
+                                    <div className="flex items-start gap-2">
+                                      <span className="font-medium">🟨</span>
+                                      <div className="flex-1">
+                                        {match.cards
+                                          .filter((c) => c.card_type === "yellow")
+                                          .map((card, idx) => (
+                                            <span key={idx} className="inline-block mr-2">
+                                              {card.players.name}
+                                            </span>
+                                          ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {match.cards && match.cards.filter((c) => c.card_type === "red").length > 0 && (
+                                    <div className="flex items-start gap-2">
+                                      <span className="font-medium">🟥</span>
+                                      <div className="flex-1">
+                                        {match.cards
+                                          .filter((c) => c.card_type === "red")
+                                          .map((card, idx) => (
+                                            <span key={idx} className="inline-block mr-2">
+                                              {card.players.name}
+                                            </span>
+                                          ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </CardContent>
                           </Card>
                         ))}

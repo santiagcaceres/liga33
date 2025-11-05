@@ -127,13 +127,27 @@ export default function TopScorers() {
                   {scorers.map((scorer, index) => (
                     <tr
                       key={scorer.player_id}
-                      className={`border-b border-primary/20 ${index === 0 ? "bg-primary/10" : ""}`}
+                      className={`border-b border-primary/20 transition-colors ${
+                        index === 0
+                          ? "bg-gradient-to-r from-yellow-500/20 to-amber-500/20 hover:from-yellow-500/30 hover:to-amber-500/30"
+                          : "hover:bg-primary/5"
+                      }`}
                     >
-                      <td className="p-3 font-semibold text-primary">{index + 1}</td>
-                      <td className="p-3 font-medium">{scorer.player_name}</td>
+                      <td className="p-3 font-semibold text-primary">
+                        {index === 0 ? <span className="text-2xl">👑</span> : index + 1}
+                      </td>
+                      <td className={`p-3 ${index === 0 ? "font-bold text-lg" : "font-medium"}`}>
+                        {scorer.player_name}
+                      </td>
                       <td className="p-3 text-muted-foreground">{scorer.team_name}</td>
                       <td className="p-3 text-center">
-                        <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary/20 text-primary font-bold">
+                        <span
+                          className={`inline-flex items-center justify-center rounded-full font-bold ${
+                            index === 0
+                              ? "w-12 h-12 bg-gradient-to-br from-yellow-400 to-amber-500 text-white text-xl shadow-lg"
+                              : "w-10 h-10 bg-primary/20 text-primary"
+                          }`}
+                        >
                           {scorer.goals}
                         </span>
                       </td>

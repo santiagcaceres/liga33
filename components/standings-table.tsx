@@ -2,11 +2,15 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Trophy, TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { Trophy } from "lucide-react"
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import Image from "next/image"
 
 interface Team {
   pos: number
   team: string
+  logo_url: string | null
   pts: number
   pj: number
   pg: number
@@ -15,182 +19,64 @@ interface Team {
   gf: number
   gc: number
   dif: number
-  form: string[]
-  trend: "up" | "down" | "same"
+  group_name: string
 }
 
-const teamsData: Team[] = [
-  {
-    pos: 1,
-    team: "Deportivo Central",
-    pts: 21,
-    pj: 8,
-    pg: 7,
-    pe: 0,
-    pp: 1,
-    gf: 18,
-    gc: 5,
-    dif: 13,
-    form: ["W", "W", "W", "L", "W"],
-    trend: "up",
-  },
-  {
-    pos: 2,
-    team: "Club Atlético Unidos",
-    pts: 18,
-    pj: 8,
-    pg: 6,
-    pe: 0,
-    pp: 2,
-    gf: 16,
-    gc: 8,
-    dif: 8,
-    form: ["W", "W", "L", "W", "W"],
-    trend: "same",
-  },
-  {
-    pos: 3,
-    team: "Racing FC",
-    pts: 16,
-    pj: 8,
-    pg: 5,
-    pe: 1,
-    pp: 2,
-    gf: 14,
-    gc: 9,
-    dif: 5,
-    form: ["D", "W", "W", "L", "W"],
-    trend: "up",
-  },
-  {
-    pos: 4,
-    team: "Independiente Sur",
-    pts: 14,
-    pj: 8,
-    pg: 4,
-    pe: 2,
-    pp: 2,
-    gf: 12,
-    gc: 10,
-    dif: 2,
-    form: ["W", "D", "W", "D", "L"],
-    trend: "down",
-  },
-  {
-    pos: 5,
-    team: "Boca Juniors Local",
-    pts: 12,
-    pj: 8,
-    pg: 4,
-    pe: 0,
-    pp: 4,
-    gf: 11,
-    gc: 12,
-    dif: -1,
-    form: ["L", "W", "L", "W", "W"],
-    trend: "up",
-  },
-  {
-    pos: 6,
-    team: "River Plate Regional",
-    pts: 11,
-    pj: 8,
-    pg: 3,
-    pe: 2,
-    pp: 3,
-    gf: 10,
-    gc: 11,
-    dif: -1,
-    form: ["D", "L", "W", "D", "L"],
-    trend: "down",
-  },
-  {
-    pos: 7,
-    team: "San Lorenzo FC",
-    pts: 10,
-    pj: 8,
-    pg: 3,
-    pe: 1,
-    pp: 4,
-    gf: 9,
-    gc: 13,
-    dif: -4,
-    form: ["L", "W", "L", "L", "D"],
-    trend: "same",
-  },
-  {
-    pos: 8,
-    team: "Estudiantes Unidos",
-    pts: 9,
-    pj: 8,
-    pg: 2,
-    pe: 3,
-    pp: 3,
-    gf: 8,
-    gc: 12,
-    dif: -4,
-    form: ["D", "D", "L", "W", "L"],
-    trend: "down",
-  },
-  {
-    pos: 9,
-    team: "Vélez Local",
-    pts: 8,
-    pj: 8,
-    pg: 2,
-    pe: 2,
-    pp: 4,
-    gf: 7,
-    gc: 14,
-    dif: -7,
-    form: ["L", "D", "L", "W", "L"],
-    trend: "down",
-  },
-  {
-    pos: 10,
-    team: "Huracán Regional",
-    pts: 7,
-    pj: 8,
-    pg: 2,
-    pe: 1,
-    pp: 5,
-    gf: 6,
-    gc: 15,
-    dif: -9,
-    form: ["L", "L", "W", "L", "D"],
-    trend: "same",
-  },
-  {
-    pos: 11,
-    team: "Gimnasia FC",
-    pts: 6,
-    pj: 8,
-    pg: 1,
-    pe: 3,
-    pp: 4,
-    gf: 5,
-    gc: 16,
-    dif: -11,
-    form: ["D", "L", "L", "D", "L"],
-    trend: "down",
-  },
-  {
-    pos: 12,
-    team: "Tigre Deportivo",
-    pts: 4,
-    pj: 8,
-    pg: 1,
-    pe: 1,
-    pp: 6,
-    gf: 4,
-    gc: 18,
-    dif: -14,
-    form: ["L", "L", "L", "D", "L"],
-    trend: "down",
-  },
-]
-
 export default function StandingsTable() {
+  const [teamsData, setTeamsData] = useState<Team[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadStandings()
+  }, [])
+
+  const loadStandings = async () => {
+    const supabase = createClient()
+
+    const { data: teamGroups, error } = await supabase
+      .from("team_groups")
+      .select(`
+        *,
+        teams (
+          name,
+          logo_url
+        ),
+        copa_groups (
+          name
+        )
+      `)
+      .order("points", { ascending: false })
+      .order("goal_difference", { ascending: false })
+      .order("goals_for", { ascending: false })
+
+    if (error) {
+      console.error("[v0] Error loading standings:", error)
+      setLoading(false)
+      return
+    }
+
+    if (teamGroups) {
+      const formattedTeams: Team[] = teamGroups.map((tg: any, index: number) => ({
+        pos: index + 1,
+        team: tg.teams?.name || "Equipo sin nombre",
+        logo_url: tg.teams?.logo_url || null,
+        pts: tg.points || 0,
+        pj: tg.played || 0,
+        pg: tg.won || 0,
+        pe: tg.drawn || 0,
+        pp: tg.lost || 0,
+        gf: tg.goals_for || 0,
+        gc: tg.goals_against || 0,
+        dif: tg.goal_difference || 0,
+        group_name: tg.copa_groups?.name || "Sin grupo",
+      }))
+
+      setTeamsData(formattedTeams)
+    }
+
+    setLoading(false)
+  }
+
   const getPositionColor = (pos: number) => {
     if (pos <= 3) return "bg-gradient-to-r from-purple-600 to-pink-600 text-white"
     if (pos <= 6) return "bg-gradient-to-r from-blue-500 to-purple-500 text-white"
@@ -198,28 +84,12 @@ export default function StandingsTable() {
     return "bg-gray-500 text-white"
   }
 
-  const getFormColor = (result: string) => {
-    switch (result) {
-      case "W":
-        return "bg-green-500 text-white"
-      case "D":
-        return "bg-yellow-500 text-white"
-      case "L":
-        return "bg-red-500 text-white"
-      default:
-        return "bg-gray-500 text-white"
-    }
-  }
-
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case "up":
-        return <TrendingUp className="w-4 h-4 text-green-500" />
-      case "down":
-        return <TrendingDown className="w-4 h-4 text-red-500" />
-      default:
-        return <Minus className="w-4 h-4 text-gray-500" />
-    }
+  if (loading) {
+    return (
+      <Card className="border-purple-200">
+        <CardContent className="py-8 text-center text-muted-foreground">Cargando tabla de posiciones...</CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -252,6 +122,7 @@ export default function StandingsTable() {
               <tr className="border-b border-purple-200">
                 <th className="text-left py-3 px-2 font-semibold text-gray-700">Pos</th>
                 <th className="text-left py-3 px-2 font-semibold text-gray-700">Equipo</th>
+                <th className="text-center py-3 px-2 font-semibold text-gray-700">Grupo</th>
                 <th className="text-center py-3 px-2 font-semibold text-gray-700">PJ</th>
                 <th className="text-center py-3 px-2 font-semibold text-gray-700">PG</th>
                 <th className="text-center py-3 px-2 font-semibold text-gray-700">PE</th>
@@ -260,8 +131,6 @@ export default function StandingsTable() {
                 <th className="text-center py-3 px-2 font-semibold text-gray-700">GC</th>
                 <th className="text-center py-3 px-2 font-semibold text-gray-700">DIF</th>
                 <th className="text-center py-3 px-2 font-semibold text-gray-700">Pts</th>
-                <th className="text-center py-3 px-2 font-semibold text-gray-700">Forma</th>
-                <th className="text-center py-3 px-2 font-semibold text-gray-700">Tend.</th>
               </tr>
             </thead>
             <tbody>
@@ -277,7 +146,29 @@ export default function StandingsTable() {
                       {team.pos}
                     </Badge>
                   </td>
-                  <td className="py-3 px-2 font-medium">{team.team}</td>
+                  <td className="py-3 px-2 font-medium">
+                    <div className="flex items-center gap-2">
+                      {team.logo_url ? (
+                        <Image
+                          src={team.logo_url || "/placeholder.svg"}
+                          alt={team.team}
+                          width={32}
+                          height={32}
+                          className="rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs">
+                          {team.team.charAt(0)}
+                        </div>
+                      )}
+                      <span>{team.team}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <Badge variant="outline" className="text-xs">
+                      {team.group_name}
+                    </Badge>
+                  </td>
                   <td className="py-3 px-2 text-center">{team.pj}</td>
                   <td className="py-3 px-2 text-center text-green-600 font-semibold">{team.pg}</td>
                   <td className="py-3 px-2 text-center text-yellow-600 font-semibold">{team.pe}</td>
@@ -291,19 +182,6 @@ export default function StandingsTable() {
                     {team.dif}
                   </td>
                   <td className="py-3 px-2 text-center font-bold text-purple-600 text-lg">{team.pts}</td>
-                  <td className="py-3 px-2">
-                    <div className="flex gap-1 justify-center">
-                      {team.form.map((result, i) => (
-                        <div
-                          key={i}
-                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${getFormColor(result)}`}
-                        >
-                          {result}
-                        </div>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="py-3 px-2 text-center">{getTrendIcon(team.trend)}</td>
                 </tr>
               ))}
             </tbody>
@@ -324,9 +202,24 @@ export default function StandingsTable() {
                   >
                     {team.pos}
                   </Badge>
+                  {team.logo_url ? (
+                    <Image
+                      src={team.logo_url || "/placeholder.svg"}
+                      alt={team.team}
+                      width={32}
+                      height={32}
+                      className="rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs">
+                      {team.team.charAt(0)}
+                    </div>
+                  )}
                   <div>
                     <div className="font-medium">{team.team}</div>
-                    <div className="text-sm text-gray-500">PJ: {team.pj}</div>
+                    <div className="text-sm text-gray-500">
+                      {team.group_name} • PJ: {team.pj}
+                    </div>
                   </div>
                 </div>
                 <div className="text-right">
@@ -350,57 +243,16 @@ export default function StandingsTable() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex gap-1">
-                  {team.form.map((result, i) => (
-                    <div
-                      key={i}
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${getFormColor(result)}`}
-                    >
-                      {result}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <span>GF: {team.gf}</span>
-                  <span>GC: {team.gc}</span>
-                  <span className={team.dif >= 0 ? "text-green-600" : "text-red-600"}>
-                    DIF: {team.dif >= 0 ? "+" : ""}
-                    {team.dif}
-                  </span>
-                  {getTrendIcon(team.trend)}
-                </div>
+              <div className="flex items-center justify-between text-sm text-gray-600">
+                <span>GF: {team.gf}</span>
+                <span>GC: {team.gc}</span>
+                <span className={team.dif >= 0 ? "text-green-600" : "text-red-600"}>
+                  DIF: {team.dif >= 0 ? "+" : ""}
+                  {team.dif}
+                </span>
               </div>
             </div>
           ))}
-        </div>
-
-        {/* Statistics Summary */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
-            <CardContent className="pt-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">156</div>
-                <div className="text-sm text-gray-600">Goles Totales</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-purple-50">
-            <CardContent className="pt-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">1.95</div>
-                <div className="text-sm text-gray-600">Promedio por Partido</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-pink-200 bg-gradient-to-br from-pink-50 to-purple-50">
-            <CardContent className="pt-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-pink-600">48</div>
-                <div className="text-sm text-gray-600">Partidos Jugados</div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </CardContent>
     </Card>

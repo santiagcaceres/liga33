@@ -148,6 +148,7 @@ export default function AdminDashboard() {
   })
   const [players, setPlayers] = useState<Player[]>([])
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(false)
+  const [isAddingPlayer, setIsAddingPlayer] = useState(false)
 
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
 
@@ -930,6 +931,8 @@ export default function AdminDashboard() {
       return
     }
 
+    setIsAddingPlayer(true)
+
     try {
       const formData = new FormData()
       formData.append("name", newPlayer.name.trim())
@@ -966,6 +969,8 @@ export default function AdminDashboard() {
         description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
         variant: "destructive",
       })
+    } finally {
+      setIsAddingPlayer(false)
     }
   }
 
@@ -994,14 +999,29 @@ export default function AdminDashboard() {
     }
 
     try {
+      console.log("[v0] DEBUG - Updating player with data:", {
+        id: editingPlayer?.id,
+        name: newPlayer.name,
+        cedula: newPlayer.cedula,
+        team_id: newPlayer.team_id,
+        number: newPlayer.number,
+      })
+
       const formData = new FormData()
-      formData.append("name", newPlayer.name.trim())
-      formData.append("cedula", newPlayer.cedula.trim())
-      formData.append("number", newPlayer.number)
+      formData.append("name", newPlayer.name)
       formData.append("team_id", newPlayer.team_id)
+      formData.append("cedula", newPlayer.cedula)
+      formData.append("number", newPlayer.number)
+
+      console.log("[v0] DEBUG - FormData entries:")
+      for (const [key, value] of formData.entries()) {
+        console.log(`  ${key}: ${value}`)
+      }
 
       const { updatePlayer } = await import("@/lib/actions/players")
-      await updatePlayer(editingPlayer.id, formData)
+      const result = await updatePlayer(editingPlayer.id, formData)
+
+      console.log("[v0] DEBUG - Update result:", result)
 
       const selectedTeam = teams.find((t) => t.id === Number.parseInt(newPlayer.team_id, 10))
 
@@ -1078,16 +1098,118 @@ export default function AdminDashboard() {
     }
   }
 
-  const performDraw = () => {
+  const performDraw = async () => {
     console.log("[v0] Performing draw with real data from database")
-    toast({
-      title: "Sorteo realizado",
-      description: "El sorteo se realizará con los datos reales de los clasificados",
+
+    const supabase = createClient()
+
+    // Get all team_groups with their teams and groups
+    const { data: teamGroups, error } = await supabase
+      .from("team_groups")
+      .select(`
+        *,
+        teams (
+          id,
+          name,
+          logo_url
+        ),
+        copa_groups (
+          id,
+          name
+        )
+      `)
+      .order("points", { ascending: false })
+      .order("goal_difference", { ascending: false })
+      .order("goals_for", { ascending: false })
+
+    if (error || !teamGroups) {
+      toast({
+        title: "Error al realizar sorteo",
+        description: "No se pudieron cargar los datos de los equipos",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Group teams by their group
+    const groupedTeams: { [key: string]: any[] } = {}
+    teamGroups.forEach((tg: any) => {
+      const groupName = tg.copa_groups?.name || "Sin grupo"
+      if (!groupedTeams[groupName]) {
+        groupedTeams[groupName] = []
+      }
+      groupedTeams[groupName].push(tg)
     })
+
+    // Get top 2 from each group
+    const qualified: any[] = []
+    const thirdPlaceTeams: any[] = []
+
+    Object.keys(groupedTeams).forEach((groupName) => {
+      const teams = groupedTeams[groupName]
+      // Top 2 qualify directly
+      if (teams[0]) qualified.push(teams[0])
+      if (teams[1]) qualified.push(teams[1])
+      // Third place goes to separate array
+      if (teams[2]) thirdPlaceTeams.push(teams[2])
+    })
+
+    // Sort third place teams by points, goal difference, goals for
+    thirdPlaceTeams.sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points
+      if (b.goal_difference !== a.goal_difference) return b.goal_difference - a.goal_difference
+      return b.goals_for - a.goals_for
+    })
+
+    // Add best 2 third place teams
+    if (thirdPlaceTeams[0]) qualified.push(thirdPlaceTeams[0])
+    if (thirdPlaceTeams[1]) qualified.push(thirdPlaceTeams[1])
+
+    console.log("[v0] Qualified teams:", qualified.length)
+
+    if (qualified.length < 8) {
+      toast({
+        title: "Error al realizar sorteo",
+        description: `Solo hay ${qualified.length} equipos clasificados. Se necesitan 8 equipos.`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Shuffle qualified teams for random draw
+    const shuffled = [...qualified].sort(() => Math.random() - 0.5)
+
+    // Create matchups (1 vs 8, 2 vs 7, 3 vs 6, 4 vs 5)
+    const matchups: string[] = []
+    for (let i = 0; i < 4; i++) {
+      const team1 = shuffled[i]?.teams?.name || "Equipo desconocido"
+      const team2 = shuffled[7 - i]?.teams?.name || "Equipo desconocido"
+      matchups.push(`${team1} vs ${team2}`)
+    }
+
+    // Save draw results to database
+    const drawData = []
+    for (let i = 0; i < 4; i++) {
+      drawData.push({
+        match_number: i + 1,
+        team1_id: shuffled[i]?.team_id,
+        team2_id: shuffled[7 - i]?.team_id,
+      })
+    }
+
+    const { error: drawError } = await supabase.from("draws").delete().neq("id", 0) // Delete all existing draws
+
+    if (!drawError) {
+      await supabase.from("draws").insert(drawData)
+    }
+
+    toast({
+      title: "Sorteo realizado exitosamente",
+      description: `Se generaron ${matchups.length} cruces de octavos de final`,
+    })
+
     setShowDrawConfirm(false)
-    // Implement actual draw logic here if needed
-    // For now, it's just a confirmation placeholder
-    setDrawResults(["Equipo A vs Equipo B", "Equipo C vs Equipo D"]) // Example results
+    setDrawResults(matchups)
     setShowDraw(true)
   }
 
@@ -2576,17 +2698,20 @@ export default function AdminDashboard() {
                     ) : (
                       <Button
                         onClick={handleAddPlayer}
-                        className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                        disabled={
-                          teams.length === 0 ||
-                          !newPlayer.name.trim() ||
-                          !newPlayer.team_id ||
-                          !newPlayer.cedula.trim() ||
-                          !newPlayer.number
-                        }
+                        disabled={isAddingPlayer}
+                        className="w-full bg-primary hover:bg-primary/90"
                       >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Agregar Jugador
+                        {isAddingPlayer ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                            Agregando...
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Agregar Jugador
+                          </>
+                        )}
                       </Button>
                     )}
                   </div>
