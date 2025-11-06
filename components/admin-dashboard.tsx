@@ -173,6 +173,33 @@ export default function AdminDashboard() {
   })
   const [selectedGroupForMatch, setSelectedGroupForMatch] = useState("")
 
+  const handleTournamentChange = (newTab: string) => {
+    const confirmChange = window.confirm(
+      "¿Estás seguro de cambiar de torneo? Asegúrate de haber guardado todos los cambios.",
+    )
+
+    if (confirmChange) {
+      setTournamentTab(newTab)
+      setSelectedTournament(newTab === "libertadores" ? 1 : 2)
+
+      // Reset form states when changing tournament
+      setSelectedMatchId(null)
+      setHomeScore("")
+      setAwayScore("")
+      setHomeGoals([{ player: "", minute: "" }])
+      setAwayGoals([{ player: "", minute: "" }])
+      setHomeYellowCards([{ player: "", minute: "" }])
+      setAwayYellowCards([{ player: "", minute: "" }])
+      setHomeRedCards([{ player: "", minute: "" }])
+      setAwayRedCards([{ player: "", minute: "" }])
+
+      toast({
+        title: "Torneo cambiado",
+        description: `Ahora estás gestionando: ${newTab === "libertadores" ? "Copa Libertadores" : "SuperLiga Femenina"}`,
+      })
+    }
+  }
+
   const loadMatchDetails = async (matchId: number) => {
     const supabase = await createClient()
 
@@ -1436,56 +1463,99 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Settings className="w-8 h-8 text-primary" />
-            <h1 className="text-3xl font-bold text-white">Panel de Administración</h1>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setIsAuthenticated(false)
-              setPassword("")
-            }}
-            className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
-          >
+          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
+            Panel de Administración
+          </h1>
+          <Button variant="outline" onClick={() => setIsAuthenticated(false)}>
             Cerrar Sesión
           </Button>
         </div>
 
-        <Card className="bg-gray-800/50 border-gray-700">
-          <CardHeader>
+        <Card className="border-2 border-primary/50 bg-gradient-to-br from-gray-800 to-gray-900 shadow-xl">
+          <CardHeader className="pb-3">
             <CardTitle className="text-white flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-primary" />
+              <Trophy className="w-6 h-6 text-primary" />
               Seleccionar Torneo
             </CardTitle>
+            <p className="text-sm text-gray-400 mt-1">Gestiona diferentes competiciones de forma independiente</p>
           </CardHeader>
           <CardContent>
-            <Tabs value={tournamentTab} onValueChange={setTournamentTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-gray-700">
+            <div
+              className={`mb-4 p-4 rounded-lg border-2 ${
+                tournamentTab === "libertadores" ? "bg-primary/10 border-primary" : "bg-pink-500/10 border-pink-500"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-3 h-3 rounded-full animate-pulse ${
+                      tournamentTab === "libertadores" ? "bg-primary" : "bg-pink-500"
+                    }`}
+                  />
+                  <div>
+                    <p className="text-sm text-gray-400">Torneo Activo:</p>
+                    <p className="text-lg font-bold text-white">
+                      {tournamentTab === "libertadores" ? "Copa Libertadores" : "SuperLiga Femenina"}
+                    </p>
+                  </div>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={`${
+                    tournamentTab === "libertadores" ? "border-primary text-primary" : "border-pink-500 text-pink-500"
+                  }`}
+                >
+                  ID: {selectedTournament}
+                </Badge>
+              </div>
+            </div>
+
+            <Tabs value={tournamentTab} onValueChange={handleTournamentChange} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 bg-gray-700/50 p-1 h-auto gap-2">
                 <TabsTrigger
                   value="libertadores"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-white"
-                  onClick={() => setSelectedTournament(1)}
+                  className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-gray-400 transition-all duration-200 py-3 px-4 rounded-md"
                 >
-                  Copa Libertadores
+                  <div className="flex flex-col items-center gap-1">
+                    <Trophy className="w-5 h-5" />
+                    <span className="font-semibold">Copa Libertadores</span>
+                    <span className="text-xs opacity-70">Formato: Grupos + Eliminatorias</span>
+                  </div>
                 </TabsTrigger>
                 <TabsTrigger
                   value="femenino"
-                  className="data-[state=active]:bg-pink-600 data-[state=active]:text-white"
-                  onClick={() => setSelectedTournament(2)}
+                  className="data-[state=active]:bg-pink-600 data-[state=active]:text-white data-[state=inactive]:text-gray-400 transition-all duration-200 py-3 px-4 rounded-md"
                 >
-                  SuperLiga Femenina
+                  <div className="flex flex-col items-center gap-1">
+                    <Trophy className="w-5 h-5" />
+                    <span className="font-semibold">SuperLiga Femenina</span>
+                    <span className="text-xs opacity-70">Formato: Todos contra Todos</span>
+                  </div>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
+
+            <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-yellow-200">
+                  <strong>Importante:</strong> Al cambiar de torneo, asegúrate de guardar todos los cambios pendientes.
+                  Los datos de cada torneo se gestionan de forma independiente.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 bg-gray-800 border border-gray-700">
+          <TabsList
+            className={`grid w-full grid-cols-2 md:grid-cols-7 bg-gray-800 border-2 ${
+              tournamentTab === "libertadores" ? "border-primary/30" : "border-pink-500/30"
+            }`}
+          >
             <TabsTrigger value="news">Noticias</TabsTrigger>
             <TabsTrigger value="groups">Grupos</TabsTrigger>
             <TabsTrigger value="matches">Partidos</TabsTrigger>
