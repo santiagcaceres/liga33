@@ -161,32 +161,32 @@ export default function TopScorers() {
                 {scorers.map((scorer, index) => (
                   <div
                     key={scorer.player_id}
-                    className={`p-3 rounded-lg border transition-colors ${
+                    className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
                       index === 0
                         ? "bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/30"
-                        : "border-primary/20 hover:bg-primary/5"
+                        : "bg-primary/5 border-primary/20"
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="text-sm font-semibold text-primary shrink-0">{index + 1}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className={`truncate ${index === 0 ? "font-bold text-sm" : "font-medium text-sm"}`}>
-                            {scorer.player_name}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">{scorer.team_name}</p>
-                        </div>
-                      </div>
-                      <span
-                        className={`shrink-0 inline-flex items-center justify-center rounded-full font-bold ${
-                          index === 0
-                            ? "w-10 h-10 bg-gradient-to-br from-yellow-400 to-amber-500 text-white text-base shadow-lg"
-                            : "w-8 h-8 bg-primary/20 text-primary text-sm"
-                        }`}
-                      >
-                        {scorer.goals}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <span className={`font-bold ${index === 0 ? "text-yellow-500 text-lg" : "text-primary text-sm"}`}>
+                        {index + 1}
                       </span>
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-semibold truncate ${index === 0 ? "text-base" : "text-sm"}`}>
+                          {scorer.player_name}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">{scorer.team_name}</div>
+                      </div>
                     </div>
+                    <span
+                      className={`inline-flex items-center justify-center rounded-full font-bold flex-shrink-0 ${
+                        index === 0
+                          ? "w-10 h-10 bg-gradient-to-br from-yellow-400 to-amber-500 text-white text-lg shadow-lg"
+                          : "w-8 h-8 bg-primary/20 text-primary text-sm"
+                      }`}
+                    >
+                      {scorer.goals}
+                    </span>
                   </div>
                 ))}
               </div>

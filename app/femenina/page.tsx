@@ -1,0 +1,275 @@
+"use client"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Menu, X, ArrowLeft, Trophy, Calendar, Target, Users } from "lucide-react"
+import { useRouter } from "next/navigation"
+import LoadingAnimation from "@/components/loading-animation"
+import WhatsAppButton from "@/components/whatsapp-button"
+import LeagueStandings from "@/components/league-standings"
+import LeagueFixtures from "@/components/league-fixtures"
+import LeagueTopScorers from "@/components/league-top-scorers"
+import LeagueTeamsRoster from "@/components/league-teams-roster"
+import { Card, CardContent } from "@/components/ui/card"
+
+export default function FemeninaPage() {
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window !== "undefined") {
+      const lastShown = localStorage.getItem("lastLoadingShownFemenina")
+      if (!lastShown) return true
+
+      const twentyMinutes = 20 * 60 * 1000
+      const timeSinceLastShown = Date.now() - Number.parseInt(lastShown, 10)
+
+      return timeSinceLastShown >= twentyMinutes
+    }
+    return true
+  })
+
+  const [activeSection, setActiveSection] = useState<string>("inicio")
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  const handleLoadingComplete = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("lastLoadingShownFemenina", Date.now().toString())
+    }
+    setIsLoading(false)
+  }
+
+  if (isLoading) {
+    return <LoadingAnimation onComplete={handleLoadingComplete} />
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black">
+      <WhatsAppButton />
+
+      <header className="bg-gradient-to-r from-black via-pink-500/20 to-black text-white shadow-lg border-b border-pink-500/30">
+        <div className="container mx-auto px-4 py-4 md:py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:bg-pink-500/20"
+                onClick={() => router.push("/")}
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <button
+                onClick={() => setActiveSection("inicio")}
+                className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+              >
+                <img src="/logo-liga33.png" alt="Liga 33" className="w-20 h-20 md:w-32 md:h-32 object-contain" />
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold leading-tight text-pink-500">Liga 33</h1>
+                  <p className="text-purple-400 text-sm md:text-base font-semibold">SuperLiga Femenina</p>
+                </div>
+              </button>
+            </div>
+
+            <div className="md:hidden">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:bg-pink-500/20"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </Button>
+            </div>
+
+            <nav className="hidden md:flex gap-4 lg:gap-6">
+              <Button
+                variant="ghost"
+                className="text-white hover:bg-pink-500/20 hover:text-pink-500 text-sm lg:text-base"
+                onClick={() => setActiveSection("inicio")}
+              >
+                Inicio
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-white hover:bg-pink-500/20 hover:text-pink-500 text-sm lg:text-base"
+                onClick={() => setActiveSection("tabla")}
+              >
+                Tabla de Posiciones
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-white hover:bg-pink-500/20 hover:text-pink-500 text-sm lg:text-base"
+                onClick={() => setActiveSection("equipos")}
+              >
+                Equipos
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-white hover:bg-pink-500/20 hover:text-pink-500 text-sm lg:text-base"
+                onClick={() => setActiveSection("fixtures")}
+              >
+                Fixtures
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-white hover:bg-pink-500/20 hover:text-pink-500 text-sm lg:text-base"
+                onClick={() => setActiveSection("goleadores")}
+              >
+                Goleadores
+              </Button>
+            </nav>
+          </div>
+
+          {isMobileMenuOpen && (
+            <nav className="md:hidden mt-4 pb-4 border-t border-pink-500/30 pt-4">
+              <div className="flex flex-col gap-2">
+                <Button
+                  variant="ghost"
+                  className="text-white hover:bg-pink-500/20 hover:text-pink-500 justify-start"
+                  onClick={() => {
+                    setActiveSection("inicio")
+                    setIsMobileMenuOpen(false)
+                  }}
+                >
+                  Inicio
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="text-white hover:bg-pink-500/20 hover:text-pink-500 justify-start"
+                  onClick={() => {
+                    setActiveSection("tabla")
+                    setIsMobileMenuOpen(false)
+                  }}
+                >
+                  Tabla de Posiciones
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="text-white hover:bg-pink-500/20 hover:text-pink-500 justify-start"
+                  onClick={() => {
+                    setActiveSection("equipos")
+                    setIsMobileMenuOpen(false)
+                  }}
+                >
+                  Equipos
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="text-white hover:bg-pink-500/20 hover:text-pink-500 justify-start"
+                  onClick={() => {
+                    setActiveSection("fixtures")
+                    setIsMobileMenuOpen(false)
+                  }}
+                >
+                  Fixtures
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="text-white hover:bg-pink-500/20 hover:text-pink-500 justify-start"
+                  onClick={() => {
+                    setActiveSection("goleadores")
+                    setIsMobileMenuOpen(false)
+                  }}
+                >
+                  Goleadores
+                </Button>
+              </div>
+            </nav>
+          )}
+        </div>
+      </header>
+
+      <main className="py-8 md:py-12">
+        <div className="container mx-auto px-4">
+          {activeSection === "inicio" && (
+            <div className="text-center text-white mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4 text-pink-500">SuperLiga Femenina 2025</h2>
+              <p className="text-gray-300 text-lg mb-8">Formato de liga - Todos contra todos</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
+                <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
+                  <CardContent className="p-6 text-center">
+                    <Trophy className="w-12 h-12 mx-auto mb-3 text-pink-500" />
+                    <h3 className="text-xl font-bold mb-2">Tabla de Posiciones</h3>
+                    <p className="text-gray-400 text-sm">Seguí la clasificación en tiempo real</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
+                  <CardContent className="p-6 text-center">
+                    <Calendar className="w-12 h-12 mx-auto mb-3 text-pink-500" />
+                    <h3 className="text-xl font-bold mb-2">Fixtures</h3>
+                    <p className="text-gray-400 text-sm">Calendario completo de partidos</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
+                  <CardContent className="p-6 text-center">
+                    <Target className="w-12 h-12 mx-auto mb-3 text-pink-500" />
+                    <h3 className="text-xl font-bold mb-2">Goleadoras</h3>
+                    <p className="text-gray-400 text-sm">Ranking de máximas anotadoras</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
+                  <CardContent className="p-6 text-center">
+                    <Users className="w-12 h-12 mx-auto mb-3 text-pink-500" />
+                    <h3 className="text-xl font-bold mb-2">Equipos</h3>
+                    <p className="text-gray-400 text-sm">Planteles completos</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {activeSection === "tabla" && <LeagueStandings />}
+          {activeSection === "fixtures" && <LeagueFixtures />}
+          {activeSection === "goleadores" && <LeagueTopScorers />}
+          {activeSection === "equipos" && <LeagueTeamsRoster />}
+        </div>
+      </main>
+
+      <footer className="bg-gradient-to-r from-black via-pink-500/10 to-black text-white py-6 md:py-8 mt-8 md:mt-12 border-t border-pink-500/30">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <img src="/logo-liga33.png" alt="Liga 33" className="w-12 h-12 object-contain" />
+                <h3 className="text-lg font-bold text-pink-500">Liga 33</h3>
+              </div>
+              <p className="text-gray-300 text-sm md:text-base font-semibold">
+                MUCHO MAS QUE FUTBOL, MAS FUTBOL Y DEL BUENO
+              </p>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold mb-4 text-pink-500">Información</h3>
+              <div className="space-y-2 text-gray-300 text-sm md:text-base">
+                <div>📍 Complejo Deportivo HF</div>
+                <div>📞 +598 94 107 059</div>
+                <div>📧 info@liga33.com</div>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold mb-4 text-pink-500">Horarios</h3>
+              <div className="text-gray-300 text-sm md:text-base">
+                <div className="font-semibold">Sábados: 17:00 - 21:00</div>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-pink-500/30 mt-6 md:mt-8 pt-4 text-center text-gray-400 text-sm md:text-base">
+            <p>
+              &copy; 2025 Liga 33. Todos los derechos reservados. Desarrollado por{" "}
+              <a
+                href="https://www.launchbyteuy.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-pink-500 hover:text-pink-500/80 transition-colors underline"
+              >
+                LaunchByte
+              </a>
+            </p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+}

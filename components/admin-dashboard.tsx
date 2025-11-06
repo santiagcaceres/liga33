@@ -30,23 +30,14 @@ import {
   Edit,
   X,
 } from "lucide-react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { createTeam, getTeams, deleteTeam, updateTeam } from "@/lib/actions/teams" // Import updateTeam
-import { createPlayer, getPlayers, deletePlayer } from "@/lib/actions/players"
+import { createTeam, deleteTeam, updateTeam } from "@/lib/actions/teams" // Import updateTeam
+import { createPlayer, deletePlayer } from "@/lib/actions/players"
 import { createNews, getNews, deleteNews } from "@/lib/actions/news"
 import { useToast } from "@/hooks/use-toast"
-import { createMatch, getMatches, deleteMatch, updateMatchResult } from "@/lib/actions/matches" // Import match actions
+import { createMatch, deleteMatch, updateMatchResult } from "@/lib/actions/matches" // Import match actions
 import MatchDetailsDisplay from "@/components/match-details-display" // Fixed import to match kebab-case filename
 import { createClient } from "@/lib/supabase/client" // Fixed import path from utils to lib
+import { getTournaments } from "@/lib/actions/tournaments"
 
 interface Match {
   id: number
@@ -104,6 +95,10 @@ export default function AdminDashboard() {
   const [showPassword, setShowPassword] = useState(false)
   const [activeTab, setActiveTab] = useState("results")
   const { toast } = useToast()
+
+  const [selectedTournament, setSelectedTournament] = useState<number>(1) // Default: Copa Libertadores
+  const [tournaments, setTournaments] = useState<any[]>([])
+  const [tournamentTab, setTournamentTab] = useState<string>("libertadores") // 'libertadores' o 'femenino'
 
   const [selectedRound, setSelectedRound] = useState("1")
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
@@ -189,114 +184,45 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => {
-    loadTeams()
-    loadGroups() // Load groups on mount
-    loadPlayers()
-  }, [])
-
-  // Players will be loaded only when needed
-
-  useEffect(() => {
-    if (activeTab === "news") {
-      loadNews()
+    if (isAuthenticated) {
+      loadTournaments()
     }
-  }, [activeTab])
+  }, [isAuthenticated])
 
-  const loadMatches = async () => {
-    setIsLoadingMatches(true)
-    const matchesData = await getMatches()
-    setMatches(matchesData)
-    setIsLoadingMatches(false)
-  }
-
-  const handleCreateMatch = async () => {
-    if (
-      !newMatch.group_id ||
-      !newMatch.home_team_id ||
-      !newMatch.away_team_id ||
-      !newMatch.round ||
-      !newMatch.match_date
-    ) {
+  const loadTournaments = async () => {
+    try {
+      const data = await getTournaments()
+      setTournaments(data)
+      if (data.length > 0) {
+        // Set default tournament based on tournamentTab state
+        if (tournamentTab === "libertadores") {
+          setSelectedTournament(1)
+        } else if (tournamentTab === "femenino") {
+          setSelectedTournament(2)
+        }
+      }
+    } catch (error) {
+      console.error("[v0] Error loading tournaments:", error)
       toast({
-        title: "❌ Campos incompletos",
-        description: "Por favor completa todos los campos para crear el partido.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    const formData = new FormData()
-    formData.append("group_id", newMatch.group_id)
-    formData.append("home_team_id", newMatch.home_team_id)
-    formData.append("away_team_id", newMatch.away_team_id)
-    formData.append("round", newMatch.round)
-    formData.append("match_date", newMatch.match_date)
-    if (newMatch.match_time) formData.append("match_time", newMatch.match_time)
-    if (newMatch.field) formData.append("field", newMatch.field)
-
-    const result = await createMatch(formData)
-
-    if (result.success) {
-      toast({
-        title: "✅ ¡Partido creado exitosamente!",
-        description: "El partido ha sido agregado al calendario.",
-        className: "bg-green-50 border-green-200",
-      })
-      setNewMatch({
-        group_id: "",
-        home_team_id: "",
-        away_team_id: "",
-        round: "",
-        match_date: "",
-        match_time: "",
-        field: "",
-      })
-      setSelectedGroupForMatch("")
-      await loadMatches()
-    } else {
-      toast({
-        title: `❌ Error al crear partido`,
-        description: result.error || "Ocurrió un error inesperado",
+        title: "Error",
+        description: "No se pudieron cargar los torneos",
         variant: "destructive",
       })
     }
   }
-
-  const handleDeleteMatch = async (matchId: number, homeTeam: string, awayTeam: string) => {
-    if (!confirm(`¿Estás seguro de eliminar el partido ${homeTeam} vs ${awayTeam}?`)) {
-      return
-    }
-
-    const result = await deleteMatch(matchId)
-
-    if (result.success) {
-      toast({
-        title: "✅ ¡Partido eliminado!",
-        description: `El partido ${homeTeam} vs ${awayTeam} ha sido eliminado.`,
-        className: "bg-green-50 border-green-200",
-      })
-      await loadMatches()
-    } else {
-      toast({
-        title: `❌ Error al eliminar partido`,
-        description: result.error || "Ocurrió un error inesperado",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const teamsInSelectedGroup = selectedGroupForMatch
-    ? groupStandings
-        .filter((s: any) => s.copa_groups?.id === Number.parseInt(selectedGroupForMatch))
-        .map((s: any) => s.teams)
-        .filter(Boolean)
-    : []
 
   const loadTeams = async () => {
     setIsLoadingTeams(true)
     try {
-      const data = await getTeams()
-      setTeams(data)
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("teams")
+        .select("*")
+        .eq("tournament_id", selectedTournament)
+        .order("name")
+
+      if (error) throw error
+      setTeams(data || [])
     } catch (error) {
       console.error("[v0] Error loading teams:", error)
       toast({
@@ -312,8 +238,15 @@ export default function AdminDashboard() {
   const loadPlayers = async () => {
     setIsLoadingPlayers(true)
     try {
-      const data = await getPlayers()
-      setPlayers(data)
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("players")
+        .select("*, teams(name, id)")
+        .eq("tournament_id", selectedTournament)
+        .order("name")
+
+      if (error) throw error
+      setPlayers(data || [])
     } catch (error) {
       console.error("[v0] Error loading players:", error)
       toast({
@@ -326,10 +259,51 @@ export default function AdminDashboard() {
     }
   }
 
+  const loadMatches = async () => {
+    setIsLoadingMatches(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("matches")
+        .select(`
+          *,
+          home_team:teams!matches_home_team_id_fkey(name, id),
+          away_team:teams!matches_away_team_id_fkey(name, id),
+          copa_groups(name, id)
+        `)
+        .eq("tournament_id", selectedTournament)
+        .order("match_date")
+
+      if (error) throw error
+      setMatches(data || [])
+    } catch (error) {
+      console.error("[v0] Error loading matches:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los partidos",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingMatches(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isAuthenticated && selectedTournament) {
+      loadTeams()
+      loadPlayers()
+      loadMatches()
+      if (tournamentTab === "libertadores") {
+        loadGroups()
+      }
+    }
+  }, [selectedTournament, tournamentTab, isAuthenticated])
+
+  // Load news when the news tab is active
   const loadNews = async () => {
     setIsLoadingNews(true)
     try {
-      const data = await getNews()
+      const data = await getNews() // Assuming getNews is available and fetches news
       setNewsList(data)
     } catch (error) {
       console.error("[v0] Error loading news:", error)
@@ -342,6 +316,12 @@ export default function AdminDashboard() {
       setIsLoadingNews(false)
     }
   }
+
+  useEffect(() => {
+    if (activeTab === "news") {
+      loadNews()
+    }
+  }, [activeTab])
 
   const loadGroups = async () => {
     setIsLoadingGroups(true)
@@ -1118,6 +1098,7 @@ export default function AdminDashboard() {
           name
         )
       `)
+      .eq("tournament_id", selectedTournament) // Added tournament filter
       .order("points", { ascending: false })
       .order("goal_difference", { ascending: false })
       .order("goals_for", { ascending: false })
@@ -1194,13 +1175,21 @@ export default function AdminDashboard() {
         match_number: i + 1,
         team1_id: shuffled[i]?.team_id,
         team2_id: shuffled[7 - i]?.team_id,
+        tournament_id: selectedTournament, // Added tournament_id
       })
     }
 
-    const { error: drawError } = await supabase.from("draws").delete().neq("id", 0) // Delete all existing draws
+    const { error: deleteError } = await supabase.from("draws").delete().eq("tournament_id", selectedTournament) // Delete by tournament
+    if (deleteError) console.error("[v0] Error deleting previous draws:", deleteError)
 
-    if (!drawError) {
-      await supabase.from("draws").insert(drawData)
+    const { error: insertError } = await supabase.from("draws").insert(drawData)
+    if (insertError) {
+      console.error("[v0] Error inserting draws:", insertError)
+      toast({
+        title: "Error al guardar el sorteo",
+        description: "No se pudieron guardar los cruces en la base de datos.",
+        variant: "destructive",
+      })
     }
 
     toast({
@@ -1289,8 +1278,118 @@ export default function AdminDashboard() {
   })
 
   // Filter matches by selected round for results tab
-  const roundMatches = matches.filter((m) => m.round === Number.parseInt(selectedRound))
+  const roundMatches = matches.filter((m) => {
+    if (selectedRound === "cuartos") return m.round === "cuartos"
+    if (selectedRound === "semi") return m.round === "semi"
+    if (selectedRound === "final") return m.round === "final"
+    return m.round === Number.parseInt(selectedRound)
+  })
+
   const selectedMatch = matches.find((m) => m.id === selectedMatchId) // Use fetched matches
+
+  // Get teams for the selected group for match creation
+  const teamsInSelectedGroup = teams.filter((team) => {
+    const group = groups.find((g) => g.id.toString() === selectedGroupForMatch)
+    if (!group) return false
+    const teamIdsInGroup = groupStandings
+      .filter((standing: any) => standing.copa_groups?.id === group.id)
+      .map((standing: any) => standing.team_id)
+    return teamIdsInGroup.includes(team.id)
+  })
+
+  // Function to create a new match
+  const handleCreateMatch = async () => {
+    if (
+      !newMatch.group_id ||
+      !newMatch.home_team_id ||
+      !newMatch.away_team_id ||
+      !newMatch.round ||
+      !newMatch.match_date
+    ) {
+      toast({
+        title: "❌ Campos incompletos",
+        description: "Por favor completa todos los campos obligatorios.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const matchData = {
+        ...newMatch,
+        tournament_id: selectedTournament, // Add tournament_id
+        round: Number.parseInt(newMatch.round),
+        group_id: Number.parseInt(newMatch.group_id),
+        home_team_id: Number.parseInt(newMatch.home_team_id),
+        away_team_id: Number.parseInt(newMatch.away_team_id),
+        match_date: newMatch.match_date, // Ensure date format is correct
+        match_time: newMatch.match_time || null, // Allow null for time
+        field: newMatch.field || null, // Allow null for field
+      }
+
+      const result = await createMatch(matchData)
+
+      if (!result.success) {
+        toast({
+          title: "❌ Error al crear partido",
+          description: result.error || "Ocurrió un error inesperado",
+          variant: "destructive",
+        })
+        return
+      }
+
+      toast({
+        title: "✅ ¡Partido creado exitosamente!",
+        description: `El partido entre ${
+          teams.find((t) => t.id === matchData.home_team_id)?.name
+        } y ${teams.find((t) => t.id === matchData.away_team_id)?.name} ha sido agregado`,
+        className: "bg-green-50 border-green-200",
+      })
+
+      setNewMatch({
+        group_id: "",
+        home_team_id: "",
+        away_team_id: "",
+        round: "",
+        match_date: "",
+        match_time: "",
+        field: "",
+      })
+      setSelectedGroupForMatch("")
+      await loadMatches()
+    } catch (error) {
+      console.error("[v0] Error creating match:", error)
+      toast({
+        title: "❌ Error al crear partido",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Function to delete a match
+  const handleDeleteMatch = async (matchId: number, homeTeamName?: string, awayTeamName?: string) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar el partido ${homeTeamName} vs ${awayTeamName}?`)) {
+      return
+    }
+
+    try {
+      await deleteMatch(matchId)
+      toast({
+        title: "✅ ¡Partido eliminado!",
+        description: `El partido ${homeTeamName} vs ${awayTeamName} ha sido eliminado exitosamente`,
+        className: "bg-green-50 border-green-200",
+      })
+      await loadMatches()
+    } catch (error) {
+      console.error("[v0] Error deleting match:", error)
+      toast({
+        title: "❌ Error al eliminar partido",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    }
+  }
 
   if (!isAuthenticated) {
     return (
@@ -1337,1311 +1436,219 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card className="border-primary/30">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-primary">
-              <Settings className="w-6 h-6" />
-              Panel de Administración - Liga 33
-            </CardTitle>
-            <Button
-              variant="outline"
-              onClick={handleLogout}
-              className="border-red-300 text-red-600 hover:bg-red-50 bg-transparent"
-            >
-              Cerrar Sesión
-            </Button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Settings className="w-8 h-8 text-primary" />
+            <h1 className="text-3xl font-bold text-white">Panel de Administración</h1>
           </div>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-7">
-              <TabsTrigger value="news">Noticias</TabsTrigger>
-              <TabsTrigger value="groups">Grupos</TabsTrigger>
-              <TabsTrigger value="matches">Partidos</TabsTrigger>
-              <TabsTrigger value="results">Resultados</TabsTrigger>
-              <TabsTrigger value="draw">Sorteo</TabsTrigger>
-              <TabsTrigger value="teams">Equipos</TabsTrigger>
-              <TabsTrigger value="players">Jugadores</TabsTrigger>
-            </TabsList>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsAuthenticated(false)
+              setPassword("")
+            }}
+            className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+          >
+            Cerrar Sesión
+          </Button>
+        </div>
 
-            <TabsContent value="news" className="space-y-6">
-              <Card className="border-primary/30 bg-gradient-to-r from-black via-primary/10 to-black">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-primary">
-                    <Newspaper className="w-5 h-5" />
-                    Gestión de Noticias
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Agrega noticias con imagen banner y texto (máximo 4 noticias)
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Título de la Noticia *</Label>
-                    <Input
-                      value={newNews.title}
-                      onChange={(e) => setNewNews({ ...newNews, title: e.target.value })}
-                      placeholder="Ej: Gran victoria de Deportivo Central"
-                    />
+        <Card className="bg-gray-800/50 border-gray-700">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-primary" />
+              Seleccionar Torneo
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={tournamentTab} onValueChange={setTournamentTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 bg-gray-700">
+                <TabsTrigger
+                  value="libertadores"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-white"
+                  onClick={() => setSelectedTournament(1)}
+                >
+                  Copa Libertadores
+                </TabsTrigger>
+                <TabsTrigger
+                  value="femenino"
+                  className="data-[state=active]:bg-pink-600 data-[state=active]:text-white"
+                  onClick={() => setSelectedTournament(2)}
+                >
+                  SuperLiga Femenina
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 bg-gray-800 border border-gray-700">
+            <TabsTrigger value="news">Noticias</TabsTrigger>
+            <TabsTrigger value="groups">Grupos</TabsTrigger>
+            <TabsTrigger value="matches">Partidos</TabsTrigger>
+            <TabsTrigger value="results">Resultados</TabsTrigger>
+            <TabsTrigger value="draw">Sorteo</TabsTrigger>
+            <TabsTrigger value="teams">Equipos</TabsTrigger>
+            <TabsTrigger value="players">Jugadores</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="news" className="space-y-6">
+            <Card className="border-primary/30 bg-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-primary">
+                  <Newspaper className="w-5 h-5" />
+                  Gestión de Noticias
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Agrega noticias con imagen banner y texto (máximo 4 noticias)
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Título de la Noticia *</Label>
+                  <Input
+                    value={newNews.title}
+                    onChange={(e) => setNewNews({ ...newNews, title: e.target.value })}
+                    placeholder="Ej: Gran victoria de Deportivo Central"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Contenido *</Label>
+                  <Textarea
+                    value={newNews.content}
+                    onChange={(e) => setNewNews({ ...newNews, content: e.target.value })}
+                    placeholder="Escribe el contenido de la noticia..."
+                    rows={4}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Fecha</Label>
+                  <Input
+                    type="date"
+                    value={newNews.date}
+                    onChange={(e) => setNewNews({ ...newNews, date: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Imagen Banner *</Label>
+                  <div className="flex gap-2">
+                    <Input type="file" accept="image/*" onChange={handleNewsImageUpload} className="flex-1" />
+                    <Button variant="outline" size="icon">
+                      <Upload className="w-4 h-4" />
+                    </Button>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label>Contenido *</Label>
-                    <Textarea
-                      value={newNews.content}
-                      onChange={(e) => setNewNews({ ...newNews, content: e.target.value })}
-                      placeholder="Escribe el contenido de la noticia..."
-                      rows={4}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Fecha</Label>
-                    <Input
-                      type="date"
-                      value={newNews.date}
-                      onChange={(e) => setNewNews({ ...newNews, date: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Imagen Banner *</Label>
-                    <div className="flex gap-2">
-                      <Input type="file" accept="image/*" onChange={handleNewsImageUpload} className="flex-1" />
-                      <Button variant="outline" size="icon">
-                        <Upload className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    {newNews.image && (
-                      <div className="mt-2 aspect-video w-full max-w-md overflow-hidden rounded-lg border border-primary/30">
-                        <img
-                          src={newNews.image || "/placeholder.svg"}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <Button
-                    onClick={handleAddNews}
-                    className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                    disabled={!newNews.title || !newNews.content || !newNews.image || newsList.length >= 4}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Agregar Noticia
-                  </Button>
-
-                  <div className="mt-6">
-                    <h3 className="font-semibold mb-3">Noticias Publicadas ({newsList.length}/4)</h3>
-                    {isLoadingNews ? (
-                      <div className="text-center py-8 text-muted-foreground">Cargando noticias...</div>
-                    ) : newsList.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Newspaper className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>No hay noticias publicadas</p>
-                      </div>
-                    ) : (
-                      <div className="grid gap-4">
-                        {newsList.map((news) => (
-                          <Card key={news.id} className="border-primary/30">
-                            <CardContent className="p-4">
-                              <div className="flex gap-4">
-                                <img
-                                  src={news.image_url || "/placeholder.svg"}
-                                  alt={news.title}
-                                  className="w-24 h-24 object-cover rounded"
-                                />
-                                <div className="flex-1">
-                                  <h4 className="font-semibold">{news.title}</h4>
-                                  <p className="text-sm text-muted-foreground line-clamp-2">{news.content}</p>
-                                  <p className="text-xs text-muted-foreground mt-1">{news.published_date}</p>
-                                </div>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleDeleteNews(news.id, news.title)}
-                                  className="border-red-300 text-red-600 hover:bg-red-50"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="groups" className="space-y-6">
-              <Card className="border-primary/30 bg-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-primary">
-                    <Trophy className="w-5 h-5" />
-                    Gestión de Grupos
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Crea los grupos de la Copa Libertadores y asigna equipos a cada grupo
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Create Group Section */}
-                  <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
-                    <h3 className="font-semibold">Crear Nuevo Grupo</h3>
-                    <div className="flex gap-2">
-                      <Input
-                        value={newGroupName}
-                        onChange={(e) => setNewGroupName(e.target.value)}
-                        placeholder="Ej: Grupo A"
-                        className="flex-1"
+                  {newNews.image && (
+                    <div className="mt-2 aspect-video w-full max-w-md overflow-hidden rounded-lg border border-primary/30">
+                      <img
+                        src={newNews.image || "/placeholder.svg"}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
                       />
-                      <Button
-                        onClick={handleCreateGroup}
-                        className="bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                        disabled={!newGroupName.trim()}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Crear Grupo
-                      </Button>
                     </div>
-                  </div>
+                  )}
+                </div>
 
-                  {/* Assign Team to Group Section */}
-                  <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
-                    <h3 className="font-semibold">Asignar Equipo a Grupo</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Seleccionar Equipo</Label>
-                        <Select
-                          value={selectedTeamForAssignment}
-                          onValueChange={setSelectedTeamForAssignment}
-                          disabled={teams.length === 0}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar equipo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {teams.map((team) => (
-                              <SelectItem key={team.id} value={team.id.toString()}>
-                                {team.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Seleccionar Grupo</Label>
-                        <Select
-                          value={selectedGroupForAssignment}
-                          onValueChange={setSelectedGroupForAssignment}
-                          disabled={groups.length === 0}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar grupo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {groups.map((group) => (
-                              <SelectItem key={group.id} value={group.id.toString()}>
-                                {group.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={handleAssignTeamToGroup}
-                      className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                      disabled={!selectedTeamForAssignment || !selectedGroupForAssignment}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Asignar Equipo
-                    </Button>
-                  </div>
+                <Button
+                  onClick={handleAddNews}
+                  className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                  disabled={!newNews.title || !newNews.content || !newNews.image || newsList.length >= 4}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Agregar Noticia
+                </Button>
 
-                  {/* Display Groups and Teams */}
-                  <div className="space-y-4">
-                    <h3 className="font-semibold">Grupos Creados ({groups.length})</h3>
-                    {isLoadingGroups ? (
-                      <div className="text-center py-8 text-muted-foreground">Cargando grupos...</div>
-                    ) : groups.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Trophy className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
-                        <p>No hay grupos creados</p>
-                        <p className="text-sm">Crea grupos usando el formulario de arriba</p>
-                      </div>
-                    ) : (
-                      <div className="grid gap-4">
-                        {groups.map((group) => {
-                          const teamsInGroup = groupStandings.filter((s: any) => s.copa_groups?.id === group.id)
-                          return (
-                            <Card key={group.id} className="border-primary/30">
-                              <CardHeader>
-                                <div className="flex items-center justify-between">
-                                  <CardTitle className="text-lg">{group.name}</CardTitle>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleDeleteGroup(group.id, group.name)}
-                                    className="border-red-300 text-red-600 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-1" />
-                                    Eliminar Grupo
-                                  </Button>
-                                </div>
-                              </CardHeader>
-                              <CardContent>
-                                {teamsInGroup.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">No hay equipos asignados</p>
-                                ) : (
-                                  <div className="space-y-2">
-                                    {teamsInGroup.map((standing: any) => (
-                                      <div
-                                        key={standing.id}
-                                        className="flex items-center justify-between p-2 bg-background rounded border border-primary/20"
-                                      >
-                                        <span className="font-medium">{standing.teams?.name}</span>
-                                        <div className="flex items-center gap-2">
-                                          <Badge className="bg-primary">
-                                            {standing.points} pts • {standing.played} PJ
-                                          </Badge>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                              handleRemoveTeamFromGroup(
-                                                standing.team_id,
-                                                standing.teams?.name,
-                                                group.name,
-                                              )
-                                            }
-                                            className="border-red-300 text-red-600 hover:bg-red-50"
-                                          >
-                                            <Trash2 className="w-4 h-4" />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </CardContent>
-                            </Card>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="matches" className="space-y-6">
-              <Card className="border-primary/30 bg-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-primary">
-                    <Calendar className="w-5 h-5" />
-                    Gestión de Partidos
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Crea los partidos de cada fecha. Solo pueden enfrentarse equipos del mismo grupo.
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Create Match Section */}
-                  <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
-                    <h3 className="font-semibold">Crear Nuevo Partido</h3>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Seleccionar Grupo *</Label>
-                        <Select
-                          value={selectedGroupForMatch}
-                          onValueChange={(value) => {
-                            setSelectedGroupForMatch(value)
-                            setNewMatch({ ...newMatch, group_id: value, home_team_id: "", away_team_id: "" })
-                          }}
-                          disabled={groups.length === 0}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar grupo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {groups.map((group) => (
-                              <SelectItem key={group.id} value={group.id.toString()}>
-                                {group.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Jornada/Fecha *</Label>
-                        <Input
-                          type="number"
-                          value={newMatch.round}
-                          onChange={(e) => setNewMatch({ ...newMatch, round: e.target.value })}
-                          placeholder="Ej: 1"
-                          min="1"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Equipo Local *</Label>
-                        <Select
-                          value={newMatch.home_team_id}
-                          onValueChange={(value) => setNewMatch({ ...newMatch, home_team_id: value })}
-                          disabled={!selectedGroupForMatch || teamsInSelectedGroup.length === 0}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar equipo local" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {teamsInSelectedGroup.map((team: any) => (
-                              <SelectItem key={team.id} value={team.id.toString()}>
-                                {team.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Equipo Visitante *</Label>
-                        <Select
-                          value={newMatch.away_team_id}
-                          onValueChange={(value) => setNewMatch({ ...newMatch, away_team_id: value })}
-                          disabled={!selectedGroupForMatch || teamsInSelectedGroup.length === 0}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar equipo visitante" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {teamsInSelectedGroup
-                              .filter((team: any) => team.id.toString() !== newMatch.home_team_id)
-                              .map((team: any) => (
-                                <SelectItem key={team.id} value={team.id.toString()}>
-                                  {team.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Fecha del Partido *</Label>
-                        <Input
-                          type="date"
-                          value={newMatch.match_date}
-                          onChange={(e) => setNewMatch({ ...newMatch, match_date: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Hora del Partido</Label>
-                        <Input
-                          type="time"
-                          value={newMatch.match_time}
-                          onChange={(e) => setNewMatch({ ...newMatch, match_time: e.target.value })}
-                          placeholder="Ej: 17:00"
-                        />
-                      </div>
-
-                      <div className="space-y-2 md:col-span-2">
-                        <Label>Cancha</Label>
-                        <Input
-                          type="text"
-                          value={newMatch.field}
-                          onChange={(e) => setNewMatch({ ...newMatch, field: e.target.value })}
-                          placeholder="Ej: Cancha 1, Cancha Principal"
-                        />
-                      </div>
-                    </div>
-
-                    <Button
-                      onClick={handleCreateMatch}
-                      className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                      disabled={
-                        !newMatch.group_id ||
-                        !newMatch.home_team_id ||
-                        !newMatch.away_team_id ||
-                        !newMatch.round ||
-                        !newMatch.match_date
-                      }
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Crear Partido
-                    </Button>
-                  </div>
-
-                  {/* Display Matches */}
-                  <div className="space-y-4">
-                    <h3 className="font-semibold">Partidos Creados ({matches.length})</h3>
-                    {isLoadingMatches ? (
-                      <div className="text-center py-8 text-muted-foreground">Cargando partidos...</div>
-                    ) : matches.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
-                        <p>No hay partidos creados</p>
-                        <p className="text-sm">Crea partidos usando el formulario de arriba</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {/* Group matches by round */}
-                        {Array.from(new Set(matches.map((m) => m.round)))
-                          .sort((a, b) => a - b)
-                          .map((round) => (
-                            <div key={round} className="space-y-2">
-                              <h4 className="font-semibold text-sm text-primary">Fecha {round}</h4>
-                              <div className="grid gap-2">
-                                {matches
-                                  .filter((m) => m.round === round)
-                                  .map((match) => (
-                                    <Card key={match.id} className="border-primary/30">
-                                      <CardContent className="p-4">
-                                        <div className="flex items-center justify-between">
-                                          <div className="flex-1">
-                                            <div className="flex items-center gap-2">
-                                              <span className="font-semibold">
-                                                {match.home_team?.name} vs {match.away_team?.name}
-                                              </span>
-                                              <Badge variant="outline" className="text-xs">
-                                                {match.copa_groups?.name}
-                                              </Badge>
-                                              {match.played && (
-                                                <Badge className="bg-green-600 text-xs">
-                                                  {match.home_score} - {match.away_score}
-                                                </Badge>
-                                              )}
-                                            </div>
-                                            <p className="text-sm text-muted-foreground">
-                                              {new Date(match.match_date).toLocaleDateString("es-ES", {
-                                                weekday: "long",
-                                                year: "numeric",
-                                                month: "long",
-                                                day: "numeric",
-                                              })}
-                                            </p>
-                                            {match.played && <MatchDetailsDisplay matchId={match.id} />}
-                                          </div>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                              handleDeleteMatch(match.id, match.home_team?.name, match.away_team?.name)
-                                            }
-                                            className="border-red-300 text-red-600 hover:bg-red-50"
-                                            disabled={match.played}
-                                            title={
-                                              match.played
-                                                ? "No se puede eliminar un partido ya jugado"
-                                                : "Eliminar partido"
-                                            }
-                                          >
-                                            <Trash2 className="w-4 h-4" />
-                                          </Button>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="results" className="space-y-6">
-              <Card className="border-primary/30 bg-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-primary">
-                    <Trophy className="w-5 h-5" />
-                    Cargar Resultado de Partido
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Agrega los goleadores y tarjetas. Los goles se calcularán automáticamente.
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {matches.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Trophy className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary" />
-                      <p className="text-lg">No hay partidos cargados</p>
-                      <p className="text-sm">
-                        Primero debes agregar equipos y crear el fixture de la Copa Libertadores
-                      </p>
+                <div className="mt-6">
+                  <h3 className="font-semibold mb-3">Noticias Publicadas ({newsList.length}/4)</h3>
+                  {isLoadingNews ? (
+                    <div className="text-center py-8 text-muted-foreground">Cargando noticias...</div>
+                  ) : newsList.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Newspaper className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>No hay noticias publicadas</p>
                     </div>
                   ) : (
-                    <>
-                      <div className="space-y-2">
-                        <Label className="text-base font-semibold">Seleccionar Fecha</Label>
-                        <div className="flex flex-wrap gap-2">
-                          {Array.from(new Set(matches.map((m) => m.round)))
-                            .sort((a, b) => a - b)
-                            .map((round) => (
+                    <div className="grid gap-4">
+                      {newsList.map((news) => (
+                        <Card key={news.id} className="border-primary/30">
+                          <CardContent className="p-4">
+                            <div className="flex gap-4">
+                              <img
+                                src={news.image_url || "/placeholder.svg"}
+                                alt={news.title}
+                                className="w-24 h-24 object-cover rounded"
+                              />
+                              <div className="flex-1">
+                                <h4 className="font-semibold">{news.title}</h4>
+                                <p className="text-sm text-muted-foreground line-clamp-2">{news.content}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{news.published_date}</p>
+                              </div>
                               <Button
-                                key={round}
-                                variant={selectedRound === round.toString() ? "default" : "outline"}
-                                className={
-                                  selectedRound === round.toString()
-                                    ? "bg-gradient-to-r from-primary to-primary/80"
-                                    : "border-primary/30"
-                                }
-                                onClick={() => {
-                                  setSelectedRound(round.toString())
-                                  setSelectedMatchId(null)
-                                }}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteNews(news.id, news.title)}
+                                className="border-red-300 text-red-600 hover:bg-red-50"
                               >
-                                Fecha {round}
+                                <Trash2 className="w-4 h-4" />
                               </Button>
-                            ))}
-                          <Button
-                            variant={selectedRound === "cuartos" ? "default" : "outline"}
-                            className={
-                              selectedRound === "cuartos"
-                                ? "bg-gradient-to-r from-primary to-primary/80"
-                                : "border-primary/30"
-                            }
-                            onClick={() => {
-                              setSelectedRound("cuartos")
-                              setSelectedMatchId(null)
-                            }}
-                          >
-                            Cuartos de Final
-                          </Button>
-                          <Button
-                            variant={selectedRound === "semi" ? "default" : "outline"}
-                            className={
-                              selectedRound === "semi"
-                                ? "bg-gradient-to-r from-primary to-primary/80"
-                                : "border-primary/30"
-                            }
-                            onClick={() => {
-                              setSelectedRound("semi")
-                              setSelectedMatchId(null)
-                            }}
-                          >
-                            Semifinales
-                          </Button>
-                          <Button
-                            variant={selectedRound === "final" ? "default" : "outline"}
-                            className={
-                              selectedRound === "final"
-                                ? "bg-gradient-to-r from-primary to-primary/80"
-                                : "border-primary/30"
-                            }
-                            onClick={() => {
-                              setSelectedRound("final")
-                              setSelectedMatchId(null)
-                            }}
-                          >
-                            Final
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <Label className="text-base font-semibold">Seleccionar Partido</Label>
-                        {Array.from(new Set(roundMatches.map((m) => m.copa_groups?.name)))
-                          .filter(Boolean)
-                          .map((groupName) => (
-                            <div key={groupName} className="space-y-2">
-                              <h4 className="text-sm font-semibold text-primary">{groupName}</h4>
-                              <div className="grid gap-2">
-                                {roundMatches
-                                  .filter((m) => m.copa_groups?.name === groupName)
-                                  .map((match) => (
-                                    <Button
-                                      key={match.id}
-                                      variant={selectedMatchId === match.id ? "default" : "outline"}
-                                      className={`w-full justify-start h-auto py-3 ${
-                                        selectedMatchId === match.id
-                                          ? "bg-gradient-to-r from-primary to-primary/80"
-                                          : "border-primary/30"
-                                      }`}
-                                      onClick={() => setSelectedMatchId(match.id)}
-                                    >
-                                      <div className="flex flex-col items-start w-full">
-                                        <div className="flex items-center justify-between w-full">
-                                          <span className="font-semibold">
-                                            {match.home_team?.name} vs {match.away_team?.name}
-                                          </span>
-                                          {match.played && (
-                                            <Badge className="bg-green-600 text-xs ml-2">
-                                              {match.home_score} - {match.away_score}
-                                            </Badge>
-                                          )}
-                                        </div>
-                                        <span className="text-xs opacity-80">
-                                          {new Date(match.match_date).toLocaleDateString("es-ES")}
-                                        </span>
-                                      </div>
-                                    </Button>
-                                  ))}
-                              </div>
                             </div>
-                          ))}
-                      </div>
-
-                      {selectedMatch && selectedMatch.played ? (
-                        <div className="space-y-4">
-                          <div className="p-4 bg-muted/50 rounded-lg border border-primary/30">
-                            <p className="text-center text-muted-foreground mb-4">
-                              Este partido ya ha finalizado. No se pueden agregar más goles o tarjetas.
-                            </p>
-                            <MatchDetailsDisplay matchId={selectedMatch.id} />
-                          </div>
-                        </div>
-                      ) : (
-                        selectedMatch && (
-                          <>
-                            <div className="p-4 bg-primary/10 rounded-lg border border-primary/30">
-                              <h3 className="font-semibold text-lg text-center mb-2">
-                                {selectedMatch.home_team?.name} vs {selectedMatch.away_team?.name}
-                              </h3>
-                              <p className="text-sm text-center text-muted-foreground">
-                                Fecha {selectedMatch.round} - Grupo {selectedMatch.copa_groups?.name}
-                              </p>
-                              {selectedMatch.field && (
-                                <p className="text-sm text-center text-muted-foreground">
-                                  Cancha: {selectedMatch.field}
-                                </p>
-                              )}
-                              {selectedMatch.match_time && (
-                                <p className="text-sm text-center text-muted-foreground">
-                                  Hora: {selectedMatch.match_time}
-                                </p>
-                              )}
-                            </div>
-
-                            {/* Goleadores Local */}
-                            <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/30">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-base font-semibold text-primary">
-                                  ⚽ Goleadores {selectedMatch.home_team?.name}
-                                </Label>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => addIncident("goal", "home")}
-                                  className="border-primary/30 text-primary hover:bg-primary/10"
-                                >
-                                  <Plus className="w-4 h-4 mr-1" />
-                                  Agregar Gol
-                                </Button>
-                              </div>
-                              {homeGoals.map((goal, index) => (
-                                <div key={index} className="flex gap-2 items-end">
-                                  <div className="flex-1">
-                                    <Select
-                                      value={goal.player}
-                                      onValueChange={(value) => updateIncident("goal", "home", index, "player", value)}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar jugador" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {players
-                                          .filter((p) =>
-                                            teams.some(
-                                              (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
-                                            ),
-                                          )
-                                          .map((player) => (
-                                            <SelectItem key={player.id} value={player.id.toString()}>
-                                              {player.name}
-                                            </SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="w-20">
-                                    <Input
-                                      placeholder="Min"
-                                      value={goal.minute}
-                                      onChange={(e) => updateIncident("goal", "home", index, "minute", e.target.value)}
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeIncident("goal", "home", index)}
-                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* Tarjetas Amarillas Local */}
-                            <div className="space-y-3 p-4 bg-yellow-500/5 rounded-lg border border-yellow-500/30">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-base font-semibold text-yellow-500">
-                                  🟨 Tarjetas Amarillas {selectedMatch.home_team?.name}
-                                </Label>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => addIncident("yellow", "home")}
-                                  className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
-                                >
-                                  <Plus className="w-4 h-4 mr-1" />
-                                  Agregar Amarilla
-                                </Button>
-                              </div>
-                              {homeYellowCards.map((card, index) => (
-                                <div key={index} className="flex gap-2 items-end">
-                                  <div className="flex-1">
-                                    <Select
-                                      value={card.player}
-                                      onValueChange={(value) =>
-                                        updateIncident("yellow", "home", index, "player", value)
-                                      }
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar jugador" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {players
-                                          .filter((p) =>
-                                            teams.some(
-                                              (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
-                                            ),
-                                          )
-                                          .map((player) => (
-                                            <SelectItem key={player.id} value={player.id.toString()}>
-                                              {player.name}
-                                            </SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="w-20">
-                                    <Input
-                                      placeholder="Min"
-                                      value={card.minute}
-                                      onChange={(e) =>
-                                        updateIncident("yellow", "home", index, "minute", e.target.value)
-                                      }
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeIncident("yellow", "home", index)}
-                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* Tarjetas Rojas Local */}
-                            <div className="space-y-3 p-4 bg-red-500/5 rounded-lg border border-red-500/30">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-base font-semibold text-red-500">
-                                  🟥 Tarjetas Rojas {selectedMatch.home_team?.name}
-                                </Label>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => addIncident("red", "home")}
-                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                >
-                                  <Plus className="w-4 h-4 mr-1" />
-                                  Agregar Roja
-                                </Button>
-                              </div>
-                              {homeRedCards.map((card, index) => (
-                                <div key={index} className="flex gap-2 items-end">
-                                  <div className="flex-1">
-                                    <Select
-                                      value={card.player}
-                                      onValueChange={(value) => updateIncident("red", "home", index, "player", value)}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar jugador" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {players
-                                          .filter((p) =>
-                                            teams.some(
-                                              (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
-                                            ),
-                                          )
-                                          .map((player) => (
-                                            <SelectItem key={player.id} value={player.id.toString()}>
-                                              {player.name}
-                                            </SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="w-20">
-                                    <Input
-                                      placeholder="Min"
-                                      value={card.minute}
-                                      onChange={(e) => updateIncident("red", "home", index, "minute", e.target.value)}
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeIncident("red", "home", index)}
-                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* Goleadores Visitante */}
-                            <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/30">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-base font-semibold text-primary">
-                                  ⚽ Goleadores {selectedMatch.away_team?.name}
-                                </Label>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => addIncident("goal", "away")}
-                                  className="border-primary/30 text-primary hover:bg-primary/10"
-                                >
-                                  <Plus className="w-4 h-4 mr-1" />
-                                  Agregar Gol
-                                </Button>
-                              </div>
-                              {awayGoals.map((goal, index) => (
-                                <div key={index} className="flex gap-2 items-end">
-                                  <div className="flex-1">
-                                    <Select
-                                      value={goal.player}
-                                      onValueChange={(value) => updateIncident("goal", "away", index, "player", value)}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar jugador" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {players
-                                          .filter((p) =>
-                                            teams.some(
-                                              (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
-                                            ),
-                                          )
-                                          .map((player) => (
-                                            <SelectItem key={player.id} value={player.id.toString()}>
-                                              {player.name}
-                                            </SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="w-20">
-                                    <Input
-                                      placeholder="Min"
-                                      value={goal.minute}
-                                      onChange={(e) => updateIncident("goal", "away", index, "minute", e.target.value)}
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeIncident("goal", "away", index)}
-                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* Tarjetas Amarillas Visitante */}
-                            <div className="space-y-3 p-4 bg-yellow-500/5 rounded-lg border border-yellow-500/30">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-base font-semibold text-yellow-500">
-                                  🟨 Tarjetas Amarillas {selectedMatch.away_team?.name}
-                                </Label>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => addIncident("yellow", "away")}
-                                  className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
-                                >
-                                  <Plus className="w-4 h-4 mr-1" />
-                                  Agregar Amarilla
-                                </Button>
-                              </div>
-                              {awayYellowCards.map((card, index) => (
-                                <div key={index} className="flex gap-2 items-end">
-                                  <div className="flex-1">
-                                    <Select
-                                      value={card.player}
-                                      onValueChange={(value) =>
-                                        updateIncident("yellow", "away", index, "player", value)
-                                      }
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar jugador" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {players
-                                          .filter((p) =>
-                                            teams.some(
-                                              (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
-                                            ),
-                                          )
-                                          .map((player) => (
-                                            <SelectItem key={player.id} value={player.id.toString()}>
-                                              {player.name}
-                                            </SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="w-20">
-                                    <Input
-                                      placeholder="Min"
-                                      value={card.minute}
-                                      onChange={(e) =>
-                                        updateIncident("yellow", "away", index, "minute", e.target.value)
-                                      }
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeIncident("yellow", "away", index)}
-                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* Tarjetas Rojas Visitante */}
-                            <div className="space-y-3 p-4 bg-red-500/5 rounded-lg border border-red-500/30">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-base font-semibold text-red-500">
-                                  🟥 Tarjetas Rojas {selectedMatch.away_team?.name}
-                                </Label>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => addIncident("red", "away")}
-                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                >
-                                  <Plus className="w-4 h-4 mr-1" />
-                                  Agregar Roja
-                                </Button>
-                              </div>
-                              {awayRedCards.map((card, index) => (
-                                <div key={index} className="flex gap-2 items-end">
-                                  <div className="flex-1">
-                                    <Select
-                                      value={card.player}
-                                      onValueChange={(value) => updateIncident("red", "away", index, "player", value)}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar jugador" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {players
-                                          .filter((p) =>
-                                            teams.some(
-                                              (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
-                                            ),
-                                          )
-                                          .map((player) => (
-                                            <SelectItem key={player.id} value={player.id.toString()}>
-                                              {player.name}
-                                            </SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="w-20">
-                                    <Input
-                                      placeholder="Min"
-                                      value={card.minute}
-                                      onChange={(e) => updateIncident("red", "away", index, "minute", e.target.value)}
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeIncident("red", "away", index)}
-                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-
-                            <Button
-                              onClick={() => setShowResultConfirm(true)}
-                              className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                            >
-                              <Save className="w-4 h-4 mr-2" />
-                              Guardar Resultado y Actualizar Tablas
-                            </Button>
-                          </>
-                        )
-                      )}
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="draw" className="space-y-6">
-              <Card className="border-green-200 bg-gradient-to-r from-green-950 via-green-900/20 to-green-950">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-xl">
-                    <Shuffle className="w-6 h-6 text-green-600" />
-                    Sorteo de Clasificados
-                  </CardTitle>
-                  <p className="text-sm text-gray-600 mt-2">
-                    Realiza el sorteo automático de los 8 equipos clasificados para los octavos de final
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button
-                    onClick={() => setShowDrawConfirm(true)}
-                    className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                  >
-                    <Shuffle className="w-4 h-4 mr-2" />
-                    Realizar Sorteo Automático
-                  </Button>
-
-                  {showDraw && drawResults.length > 0 && (
-                    <div className="space-y-3 mt-4">
-                      <h3 className="font-semibold text-lg text-center">Cruces de Octavos de Final</h3>
-                      <div className="grid gap-3">
-                        {drawResults.map((matchup, index) => (
-                          <Card key={index} className="border-primary/30 bg-card">
-                            <CardContent className="p-4">
-                              <div className="flex items-center justify-between">
-                                <Badge className="bg-primary">Partido {index + 1}</Badge>
-                                <span className="font-semibold text-center flex-1">{matchup}</span>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-            <TabsContent value="teams" className="space-y-6">
-              <Card className="border-primary/30 bg-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-primary">
-                    <Users className="w-5 h-5" />
-                    {editingTeam ? "Editar Equipo" : "Gestión de Equipos"}
-                  </CardTitle>
-                  {editingTeam && (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Editando: <span className="font-semibold text-primary">{editingTeam.name}</span>
-                    </p>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Nombre del Equipo *</Label>
-                    <Input
-                      value={newTeam.name}
-                      onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
-                      placeholder="Ej: Deportivo Central"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Foto del Equipo (JPG o PNG) *</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png"
-                        onChange={handleTeamLogoUpload}
-                        className="flex-1"
-                      />
-                      <Button variant="outline" size="icon" disabled>
-                        <Upload className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Selecciona una imagen JPG o PNG desde tu computadora
-                    </p>
-                    {newTeam.logo_url && (
-                      <div className="mt-2 w-24 h-24 border border-primary/30 rounded-lg overflow-hidden">
-                        <img
-                          src={newTeam.logo_url || "/placeholder.svg"}
-                          alt="Preview"
-                          className="w-full h-full object-contain bg-white"
-                          onError={(e) => {
-                            e.currentTarget.src = "/placeholder.svg?height=96&width=96"
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-
+          <TabsContent value="groups" className="space-y-6">
+            <Card className="border-primary/30 bg-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-primary">
+                  <Trophy className="w-5 h-5" />
+                  Gestión de Grupos
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Crea los grupos de la Copa Libertadores y asigna equipos a cada grupo
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Create Group Section */}
+                <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
+                  <h3 className="font-semibold">Crear Nuevo Grupo</h3>
                   <div className="flex gap-2">
+                    <Input
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      placeholder="Ej: Grupo A"
+                      className="flex-1"
+                    />
                     <Button
-                      onClick={handleAddTeam}
-                      className="flex-1 bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                      disabled={!newTeam.name.trim() || !newTeam.logo_url}
+                      onClick={handleCreateGroup}
+                      className="bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                      disabled={!newGroupName.trim()}
                     >
-                      {editingTeam ? (
-                        <>
-                          <Save className="w-4 h-4 mr-2" />
-                          Actualizar Equipo
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Agregar Equipo
-                        </>
-                      )}
+                      <Plus className="w-4 h-4 mr-2" />
+                      Crear Grupo
                     </Button>
-                    {editingTeam && (
-                      <Button variant="outline" onClick={handleCancelEditTeam}>
-                        <X className="w-4 h-4 mr-2" />
-                        Cancelar
-                      </Button>
-                    )}
                   </div>
+                </div>
 
-                  <div className="mt-6">
-                    <h3 className="font-semibold mb-3">Equipos Registrados ({teams.length})</h3>
-                    {isLoadingTeams ? (
-                      <div className="text-center py-8 text-muted-foreground">Cargando equipos...</div>
-                    ) : teams.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Users className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
-                        <p>No hay equipos registrados</p>
-                        <p className="text-sm">Agrega equipos usando el formulario de arriba</p>
-                      </div>
-                    ) : (
-                      <div className="grid gap-3">
-                        {teams.map((team) => (
-                          <Card key={team.id} className="border-primary/30">
-                            <CardContent className="p-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <h4 className="font-semibold">{team.name}</h4>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Badge className="bg-primary">ID: {team.id}</Badge>
-                                  {team.logo_url && (
-                                    <img
-                                      src={team.logo_url || "/placeholder.svg"}
-                                      alt={`${team.name} logo`}
-                                      className="w-8 h-8 rounded-full object-contain bg-white"
-                                      onError={(e) => {
-                                        e.currentTarget.src = "/placeholder.svg?height=32&width=32"
-                                      }}
-                                    />
-                                  )}
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEditTeam(team)}
-                                    className="border-primary/30 text-primary hover:bg-primary/10"
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleDeleteTeam(team.id, team.name)}
-                                    className="border-red-300 text-red-600 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="players" className="space-y-6">
-              <Card className="border-primary/30 bg-gradient-to-r from-black via-primary/10 to-black">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-primary">
-                    <Target className="w-5 h-5" />
-                    {editingPlayer ? "Editar Jugador" : "Gestión de Jugadores"}
-                  </CardTitle>
-                  {teams.length === 0 && (
-                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
-                      <AlertCircle className="w-5 h-5" />
-                      <p className="text-sm">Debes crear al menos un equipo antes de agregar jugadores</p>
-                    </div>
-                  )}
-                  {editingPlayer && (
-                    <div className="flex items-center gap-2 text-blue-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
-                      <AlertCircle className="w-5 h-5" />
-                      <p className="text-sm">Editando: {editingPlayer.name}</p>
-                    </div>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Assign Team to Group Section */}
+                <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
+                  <h3 className="font-semibold">Asignar Equipo a Grupo</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Nombre Completo *</Label>
-                      <Input
-                        value={newPlayer.name}
-                        onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
-                        placeholder="Ej: Carlos Rodríguez"
-                        disabled={teams.length === 0}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Cédula *</Label>
-                      <Input
-                        value={newPlayer.cedula}
-                        onChange={(e) => setNewPlayer({ ...newPlayer, cedula: e.target.value })}
-                        placeholder="Ej: 12345678"
-                        disabled={teams.length === 0}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Equipo *</Label>
+                      <Label>Seleccionar Equipo</Label>
                       <Select
-                        value={newPlayer.team_id}
-                        onValueChange={(value) => setNewPlayer({ ...newPlayer, team_id: value })}
+                        value={selectedTeamForAssignment}
+                        onValueChange={setSelectedTeamForAssignment}
                         disabled={teams.length === 0}
                       >
                         <SelectTrigger>
@@ -2657,216 +1664,1294 @@ export default function AdminDashboard() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Número *</Label>
+                      <Label>Seleccionar Grupo</Label>
+                      <Select
+                        value={selectedGroupForAssignment}
+                        onValueChange={setSelectedGroupForAssignment}
+                        disabled={groups.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar grupo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {groups.map((group) => (
+                            <SelectItem key={group.id} value={group.id.toString()}>
+                              {group.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleAssignTeamToGroup}
+                    className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                    disabled={!selectedTeamForAssignment || !selectedGroupForAssignment}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Asignar Equipo
+                  </Button>
+                </div>
+
+                {/* Display Groups and Teams */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Grupos Creados ({groups.length})</h3>
+                  {isLoadingGroups ? (
+                    <div className="text-center py-8 text-muted-foreground">Cargando grupos...</div>
+                  ) : groups.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Trophy className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
+                      <p>No hay grupos creados</p>
+                      <p className="text-sm">Crea grupos usando el formulario de arriba</p>
+                    </div>
+                  ) : (
+                    <div className="grid gap-4">
+                      {groups.map((group) => {
+                        const teamsInGroup = groupStandings.filter((s: any) => s.copa_groups?.id === group.id)
+                        return (
+                          <Card key={group.id} className="border-primary/30">
+                            <CardHeader>
+                              <div className="flex items-center justify-between">
+                                <CardTitle className="text-lg">{group.name}</CardTitle>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteGroup(group.id, group.name)}
+                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-1" />
+                                  Eliminar Grupo
+                                </Button>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              {teamsInGroup.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No hay equipos asignados</p>
+                              ) : (
+                                <div className="space-y-2">
+                                  {teamsInGroup.map((standing: any) => (
+                                    <div
+                                      key={standing.id}
+                                      className="flex items-center justify-between p-2 bg-background rounded border border-primary/20"
+                                    >
+                                      <span className="font-medium">{standing.teams?.name}</span>
+                                      <div className="flex items-center gap-2">
+                                        <Badge className="bg-primary">
+                                          {standing.points} pts • {standing.played} PJ
+                                        </Badge>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleRemoveTeamFromGroup(
+                                              standing.team_id,
+                                              standing.teams?.name,
+                                              group.name,
+                                            )
+                                          }
+                                          className="border-red-300 text-red-600 hover:bg-red-50"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="matches" className="space-y-6">
+            <Card className="border-primary/30 bg-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-primary">
+                  <Calendar className="w-5 h-5" />
+                  Gestión de Partidos
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Crea los partidos de cada fecha. Solo pueden enfrentarse equipos del mismo grupo.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Create Match Section */}
+                <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
+                  <h3 className="font-semibold">Crear Nuevo Partido</h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Seleccionar Grupo *</Label>
+                      <Select
+                        value={selectedGroupForMatch}
+                        onValueChange={(value) => {
+                          setSelectedGroupForMatch(value)
+                          setNewMatch({ ...newMatch, group_id: value, home_team_id: "", away_team_id: "" })
+                        }}
+                        disabled={groups.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar grupo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {groups.map((group) => (
+                            <SelectItem key={group.id} value={group.id.toString()}>
+                              {group.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Jornada/Fecha *</Label>
                       <Input
                         type="number"
-                        value={newPlayer.number}
-                        onChange={(e) => setNewPlayer({ ...newPlayer, number: e.target.value })}
-                        placeholder="10"
+                        value={newMatch.round}
+                        onChange={(e) => setNewMatch({ ...newMatch, round: e.target.value })}
+                        placeholder="Ej: 1"
                         min="1"
-                        max="99"
-                        disabled={teams.length === 0}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Equipo Local *</Label>
+                      <Select
+                        value={newMatch.home_team_id}
+                        onValueChange={(value) => setNewMatch({ ...newMatch, home_team_id: value })}
+                        disabled={!selectedGroupForMatch || teamsInSelectedGroup.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar equipo local" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {teamsInSelectedGroup.map((team: any) => (
+                            <SelectItem key={team.id} value={team.id.toString()}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Equipo Visitante *</Label>
+                      <Select
+                        value={newMatch.away_team_id}
+                        onValueChange={(value) => setNewMatch({ ...newMatch, away_team_id: value })}
+                        disabled={!selectedGroupForMatch || teamsInSelectedGroup.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar equipo visitante" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {teamsInSelectedGroup
+                            .filter((team: any) => team.id.toString() !== newMatch.home_team_id)
+                            .map((team: any) => (
+                              <SelectItem key={team.id} value={team.id.toString()}>
+                                {team.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Fecha del Partido *</Label>
+                      <Input
+                        type="date"
+                        value={newMatch.match_date}
+                        onChange={(e) => setNewMatch({ ...newMatch, match_date: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Hora del Partido</Label>
+                      <Input
+                        type="time"
+                        value={newMatch.match_time}
+                        onChange={(e) => setNewMatch({ ...newMatch, match_time: e.target.value })}
+                        placeholder="Ej: 17:00"
+                      />
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Cancha</Label>
+                      <Input
+                        type="text"
+                        value={newMatch.field}
+                        onChange={(e) => setNewMatch({ ...newMatch, field: e.target.value })}
+                        placeholder="Ej: Cancha 1, Cancha Principal"
                       />
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
-                    {editingPlayer ? (
-                      <>
+                  <Button
+                    onClick={handleCreateMatch}
+                    className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                    disabled={
+                      !newMatch.group_id ||
+                      !newMatch.home_team_id ||
+                      !newMatch.away_team_id ||
+                      !newMatch.round ||
+                      !newMatch.match_date
+                    }
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Crear Partido
+                  </Button>
+                </div>
+
+                {/* Display Matches */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Partidos Creados ({matches.length})</h3>
+                  {isLoadingMatches ? (
+                    <div className="text-center py-8 text-muted-foreground">Cargando partidos...</div>
+                  ) : matches.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
+                      <p>No hay partidos creados</p>
+                      <p className="text-sm">Crea partidos usando el formulario de arriba</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Group matches by round */}
+                      {Array.from(new Set(matches.map((m) => m.round)))
+                        .sort((a, b) => a - b)
+                        .map((round) => (
+                          <div key={round} className="space-y-2">
+                            <h4 className="font-semibold text-sm text-primary">Fecha {round}</h4>
+                            <div className="grid gap-2">
+                              {matches
+                                .filter((m) => m.round === round)
+                                .map((match) => (
+                                  <Card key={match.id} className="border-primary/30">
+                                    <CardContent className="p-4">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-semibold">
+                                              {match.home_team?.name} vs {match.away_team?.name}
+                                            </span>
+                                            <Badge variant="outline" className="text-xs">
+                                              {match.copa_groups?.name}
+                                            </Badge>
+                                            {match.played && (
+                                              <Badge className="bg-green-600 text-xs">
+                                                {match.home_score} - {match.away_score}
+                                              </Badge>
+                                            )}
+                                          </div>
+                                          <p className="text-sm text-muted-foreground">
+                                            {new Date(match.match_date).toLocaleDateString("es-ES", {
+                                              weekday: "long",
+                                              year: "numeric",
+                                              month: "long",
+                                              day: "numeric",
+                                            })}
+                                          </p>
+                                          {match.played && <MatchDetailsDisplay matchId={match.id} />}
+                                        </div>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleDeleteMatch(match.id, match.home_team?.name, match.away_team?.name)
+                                          }
+                                          className="border-red-300 text-red-600 hover:bg-red-50"
+                                          disabled={match.played}
+                                          title={
+                                            match.played
+                                              ? "No se puede eliminar un partido ya jugado"
+                                              : "Eliminar partido"
+                                          }
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="results" className="space-y-6">
+            <Card className="border-primary/30 bg-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-primary">
+                  <Trophy className="w-5 h-5" />
+                  Cargar Resultado de Partido
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Agrega los goleadores y tarjetas. Los goles se calcularán automáticamente.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <Label className="text-base font-semibold">Seleccionar Torneo</Label>
+                  <Select
+                    value={selectedTournament.toString()}
+                    onValueChange={(value) => setSelectedTournament(Number.parseInt(value))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar torneo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tournaments.map((tournament) => (
+                        <SelectItem key={tournament.id} value={tournament.id.toString()}>
+                          {tournament.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {matches.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Trophy className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary" />
+                    <p className="text-lg">No hay partidos cargados</p>
+                    <p className="text-sm">Primero debes agregar equipos y crear el fixture de la Copa Libertadores</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-base font-semibold">Seleccionar Fecha</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {Array.from(new Set(matches.map((m) => m.round)))
+                          .sort((a, b) => a - b)
+                          .map((round) => (
+                            <Button
+                              key={round}
+                              variant={selectedRound === round.toString() ? "default" : "outline"}
+                              className={
+                                selectedRound === round.toString()
+                                  ? "bg-gradient-to-r from-primary to-primary/80"
+                                  : "border-primary/30"
+                              }
+                              onClick={() => {
+                                setSelectedRound(round.toString())
+                                setSelectedMatchId(null)
+                              }}
+                            >
+                              Fecha {round}
+                            </Button>
+                          ))}
                         <Button
-                          onClick={handleUpdatePlayer}
-                          className="flex-1 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-700 hover:via-blue-600 hover:to-blue-700"
-                          disabled={
-                            teams.length === 0 ||
-                            !newPlayer.name.trim() ||
-                            !newPlayer.team_id ||
-                            !newPlayer.cedula.trim() ||
-                            !newPlayer.number
+                          variant={selectedRound === "cuartos" ? "default" : "outline"}
+                          className={
+                            selectedRound === "cuartos"
+                              ? "bg-gradient-to-r from-primary to-primary/80"
+                              : "border-primary/30"
                           }
+                          onClick={() => {
+                            setSelectedRound("cuartos")
+                            setSelectedMatchId(null)
+                          }}
                         >
-                          <Save className="w-4 h-4 mr-2" />
-                          Actualizar Jugador
+                          Cuartos de Final
                         </Button>
                         <Button
-                          onClick={handleCancelEdit}
-                          variant="outline"
-                          className="border-red-300 text-red-600 hover:bg-red-50 bg-transparent"
+                          variant={selectedRound === "semi" ? "default" : "outline"}
+                          className={
+                            selectedRound === "semi"
+                              ? "bg-gradient-to-r from-primary to-primary/80"
+                              : "border-primary/30"
+                          }
+                          onClick={() => {
+                            setSelectedRound("semi")
+                            setSelectedMatchId(null)
+                          }}
                         >
-                          Cancelar
+                          Semifinales
                         </Button>
+                        <Button
+                          variant={selectedRound === "final" ? "default" : "outline"}
+                          className={
+                            selectedRound === "final"
+                              ? "bg-gradient-to-r from-primary to-primary/80"
+                              : "border-primary/30"
+                          }
+                          onClick={() => {
+                            setSelectedRound("final")
+                            setSelectedMatchId(null)
+                          }}
+                        >
+                          Final
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <Label className="text-base font-semibold">Seleccionar Partido</Label>
+                      {Array.from(new Set(roundMatches.map((m) => m.copa_groups?.name)))
+                        .filter(Boolean)
+                        .map((groupName) => (
+                          <div key={groupName} className="space-y-2">
+                            <h4 className="text-sm font-semibold text-primary">{groupName}</h4>
+                            <div className="grid gap-2">
+                              {roundMatches
+                                .filter((m) => m.copa_groups?.name === groupName)
+                                .map((match) => (
+                                  <Button
+                                    key={match.id}
+                                    variant={selectedMatchId === match.id ? "default" : "outline"}
+                                    className={`w-full justify-start h-auto py-3 ${
+                                      selectedMatchId === match.id
+                                        ? "bg-gradient-to-r from-primary to-primary/80"
+                                        : "border-primary/30"
+                                    }`}
+                                    onClick={() => setSelectedMatchId(match.id)}
+                                  >
+                                    <div className="flex flex-col items-start w-full">
+                                      <div className="flex items-center justify-between w-full">
+                                        <span className="font-semibold">
+                                          {match.home_team?.name} vs {match.away_team?.name}
+                                        </span>
+                                        {match.played && (
+                                          <Badge className="bg-green-600 text-xs ml-2">
+                                            {match.home_score} - {match.away_score}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <span className="text-xs opacity-80">
+                                        {new Date(match.match_date).toLocaleDateString("es-ES")}
+                                      </span>
+                                    </div>
+                                  </Button>
+                                ))}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+
+                    {selectedMatch && selectedMatch.played ? (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-muted/50 rounded-lg border border-primary/30">
+                          <p className="text-center text-muted-foreground mb-4">
+                            Este partido ya ha finalizado. No se pueden agregar más goles o tarjetas.
+                          </p>
+                          <MatchDetailsDisplay matchId={selectedMatch.id} />
+                        </div>
+                      </div>
+                    ) : (
+                      selectedMatch && (
+                        <>
+                          <div className="p-4 bg-primary/10 rounded-lg border border-primary/30">
+                            <h3 className="font-semibold text-lg text-center mb-2">
+                              {selectedMatch.home_team?.name} vs {selectedMatch.away_team?.name}
+                            </h3>
+                            <p className="text-sm text-center text-muted-foreground">
+                              Fecha {selectedMatch.round} - Grupo {selectedMatch.copa_groups?.name}
+                            </p>
+                            {selectedMatch.field && (
+                              <p className="text-sm text-center text-muted-foreground">Cancha: {selectedMatch.field}</p>
+                            )}
+                            {selectedMatch.match_time && (
+                              <p className="text-sm text-center text-muted-foreground">
+                                Hora: {selectedMatch.match_time}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Goleadores Local */}
+                          <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/30">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-base font-semibold text-primary">
+                                ⚽ Goleadores {selectedMatch.home_team?.name}
+                              </Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addIncident("goal", "home")}
+                                className="border-primary/30 text-primary hover:bg-primary/10"
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Agregar Gol
+                              </Button>
+                            </div>
+                            {homeGoals.map((goal, index) => (
+                              <div key={index} className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                  <Select
+                                    value={goal.player}
+                                    onValueChange={(value) => updateIncident("goal", "home", index, "player", value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Seleccionar jugador" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {players
+                                        .filter((p) =>
+                                          teams.some(
+                                            (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
+                                          ),
+                                        )
+                                        .map((player) => (
+                                          <SelectItem key={player.id} value={player.id.toString()}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="w-20">
+                                  <Input
+                                    placeholder="Min"
+                                    value={goal.minute}
+                                    onChange={(e) => updateIncident("goal", "home", index, "minute", e.target.value)}
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeIncident("goal", "home", index)}
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Tarjetas Amarillas Local */}
+                          <div className="space-y-3 p-4 bg-yellow-500/5 rounded-lg border border-yellow-500/30">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-base font-semibold text-yellow-500">
+                                🟨 Tarjetas Amarillas {selectedMatch.home_team?.name}
+                              </Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addIncident("yellow", "home")}
+                                className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Agregar Amarilla
+                              </Button>
+                            </div>
+                            {homeYellowCards.map((card, index) => (
+                              <div key={index} className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                  <Select
+                                    value={card.player}
+                                    onValueChange={(value) => updateIncident("yellow", "home", index, "player", value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Seleccionar jugador" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {players
+                                        .filter((p) =>
+                                          teams.some(
+                                            (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
+                                          ),
+                                        )
+                                        .map((player) => (
+                                          <SelectItem key={player.id} value={player.id.toString()}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="w-20">
+                                  <Input
+                                    placeholder="Min"
+                                    value={card.minute}
+                                    onChange={(e) => updateIncident("yellow", "home", index, "minute", e.target.value)}
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeIncident("yellow", "home", index)}
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Tarjetas Rojas Local */}
+                          <div className="space-y-3 p-4 bg-red-500/5 rounded-lg border border-red-500/30">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-base font-semibold text-red-500">
+                                🟥 Tarjetas Rojas {selectedMatch.home_team?.name}
+                              </Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addIncident("red", "home")}
+                                className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Agregar Roja
+                              </Button>
+                            </div>
+                            {homeRedCards.map((card, index) => (
+                              <div key={index} className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                  <Select
+                                    value={card.player}
+                                    onValueChange={(value) => updateIncident("red", "home", index, "player", value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Seleccionar jugador" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {players
+                                        .filter((p) =>
+                                          teams.some(
+                                            (t) => t.id === p.team_id && t.name === selectedMatch.home_team?.name,
+                                          ),
+                                        )
+                                        .map((player) => (
+                                          <SelectItem key={player.id} value={player.id.toString()}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="w-20">
+                                  <Input
+                                    placeholder="Min"
+                                    value={card.minute}
+                                    onChange={(e) => updateIncident("red", "home", index, "minute", e.target.value)}
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeIncident("red", "home", index)}
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Goleadores Visitante */}
+                          <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/30">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-base font-semibold text-primary">
+                                ⚽ Goleadores {selectedMatch.away_team?.name}
+                              </Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addIncident("goal", "away")}
+                                className="border-primary/30 text-primary hover:bg-primary/10"
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Agregar Gol
+                              </Button>
+                            </div>
+                            {awayGoals.map((goal, index) => (
+                              <div key={index} className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                  <Select
+                                    value={goal.player}
+                                    onValueChange={(value) => updateIncident("goal", "away", index, "player", value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Seleccionar jugador" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {players
+                                        .filter((p) =>
+                                          teams.some(
+                                            (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
+                                          ),
+                                        )
+                                        .map((player) => (
+                                          <SelectItem key={player.id} value={player.id.toString()}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="w-20">
+                                  <Input
+                                    placeholder="Min"
+                                    value={goal.minute}
+                                    onChange={(e) => updateIncident("goal", "away", index, "minute", e.target.value)}
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeIncident("goal", "away", index)}
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Tarjetas Amarillas Visitante */}
+                          <div className="space-y-3 p-4 bg-yellow-500/5 rounded-lg border border-yellow-500/30">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-base font-semibold text-yellow-500">
+                                🟨 Tarjetas Amarillas {selectedMatch.away_team?.name}
+                              </Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addIncident("yellow", "away")}
+                                className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Agregar Amarilla
+                              </Button>
+                            </div>
+                            {awayYellowCards.map((card, index) => (
+                              <div key={index} className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                  <Select
+                                    value={card.player}
+                                    onValueChange={(value) => updateIncident("yellow", "away", index, "player", value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Seleccionar jugador" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {players
+                                        .filter((p) =>
+                                          teams.some(
+                                            (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
+                                          ),
+                                        )
+                                        .map((player) => (
+                                          <SelectItem key={player.id} value={player.id.toString()}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="w-20">
+                                  <Input
+                                    placeholder="Min"
+                                    value={card.minute}
+                                    onChange={(e) => updateIncident("yellow", "away", index, "minute", e.target.value)}
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeIncident("yellow", "away", index)}
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Tarjetas Rojas Visitante */}
+                          <div className="space-y-3 p-4 bg-red-500/5 rounded-lg border border-red-500/30">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-base font-semibold text-red-500">
+                                🟥 Tarjetas Rojas {selectedMatch.away_team?.name}
+                              </Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addIncident("red", "away")}
+                                className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Agregar Roja
+                              </Button>
+                            </div>
+                            {awayRedCards.map((card, index) => (
+                              <div key={index} className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                  <Select
+                                    value={card.player}
+                                    onValueChange={(value) => updateIncident("red", "away", index, "player", value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Seleccionar jugador" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {players
+                                        .filter((p) =>
+                                          teams.some(
+                                            (t) => t.id === p.team_id && t.name === selectedMatch.away_team?.name,
+                                          ),
+                                        )
+                                        .map((player) => (
+                                          <SelectItem key={player.id} value={player.id.toString()}>
+                                            {player.name}
+                                          </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="w-20">
+                                  <Input
+                                    placeholder="Min"
+                                    value={card.minute}
+                                    onChange={(e) => updateIncident("red", "away", index, "minute", e.target.value)}
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeIncident("red", "away", index)}
+                                  className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+
+                          <Button
+                            onClick={() => setShowResultConfirm(true)}
+                            className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                          >
+                            <Save className="w-4 h-4 mr-2" />
+                            Guardar Resultado y Actualizar Tablas
+                          </Button>
+                        </>
+                      )
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="draw" className="space-y-6">
+            <Card className="border-green-200 bg-gradient-to-r from-green-950 via-green-900/20 to-green-950">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Shuffle className="w-6 h-6 text-green-600" />
+                  Sorteo de Clasificados
+                </CardTitle>
+                <p className="text-sm text-gray-600 mt-2">
+                  Realiza el sorteo automático de los 8 equipos clasificados para los octavos de final
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button
+                  onClick={() => setShowDrawConfirm(true)}
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                >
+                  <Shuffle className="w-4 h-4 mr-2" />
+                  Realizar Sorteo Automático
+                </Button>
+
+                {showDraw && drawResults.length > 0 && (
+                  <div className="space-y-3 mt-4">
+                    <h3 className="font-semibold text-lg text-center">Cruces de Octavos de Final</h3>
+                    <div className="grid gap-3">
+                      {drawResults.map((matchup, index) => (
+                        <Card key={index} className="border-primary/30 bg-card">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <Badge className="bg-primary">Partido {index + 1}</Badge>
+                              <span className="font-semibold text-center flex-1">{matchup}</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="teams" className="space-y-6">
+            <Card className="border-primary/30 bg-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-primary">
+                  <Users className="w-5 h-5" />
+                  {editingTeam ? "Editar Equipo" : "Gestión de Equipos"}
+                </CardTitle>
+                {editingTeam && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Editando: <span className="font-semibold text-primary">{editingTeam.name}</span>
+                  </p>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nombre del Equipo *</Label>
+                  <Input
+                    value={newTeam.name}
+                    onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
+                    placeholder="Ej: Deportivo Central"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Foto del Equipo (JPG o PNG) *</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png"
+                      onChange={handleTeamLogoUpload}
+                      className="flex-1"
+                    />
+                    <Button variant="outline" size="icon" disabled>
+                      <Upload className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Selecciona una imagen JPG o PNG desde tu computadora</p>
+                  {newTeam.logo_url && (
+                    <div className="mt-2 w-24 h-24 border border-primary/30 rounded-lg overflow-hidden">
+                      <img
+                        src={newTeam.logo_url || "/placeholder.svg"}
+                        alt="Preview"
+                        className="w-full h-full object-contain bg-white"
+                        onError={(e) => {
+                          e.currentTarget.src = "/placeholder.svg?height=96&width=96"
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleAddTeam}
+                    className="flex-1 bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                    disabled={!newTeam.name.trim() || !newTeam.logo_url}
+                  >
+                    {editingTeam ? (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Actualizar Equipo
                       </>
                     ) : (
-                      <Button
-                        onClick={handleAddPlayer}
-                        disabled={isAddingPlayer}
-                        className="w-full bg-primary hover:bg-primary/90"
-                      >
-                        {isAddingPlayer ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                            Agregando...
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Agregar Jugador
-                          </>
-                        )}
-                      </Button>
+                      <>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Agregar Equipo
+                      </>
                     )}
-                  </div>
+                  </Button>
+                  {editingTeam && (
+                    <Button variant="outline" onClick={handleCancelEditTeam}>
+                      <X className="w-4 h-4 mr-2" />
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
 
-                  <div className="mt-6">
-                    <h3 className="font-semibold mb-3">Jugadores Registrados ({players.length})</h3>
-
-                    {players.length > 0 && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
-                        <div className="space-y-2">
-                          <Label>Filtrar por Equipo</Label>
-                          <Select value={playerFilterTeam} onValueChange={setPlayerFilterTeam}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Todos los equipos" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">Todos los equipos</SelectItem>
-                              {teams.map((team) => (
-                                <SelectItem key={team.id} value={team.id.toString()}>
-                                  {team.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Buscar por Nombre</Label>
-                          <Input
-                            value={playerSearchTerm}
-                            onChange={(e) => setPlayerSearchTerm(e.target.value)}
-                            placeholder="Buscar jugador..."
-                            className="w-full"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {isLoadingPlayers ? (
-                      <div className="text-center py-8 text-muted-foreground">Cargando jugadores...</div>
-                    ) : filteredPlayers.length === 0 && players.length > 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Target className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
-                        <p>No se encontraron jugadores con los filtros aplicados</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setPlayerFilterTeam("all")
-                            setPlayerSearchTerm("")
-                          }}
-                          className="mt-2"
-                        >
-                          Limpiar filtros
-                        </Button>
-                      </div>
-                    ) : players.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Target className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
-                        <p>No hay jugadores registrados</p>
-                        <p className="text-sm">Agrega jugadores usando el formulario de arriba</p>
-                      </div>
-                    ) : (
-                      <div className="grid gap-3">
-                        {filteredPlayers.map((player) => (
-                          <Card key={player.id} className="border-primary/30">
-                            <CardContent className="p-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <h4 className="font-semibold">{player.name}</h4>
-                                    <Badge variant="outline">#{player.number}</Badge>
-                                  </div>
-                                  <p className="text-sm text-muted-foreground">
-                                    {player.teams?.name} • CI: {player.cedula}
-                                  </p>
-                                </div>
-                                <div className="flex gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEditPlayer(player)}
-                                    className="border-blue-300 text-blue-600 hover:bg-blue-50"
-                                  >
-                                    <Settings className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleDeletePlayer(player.id, player.name)}
-                                    className="border-red-300 text-red-600 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
+                <div className="mt-6">
+                  <h3 className="font-semibold mb-3">Equipos Registrados ({teams.length})</h3>
+                  {isLoadingTeams ? (
+                    <div className="text-center py-8 text-muted-foreground">Cargando equipos...</div>
+                  ) : teams.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Users className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
+                      <p>No hay equipos registrados</p>
+                      <p className="text-sm">Agrega equipos usando el formulario de arriba</p>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3">
+                      {teams.map((team) => (
+                        <Card key={team.id} className="border-primary/30">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <h4 className="font-semibold">{team.name}</h4>
                               </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
+                              <div className="flex items-center gap-2">
+                                <Badge className="bg-primary">ID: {team.id}</Badge>
+                                {team.logo_url && (
+                                  <img
+                                    src={team.logo_url || "/placeholder.svg"}
+                                    alt={`${team.name} logo`}
+                                    className="w-8 h-8 rounded-full object-contain bg-white"
+                                    onError={(e) => {
+                                      e.currentTarget.src = "/placeholder.svg?height=32&width=32"
+                                    }}
+                                  />
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditTeam(team)}
+                                  className="border-primary/30 text-primary hover:bg-primary/10"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteTeam(team.id, team.name)}
+                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="players" className="space-y-6">
+            <Card className="border-primary/30 bg-gradient-to-r from-black via-primary/10 to-black">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-primary">
+                  <Target className="w-5 h-5" />
+                  {editingPlayer ? "Editar Jugador" : "Gestión de Jugadores"}
+                </CardTitle>
+                {teams.length === 0 && (
+                  <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                    <AlertCircle className="w-5 h-5" />
+                    <p className="text-sm">Debes crear al menos un equipo antes de agregar jugadores</p>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+                )}
+                {editingPlayer && (
+                  <div className="flex items-center gap-2 text-blue-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    <AlertCircle className="w-5 h-5" />
+                    <p className="text-sm">Editando: {editingPlayer.name}</p>
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label>Nombre Completo *</Label>
+                    <Input
+                      value={newPlayer.name}
+                      onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
+                      placeholder="Ej: Carlos Rodríguez"
+                      disabled={teams.length === 0}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cédula *</Label>
+                    <Input
+                      value={newPlayer.cedula}
+                      onChange={(e) => setNewPlayer({ ...newPlayer, cedula: e.target.value })}
+                      placeholder="Ej: 12345678"
+                      disabled={teams.length === 0}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Equipo *</Label>
+                    <Select
+                      value={newPlayer.team_id}
+                      onValueChange={(value) => setNewPlayer({ ...newPlayer, team_id: value })}
+                      disabled={teams.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar equipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teams.map((team) => (
+                          <SelectItem key={team.id} value={team.id.toString()}>
+                            {team.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Número *</Label>
+                    <Input
+                      type="number"
+                      value={newPlayer.number}
+                      onChange={(e) => setNewPlayer({ ...newPlayer, number: e.target.value })}
+                      placeholder="10"
+                      min="1"
+                      max="99"
+                      disabled={teams.length === 0}
+                    />
+                  </div>
+                </div>
 
-      <AlertDialog open={showDrawConfirm} onOpenChange={setShowDrawConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-orange-600" />
-              Confirmar Sorteo
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Estás seguro de que deseas realizar el sorteo de los clasificados? Esta acción generará los cruces de
-              octavos de final de forma aleatoria.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={performDraw}
-              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-            >
-              Confirmar Sorteo
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                <div className="flex gap-2">
+                  {editingPlayer ? (
+                    <>
+                      <Button
+                        onClick={handleUpdatePlayer}
+                        className="flex-1 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-700 hover:via-blue-600 hover:to-blue-700"
+                        disabled={
+                          teams.length === 0 ||
+                          !newPlayer.name.trim() ||
+                          !newPlayer.team_id ||
+                          !newPlayer.cedula.trim() ||
+                          !newPlayer.number
+                        }
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        Actualizar Jugador
+                      </Button>
+                      <Button
+                        onClick={handleCancelEdit}
+                        variant="outline"
+                        className="border-red-300 text-red-600 hover:bg-red-50 bg-transparent"
+                      >
+                        Cancelar
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      onClick={handleAddPlayer}
+                      disabled={isAddingPlayer}
+                      className="w-full bg-primary hover:bg-primary/90"
+                    >
+                      {isAddingPlayer ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                          Agregando...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Agregar Jugador
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
 
-      <AlertDialog open={showResultConfirm} onOpenChange={setShowResultConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-blue-600" />
-              Confirmar Resultado
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Estás seguro de que deseas guardar este resultado? Los goles y tarjetas se sumarán automáticamente a las
-              tablas y estadísticas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleSubmitResult}
-              className="bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-            >
-              Confirmar y Guardar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                <div className="mt-6">
+                  <h3 className="font-semibold mb-3">Jugadores Registrados ({players.length})</h3>
+
+                  {players.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
+                      <div className="space-y-2">
+                        <Label>Filtrar por Equipo</Label>
+                        <Select value={playerFilterTeam} onValueChange={setPlayerFilterTeam}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Todos los equipos" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos los equipos</SelectItem>
+                            {teams.map((team) => (
+                              <SelectItem key={team.id} value={team.id.toString()}>
+                                {team.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Buscar por Nombre</Label>
+                        <Input
+                          value={playerSearchTerm}
+                          onChange={(e) => setPlayerSearchTerm(e.target.value)}
+                          placeholder="Buscar jugador..."
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {isLoadingPlayers ? (
+                    <div className="text-center py-8 text-muted-foreground">Cargando jugadores...</div>
+                  ) : filteredPlayers.length === 0 && players.length > 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Target className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
+                      <p>No se encontraron jugadores con los filtros aplicados</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setPlayerFilterTeam("all")
+                          setPlayerSearchTerm("")
+                        }}
+                        className="mt-2"
+                      >
+                        Limpiar filtros
+                      </Button>
+                    </div>
+                  ) : players.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Target className="w-12 h-12 mx-auto mb-2 opacity-50 text-primary" />
+                      <p>No hay jugadores registrados</p>
+                      <p className="text-sm">Agrega jugadores usando el formulario de arriba</p>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3">
+                      {filteredPlayers.map((player) => (
+                        <Card key={player.id} className="border-primary/30">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-semibold">{player.name}</h4>
+                                  <Badge variant="outline">#{player.number}</Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  {player.teams?.name} • CI: {player.cedula}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditPlayer(player)}
+                                  className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                                >
+                                  <Settings className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeletePlayer(player.id, player.name)}
+                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   )
 }

@@ -20,6 +20,7 @@ interface Match {
   copa_groups: { name: string }
   goals?: Array<{ player_id: number; players: { name: string }; team_id: number }>
   cards?: Array<{ player_id: number; players: { name: string }; card_type: string; team_id: number }>
+  status?: string
 }
 
 export default function FixturesSystem() {
@@ -53,7 +54,8 @@ export default function FixturesSystem() {
           away_team:teams!matches_away_team_id_fkey(name, logo_url),
           copa_groups(name),
           goals(player_id, team_id, players(name)),
-          cards(player_id, team_id, card_type, players(name))
+          cards(player_id, team_id, card_type, players(name)),
+          status
         `,
         )
         .order("match_date", { ascending: false })
@@ -192,31 +194,30 @@ export default function FixturesSystem() {
                                 )}
                               </div>
 
-                              {match.played && (match.goals?.length > 0 || match.cards?.length > 0) && (
-                                <div className="mt-3 pt-3 border-t border-primary/20 space-y-1 text-sm text-muted-foreground">
+                              {match.status === "played" && (match.goals?.length > 0 || match.cards?.length > 0) && (
+                                <div className="mt-3 pt-3 border-t border-primary/20 space-y-2 text-sm">
                                   {match.goals && match.goals.length > 0 && (
                                     <div className="flex items-start gap-2">
                                       <span className="font-medium">⚽</span>
                                       <div className="flex-1">
                                         {(() => {
                                           const goalsByPlayer = match.goals.reduce(
-                                            (acc: Record<string, { name: string; count: number }>, goal) => {
-                                              const playerId = goal.player_id.toString()
+                                            (acc, goal) => {
+                                              const playerId = goal.player_id
+                                              const playerName = goal.players.name
                                               if (!acc[playerId]) {
-                                                acc[playerId] = { name: goal.players.name, count: 0 }
+                                                acc[playerId] = { name: playerName, count: 0 }
                                               }
-                                              acc[playerId].count++
+                                              acc[playerId].count += 1
                                               return acc
                                             },
-                                            {},
+                                            {} as Record<number, { name: string; count: number }>,
                                           )
 
                                           return Object.values(goalsByPlayer).map((player, idx) => (
                                             <span key={idx} className="inline-block mr-2">
                                               {player.name}
-                                              {player.count > 1 && (
-                                                <span className="font-semibold"> x{player.count}</span>
-                                              )}
+                                              {player.count > 1 && ` x${player.count}`}
                                             </span>
                                           ))
                                         })()}

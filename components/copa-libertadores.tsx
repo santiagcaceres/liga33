@@ -114,21 +114,22 @@ export default function CopaLibertadores() {
                     }`}
                   >
                     <td className="p-2">
-                      <Badge
-                        className={`${getPositionColor(pos)} w-8 h-8 rounded-full flex items-center justify-center text-white`}
+                      <div
+                        className={`${getPositionColor(pos)} w-10 h-10 rounded-full flex items-center justify-center p-1`}
                       >
-                        {pos}
-                      </Badge>
+                        {team.teams?.logo_url ? (
+                          <img
+                            src={team.teams.logo_url || "/placeholder.svg"}
+                            alt={team.teams.name}
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <span className="text-white font-bold text-sm">{pos}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-2">
                       <div className="flex items-center gap-2">
-                        {team.teams?.logo_url && (
-                          <img
-                            src={team.teams.logo_url || "/placeholder.svg"}
-                            alt={team.teams?.name}
-                            className="w-6 h-6 object-contain"
-                          />
-                        )}
                         <span className="font-medium text-white">{team.teams?.name}</span>
                         {pos <= 2 && <Badge className="bg-green-600 text-white text-xs">{getPositionBadge(pos)}</Badge>}
                       </div>
@@ -171,22 +172,21 @@ export default function CopaLibertadores() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <Badge
-                        className={`${getPositionColor(pos)} w-8 h-8 rounded-full flex items-center justify-center text-white`}
+                      <div
+                        className={`${getPositionColor(pos)} w-10 h-10 rounded-full flex items-center justify-center p-1`}
                       >
-                        {pos}
-                      </Badge>
+                        {team.teams?.logo_url ? (
+                          <img
+                            src={team.teams.logo_url || "/placeholder.svg"}
+                            alt={team.teams.name}
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <span className="text-white font-bold text-sm">{pos}</span>
+                        )}
+                      </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          {team.teams?.logo_url && (
-                            <img
-                              src={team.teams.logo_url || "/placeholder.svg"}
-                              alt={team.teams?.name}
-                              className="w-5 h-5 object-contain"
-                            />
-                          )}
-                          <div className="font-semibold text-white">{team.teams?.name}</div>
-                        </div>
+                        <div className="font-semibold text-white">{team.teams?.name}</div>
                         {pos <= 2 && (
                           <Badge className="bg-green-600 text-white text-xs mt-1">{getPositionBadge(pos)}</Badge>
                         )}

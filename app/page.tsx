@@ -1,272 +1,90 @@
 "use client"
+import { Trophy, Users } from "lucide-react"
+import { useRouter } from "next/navigation"
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Menu, X } from "lucide-react"
-import LoadingAnimation from "@/components/loading-animation"
-import FixturesSystem from "@/components/fixtures-system"
-import TopScorers from "@/components/top-scorers"
-import WhatsAppButton from "@/components/whatsapp-button"
-import CopaLibertadores from "@/components/copa-libertadores"
-import TeamsRoster from "@/components/teams-roster"
-import HomeSection from "@/components/home-section"
-
-export default function HomePage() {
-  const [isLoading, setIsLoading] = useState(() => {
-    if (typeof window !== "undefined") {
-      const lastShown = localStorage.getItem("lastLoadingShown")
-      if (!lastShown) return true
-
-      const twentyMinutes = 20 * 60 * 1000 // 20 minutes in milliseconds
-      const timeSinceLastShown = Date.now() - Number.parseInt(lastShown, 10)
-
-      return timeSinceLastShown >= twentyMinutes
-    }
-    return true
-  })
-
-  const [activeSection, setActiveSection] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("activeSection") || "inicio"
-    }
-    return "inicio"
-  })
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("activeSection", activeSection)
-    }
-  }, [activeSection])
-
-  const handleLoadingComplete = () => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("lastLoadingShown", Date.now().toString())
-    }
-    setIsLoading(false)
-  }
-
-  if (isLoading) {
-    return <LoadingAnimation onComplete={handleLoadingComplete} />
-  }
+export default function LandingPage() {
+  const router = useRouter()
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black">
-      <WhatsAppButton />
-
-      <header className="bg-gradient-to-r from-black via-primary/20 to-black text-white shadow-lg border-b border-primary/30">
-        <div className="container mx-auto px-4 py-4 md:py-6">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setActiveSection("inicio")}
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-            >
-              <img src="/logo-liga33.png" alt="Liga 33" className="w-20 h-20 md:w-32 md:h-32 object-contain" />
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold leading-tight text-primary">Liga 33</h1>
-                <p className="text-yellow-500 text-sm md:text-base font-semibold">Copa Libertadores</p>
-              </div>
-            </button>
-
-            <div className="md:hidden">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-primary/20"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              >
-                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </Button>
-            </div>
-
-            <nav className="hidden md:flex gap-4 lg:gap-6">
-              <Button
-                variant="ghost"
-                className="text-white hover:bg-primary/20 hover:text-primary text-sm lg:text-base"
-                onClick={() => setActiveSection("inicio")}
-              >
-                Inicio
-              </Button>
-              <Button
-                variant="ghost"
-                className="text-white hover:bg-primary/20 hover:text-primary text-sm lg:text-base"
-                onClick={() => setActiveSection("copa")}
-              >
-                Copa Libertadores
-              </Button>
-              <Button
-                variant="ghost"
-                className="text-white hover:bg-primary/20 hover:text-primary text-sm lg:text-base"
-                onClick={() => setActiveSection("equipos")}
-              >
-                Equipos
-              </Button>
-              <Button
-                variant="ghost"
-                className="text-white hover:bg-primary/20 hover:text-primary text-sm lg:text-base"
-                onClick={() => setActiveSection("fixtures")}
-              >
-                Fixtures
-              </Button>
-              <Button
-                variant="ghost"
-                className="text-white hover:bg-primary/20 hover:text-primary text-sm lg:text-base"
-                onClick={() => setActiveSection("goleadores")}
-              >
-                Goleadores
-              </Button>
-            </nav>
-          </div>
-
-          {isMobileMenuOpen && (
-            <nav className="md:hidden mt-4 pb-4 border-t border-primary/30 pt-4">
-              <div className="flex flex-col gap-2">
-                <Button
-                  variant="ghost"
-                  className="text-white hover:bg-primary/20 hover:text-primary justify-start"
-                  onClick={() => {
-                    setActiveSection("inicio")
-                    setIsMobileMenuOpen(false)
-                  }}
-                >
-                  Inicio
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="text-white hover:bg-primary/20 hover:text-primary justify-start"
-                  onClick={() => {
-                    setActiveSection("copa")
-                    setIsMobileMenuOpen(false)
-                  }}
-                >
-                  Copa Libertadores
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="text-white hover:bg-primary/20 hover:text-primary justify-start"
-                  onClick={() => {
-                    setActiveSection("equipos")
-                    setIsMobileMenuOpen(false)
-                  }}
-                >
-                  Equipos
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="text-white hover:bg-primary/20 hover:text-primary justify-start"
-                  onClick={() => {
-                    setActiveSection("fixtures")
-                    setIsMobileMenuOpen(false)
-                  }}
-                >
-                  Fixtures
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="text-white hover:bg-primary/20 hover:text-primary justify-start"
-                  onClick={() => {
-                    setActiveSection("goleadores")
-                    setIsMobileMenuOpen(false)
-                  }}
-                >
-                  Goleadores
-                </Button>
-              </div>
-            </nav>
-          )}
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center p-4">
+      <div className="container max-w-6xl mx-auto">
+        {/* Logo and Title */}
+        <div className="text-center mb-12 md:mb-16">
+          <img
+            src="/logo-liga33.png"
+            alt="Liga 33"
+            className="w-32 h-32 md:w-48 md:h-48 object-contain mx-auto mb-6 animate-pulse"
+          />
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-primary mb-4">Liga 33</h1>
+          <p className="text-xl md:text-2xl text-gray-300 font-semibold">
+            MUCHO MAS QUE FUTBOL, MAS FUTBOL Y DEL BUENO
+          </p>
         </div>
-      </header>
 
-      {activeSection === "inicio" && (
-        <section className="py-8 md:py-12">
-          <div className="container mx-auto px-4">
-            <HomeSection onNavigate={setActiveSection} />
-          </div>
-        </section>
-      )}
-
-      {activeSection === "copa" && (
-        <section className="py-8 md:py-12">
-          <div className="container mx-auto px-4">
-            <CopaLibertadores />
-          </div>
-        </section>
-      )}
-
-      {activeSection === "equipos" && (
-        <section className="py-8 md:py-12">
-          <div className="container mx-auto px-4">
-            <TeamsRoster />
-          </div>
-        </section>
-      )}
-
-      {/* {activeSection === "admin" && (
-        <section className="py-8 md:py-12">
-          <div className="container mx-auto px-4">
-            <AdminDashboard />
-          </div>
-        </section>
-      )} */}
-
-      {activeSection === "goleadores" && (
-        <section className="py-8 md:py-12">
-          <div className="container mx-auto px-4">
-            <TopScorers />
-          </div>
-        </section>
-      )}
-
-      {activeSection === "fixtures" && (
-        <section className="py-8 md:py-12">
-          <div className="container mx-auto px-4">
-            <FixturesSystem />
-          </div>
-        </section>
-      )}
-
-      <footer className="bg-gradient-to-r from-black via-primary/10 to-black text-white py-6 md:py-8 mt-8 md:mt-12 border-t border-primary/30">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <img src="/logo-liga33.png" alt="Liga 33" className="w-12 h-12 object-contain" />
-                <h3 className="text-lg font-bold text-primary">Liga 33</h3>
+        {/* Tournament Selection */}
+        <div className="grid md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto">
+          {/* Copa Libertadores Card */}
+          <button
+            onClick={() => router.push("/libertadores")}
+            className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border-2 border-primary/30 hover:border-primary transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-primary/20"
+          >
+            <div className="p-8 md:p-10 text-center">
+              <div className="mb-6 flex justify-center">
+                <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
+                  <Trophy className="w-10 h-10 md:w-12 md:h-12 text-primary" />
+                </div>
               </div>
-              <p className="text-gray-300 text-sm md:text-base font-semibold">
-                MUCHO MAS QUE FUTBOL, MAS FUTBOL Y DEL BUENO
+              <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">Copa Libertadores</h2>
+              <p className="text-gray-300 text-sm md:text-base mb-6">Torneo de grupos con fase eliminatoria</p>
+              <div className="inline-flex items-center gap-2 text-primary font-semibold group-hover:gap-3 transition-all">
+                <span>Ingresar</span>
+                <span className="text-xl">→</span>
+              </div>
+            </div>
+          </button>
+
+          {/* Liga Femenina Card */}
+          <button
+            onClick={() => router.push("/femenina")}
+            className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-pink-500/20 to-purple-500/5 border-2 border-pink-500/30 hover:border-pink-500 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-pink-500/20"
+          >
+            <div className="p-8 md:p-10 text-center">
+              <div className="mb-6 flex justify-center">
+                <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-pink-500/20 flex items-center justify-center group-hover:bg-pink-500/30 transition-colors">
+                  <Users className="w-10 h-10 md:w-12 md:h-12 text-pink-500" />
+                </div>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">SuperLiga Femenina</h2>
+              <p className="text-gray-300 text-sm md:text-base mb-6">Liga de todos contra todos</p>
+              <div className="inline-flex items-center gap-2 text-pink-500 font-semibold group-hover:gap-3 transition-all">
+                <span>Ingresar</span>
+                <span className="text-xl">→</span>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {/* Footer Info */}
+        <div className="mt-12 md:mt-16 text-center text-gray-400 text-sm md:text-base">
+          <div className="space-y-2">
+            <div>📍 Complejo Deportivo HF</div>
+            <div>📞 +598 94 107 059</div>
+            <div className="pt-4 border-t border-gray-800 mt-4">
+              <p>
+                &copy; 2025 Liga 33. Desarrollado por{" "}
+                <a
+                  href="https://www.launchbyteuy.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:text-primary/80 transition-colors underline"
+                >
+                  LaunchByte
+                </a>
               </p>
             </div>
-            <div>
-              <h3 className="text-lg font-bold mb-4 text-primary">Información</h3>
-              <div className="space-y-2 text-gray-300 text-sm md:text-base">
-                <div>📍 Complejo Deportivo HF</div>
-                <div>📞 +598 94 107 059</div>
-                <div>📧 info@liga33.com</div>
-              </div>
-            </div>
-            <div>
-              <h3 className="text-lg font-bold mb-4 text-primary">Horarios</h3>
-              <div className="text-gray-300 text-sm md:text-base">
-                <div className="font-semibold">Sábados: 17:00 - 21:00</div>
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-primary/30 mt-6 md:mt-8 pt-4 text-center text-gray-400 text-sm md:text-base">
-            <p>
-              &copy; 2025 Liga 33. Todos los derechos reservados. Desarrollado por{" "}
-              <a
-                href="https://www.launchbyteuy.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:text-primary/80 transition-colors underline"
-              >
-                LaunchByte
-              </a>
-            </p>
           </div>
         </div>
-      </footer>
+      </div>
     </div>
   )
 }

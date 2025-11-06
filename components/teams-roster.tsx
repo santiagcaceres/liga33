@@ -195,67 +195,65 @@ export default function TeamsRoster() {
                         </table>
                       </div>
 
-                      <div className="md:hidden space-y-2">
+                      <div className="md:hidden space-y-3">
                         {currentTeamPlayers.map((player) => (
-                          <div
+                          <Card
                             key={player.id}
-                            className={`p-3 rounded-lg border transition-colors ${
-                              player.suspended
-                                ? "bg-red-500/20 border-red-500/30"
-                                : "border-primary/20 hover:bg-primary/5"
-                            }`}
+                            className={`border-primary/30 ${player.suspended ? "bg-red-500/20" : "bg-primary/5"}`}
                           >
-                            <div className="flex items-start justify-between gap-2 mb-2">
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <span className="text-base font-bold text-primary shrink-0">#{player.number}</span>
-                                <div className="min-w-0 flex-1">
-                                  <p
-                                    className={`text-sm font-semibold truncate ${player.suspended ? "line-through" : ""}`}
-                                  >
-                                    {player.name}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">CI: {player.cedula}</p>
+                            <CardContent className="p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-2xl font-bold text-primary">{player.number}</span>
+                                  <div>
+                                    <div className={`font-semibold text-sm ${player.suspended ? "line-through" : ""}`}>
+                                      {player.name}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">{player.cedula}</div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  {player.suspended ? (
+                                    <span className="text-xs bg-red-600 text-white px-2 py-1 rounded">SUSPENDIDO</span>
+                                  ) : hasTwoYellowCards(player) ? (
+                                    <span className="text-xs bg-red-600 text-white px-2 py-1 rounded">
+                                      🔴 2 AMARILLAS
+                                    </span>
+                                  ) : player.yellow_cards === 1 ? (
+                                    <span className="text-xs bg-orange-500 text-white px-2 py-1 rounded">⚠️ RIESGO</span>
+                                  ) : (
+                                    <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">
+                                      HABILITADO
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                              <div className="shrink-0">
-                                {player.suspended ? (
-                                  <span className="text-xs bg-red-600 text-white px-2 py-1 rounded">SUSPENDIDO</span>
-                                ) : hasTwoYellowCards(player) ? (
-                                  <span className="text-xs bg-red-600 text-white px-2 py-1 rounded">
-                                    🔴 2 AMARILLAS
-                                  </span>
-                                ) : player.yellow_cards === 1 ? (
-                                  <span className="text-xs bg-orange-500 text-white px-2 py-1 rounded">⚠️ RIESGO</span>
-                                ) : (
-                                  <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">HABILITADO</span>
-                                )}
+                              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                <div>
+                                  <div className="text-muted-foreground">Goles</div>
+                                  <div className="font-semibold">⚽ {player.goals}</div>
+                                </div>
+                                <div>
+                                  <div className="text-muted-foreground">Amarillas</div>
+                                  <div
+                                    className={`font-semibold ${
+                                      hasTwoYellowCards(player)
+                                        ? "text-red-600"
+                                        : player.yellow_cards === 1
+                                          ? "text-orange-600"
+                                          : ""
+                                    }`}
+                                  >
+                                    🟨 {player.yellow_cards}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-muted-foreground">Rojas</div>
+                                  <div className="font-semibold">🟥 {player.red_cards}</div>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex items-center gap-4 text-xs">
-                              <span className="flex items-center gap-1">
-                                <span className="font-semibold">⚽</span>
-                                <span>{player.goals}</span>
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <span className="font-semibold">🟨</span>
-                                <span
-                                  className={
-                                    hasTwoYellowCards(player)
-                                      ? "text-red-600 font-bold"
-                                      : player.yellow_cards === 1
-                                        ? "text-orange-600 font-semibold"
-                                        : ""
-                                  }
-                                >
-                                  {player.yellow_cards}
-                                </span>
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <span className="font-semibold">🟥</span>
-                                <span>{player.red_cards}</span>
-                              </span>
-                            </div>
-                          </div>
+                            </CardContent>
+                          </Card>
                         ))}
                       </div>
                     </>
