@@ -1,5 +1,4 @@
 "use client"
-import { Trophy, Users } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 export default function LandingPage() {
@@ -30,9 +29,11 @@ export default function LandingPage() {
           >
             <div className="p-8 md:p-10 text-center">
               <div className="mb-6 flex justify-center">
-                <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
-                  <Trophy className="w-10 h-10 md:w-12 md:h-12 text-primary" />
-                </div>
+                <img
+                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/libertadores-nqKalxYn1t2QqZSojqBgOz5iBfsvkQ.png"
+                  alt="Copa Libertadores"
+                  className="w-24 h-24 md:w-32 md:h-32 object-contain group-hover:scale-110 transition-transform duration-300"
+                />
               </div>
               <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">Copa Libertadores</h2>
               <p className="text-gray-300 text-sm md:text-base mb-6">Torneo de grupos con fase eliminatoria</p>
@@ -50,9 +51,11 @@ export default function LandingPage() {
           >
             <div className="p-8 md:p-10 text-center">
               <div className="mb-6 flex justify-center">
-                <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-pink-500/20 flex items-center justify-center group-hover:bg-pink-500/30 transition-colors">
-                  <Users className="w-10 h-10 md:w-12 md:h-12 text-pink-500" />
-                </div>
+                <img
+                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo%20fem-iqSGF186XTkPixDKR43n9kMdMjAl1T.png"
+                  alt="SuperLiga Femenina"
+                  className="w-24 h-24 md:w-32 md:h-32 object-contain group-hover:scale-110 transition-transform duration-300"
+                />
               </div>
               <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">SuperLiga Femenina</h2>
               <p className="text-gray-300 text-sm md:text-base mb-6">Liga de todos contra todos</p>

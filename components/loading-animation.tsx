@@ -3,7 +3,15 @@
 import { useEffect } from "react"
 import { motion } from "framer-motion"
 
-export default function LoadingAnimation({ onComplete }: { onComplete: () => void }) {
+export default function LoadingAnimation({
+  onComplete,
+  logoUrl = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/libertadores-WVv740p2nm7LGAoIfoCoQtBYqFv0wg.png",
+  shadowColor = "rgba(184, 134, 11, 0.8)",
+}: {
+  onComplete: () => void
+  logoUrl?: string
+  shadowColor?: string
+}) {
   useEffect(() => {
     const timer = setTimeout(onComplete, 3000)
     return () => clearTimeout(timer)
@@ -19,14 +27,14 @@ export default function LoadingAnimation({ onComplete }: { onComplete: () => voi
           className="flex flex-col items-center"
         >
           <motion.img
-            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/libertadores-WVv740p2nm7LGAoIfoCoQtBYqFv0wg.png"
-            alt="Copa Libertadores"
+            src={logoUrl}
+            alt="Tournament Logo"
             className="w-64 h-64 md:w-80 md:h-80 object-contain mb-8"
             animate={{
               filter: [
-                "drop-shadow(0 0 20px rgba(184, 134, 11, 0.8))",
-                "drop-shadow(0 0 40px rgba(218, 165, 32, 0.9))",
-                "drop-shadow(0 0 20px rgba(184, 134, 11, 0.8))",
+                `drop-shadow(0 0 20px ${shadowColor})`,
+                `drop-shadow(0 0 40px ${shadowColor.replace("0.8", "0.9")})`,
+                `drop-shadow(0 0 20px ${shadowColor})`,
               ],
             }}
             transition={{

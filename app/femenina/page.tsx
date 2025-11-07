@@ -10,6 +10,7 @@ import LeagueStandings from "@/components/league-standings"
 import LeagueFixtures from "@/components/league-fixtures"
 import LeagueTopScorers from "@/components/league-top-scorers"
 import LeagueTeamsRoster from "@/components/league-teams-roster"
+import NewsSection from "@/components/news-section"
 import { Card, CardContent } from "@/components/ui/card"
 
 export default function FemeninaPage() {
@@ -38,7 +39,13 @@ export default function FemeninaPage() {
   }
 
   if (isLoading) {
-    return <LoadingAnimation onComplete={handleLoadingComplete} />
+    return (
+      <LoadingAnimation
+        onComplete={handleLoadingComplete}
+        logoUrl="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo%20fem-iqSGF186XTkPixDKR43n9kMdMjAl1T.png"
+        shadowColor="rgba(236, 72, 153, 0.8)"
+      />
+    )
   }
 
   return (
@@ -116,6 +123,13 @@ export default function FemeninaPage() {
               >
                 Goleadores
               </Button>
+              <Button
+                variant="ghost"
+                className="text-white hover:bg-pink-500/20 hover:text-pink-500 text-sm lg:text-base"
+                onClick={() => setActiveSection("noticias")}
+              >
+                Noticias
+              </Button>
             </nav>
           </div>
 
@@ -172,6 +186,16 @@ export default function FemeninaPage() {
                 >
                   Goleadores
                 </Button>
+                <Button
+                  variant="ghost"
+                  className="text-white hover:bg-pink-500/20 hover:text-pink-500 justify-start"
+                  onClick={() => {
+                    setActiveSection("noticias")
+                    setIsMobileMenuOpen(false)
+                  }}
+                >
+                  Noticias
+                </Button>
               </div>
             </nav>
           )}
@@ -225,6 +249,11 @@ export default function FemeninaPage() {
           {activeSection === "fixtures" && <LeagueFixtures />}
           {activeSection === "goleadores" && <LeagueTopScorers />}
           {activeSection === "equipos" && <LeagueTeamsRoster />}
+          {activeSection === "noticias" && (
+            <div className="text-white">
+              <NewsSection />
+            </div>
+          )}
         </div>
       </main>
 

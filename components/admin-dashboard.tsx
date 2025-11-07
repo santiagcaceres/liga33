@@ -38,6 +38,16 @@ import { createMatch, deleteMatch, updateMatchResult } from "@/lib/actions/match
 import MatchDetailsDisplay from "@/components/match-details-display" // Fixed import to match kebab-case filename
 import { createClient } from "@/lib/supabase/client" // Fixed import path from utils to lib
 import { getTournaments } from "@/lib/actions/tournaments"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface Match {
   id: number
@@ -66,6 +76,7 @@ interface Team {
   name: string
   coach: string
   logo_url?: string // Added logo_url to Team interface
+  group_id?: string // Added group_id to Team interface
 }
 
 interface Player {
@@ -100,6 +111,9 @@ export default function AdminDashboard() {
   const [tournaments, setTournaments] = useState<any[]>([])
   const [tournamentTab, setTournamentTab] = useState<string>("libertadores") // 'libertadores' o 'femenino'
 
+  const [showTournamentDialog, setShowTournamentDialog] = useState(false)
+  const [pendingTournamentTab, setPendingTournamentTab] = useState<"libertadores" | "femenino">("libertadores")
+
   const [selectedRound, setSelectedRound] = useState("1")
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
 
@@ -128,7 +142,7 @@ export default function AdminDashboard() {
   const [homeRedCards, setHomeRedCards] = useState([{ player: "", minute: "" }])
   const [awayRedCards, setAwayRedCards] = useState([{ player: "", minute: "" }])
 
-  const [newTeam, setNewTeam] = useState({ name: "", logo_url: "" })
+  const [newTeam, setNewTeam] = useState({ name: "", logo_url: "", group_id: "" }) // Added group_id to newTeam state
   const [teams, setTeams] = useState<Team[]>([])
   const [isLoadingTeams, setIsLoadingTeams] = useState(false)
   const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null)
@@ -173,31 +187,40 @@ export default function AdminDashboard() {
   })
   const [selectedGroupForMatch, setSelectedGroupForMatch] = useState("")
 
-  const handleTournamentChange = (newTab: string) => {
-    const confirmChange = window.confirm(
-      "¿Estás seguro de cambiar de torneo? Asegúrate de haber guardado todos los cambios.",
-    )
+  const handleTournamentChange = (value: string) => {
+    setPendingTournamentTab(value as "libertadores" | "femenino")
+    setShowTournamentDialog(true)
+  }
 
-    if (confirmChange) {
-      setTournamentTab(newTab)
-      setSelectedTournament(newTab === "libertadores" ? 1 : 2)
+  const confirmTournamentChange = () => {
+    setTournamentTab(pendingTournamentTab)
+    setSelectedTournament(pendingTournamentTab === "libertadores" ? 1 : 2)
+    setShowTournamentDialog(false)
 
-      // Reset form states when changing tournament
-      setSelectedMatchId(null)
-      setHomeScore("")
-      setAwayScore("")
-      setHomeGoals([{ player: "", minute: "" }])
-      setAwayGoals([{ player: "", minute: "" }])
-      setHomeYellowCards([{ player: "", minute: "" }])
-      setAwayYellowCards([{ player: "", minute: "" }])
-      setHomeRedCards([{ player: "", minute: "" }])
-      setAwayRedCards([{ player: "", minute: "" }])
+    // Reset all forms and selections
+    setNewTeam({ name: "", logo_url: "", group_id: "" }) // Ensure group_id is reset
+    setNewPlayer({ name: "", cedula: "", team_id: "", number: "" })
+    setNewMatch({
+      group_id: "",
+      home_team_id: "",
+      away_team_id: "",
+      match_date: "",
+      match_time: "",
+      round: "",
+      field: "",
+    })
+    setSelectedMatchId(null)
+    setEditingPlayer(null)
+    setEditingTeam(null)
 
-      toast({
-        title: "Torneo cambiado",
-        description: `Ahora estás gestionando: ${newTab === "libertadores" ? "Copa Libertadores" : "SuperLiga Femenina"}`,
-      })
-    }
+    toast({
+      title: "Torneo cambiado",
+      description: `Ahora estás gestionando: ${pendingTournamentTab === "libertadores" ? "Copa Libertadores" : "SuperLiga Femenina"}`,
+    })
+  }
+
+  const cancelTournamentChange = () => {
+    setShowTournamentDialog(false)
   }
 
   const loadMatchDetails = async (matchId: number) => {
@@ -725,6 +748,7 @@ export default function AdminDashboard() {
       } else {
         formData.append("logo_url", newTeam.logo_url) // Fallback if no file is selected but logo_url exists
       }
+      formData.append("group_id", newTeam.group_id) // Append group_id
 
       if (editingTeam) {
         // Update existing team
@@ -745,7 +769,7 @@ export default function AdminDashboard() {
         })
       }
 
-      setNewTeam({ name: "", logo_url: "" })
+      setNewTeam({ name: "", logo_url: "", group_id: "" }) // Reset group_id
       setTeamLogoFile(null)
       await loadTeams()
     } catch (error) {
@@ -763,6 +787,7 @@ export default function AdminDashboard() {
     setNewTeam({
       name: team.name,
       logo_url: team.logo_url || "",
+      group_id: team.group_id?.toString() || "", // Set group_id for editing
     })
     // Scroll to form
     window.scrollTo({ top: 0, behavior: "smooth" })
@@ -770,7 +795,7 @@ export default function AdminDashboard() {
 
   const handleCancelEditTeam = () => {
     setEditingTeam(null)
-    setNewTeam({ name: "", logo_url: "" })
+    setNewTeam({ name: "", logo_url: "", group_id: "" }) // Reset group_id
     setTeamLogoFile(null)
   }
 
@@ -831,7 +856,8 @@ export default function AdminDashboard() {
 
       setSelectedTeamForAssignment("")
       setSelectedGroupForAssignment("")
-      await loadGroups()
+      await loadGroups() // Reload groups to reflect assignments
+      await loadTeams() // Reload teams to ensure their group_id is updated if necessary for display
     } catch (error) {
       console.error("[v0] Error assigning team to group:", error)
       toast({
@@ -888,6 +914,7 @@ export default function AdminDashboard() {
       })
 
       await loadGroups()
+      await loadTeams() // Reload teams as their group association might be removed
     } catch (error) {
       console.error("[v0] Error deleting group:", error)
       toast({
@@ -946,6 +973,7 @@ export default function AdminDashboard() {
       formData.append("cedula", newPlayer.cedula.trim())
       formData.append("number", newPlayer.number)
       formData.append("team_id", newPlayer.team_id)
+      formData.append("tournament_id", selectedTournament.toString()) // Add tournament_id
 
       console.log("[v0] Calling createPlayer with formData")
       const result = await createPlayer(formData)
@@ -1083,6 +1111,7 @@ export default function AdminDashboard() {
       formData.append("content", newNews.content.trim())
       formData.append("image_url", newNews.image)
       formData.append("published_date", newNews.date)
+      formData.append("tournament_id", selectedTournament.toString()) // Add tournament_id
 
       await createNews(formData)
 
@@ -1552,15 +1581,15 @@ export default function AdminDashboard() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList
-            className={`grid w-full grid-cols-2 md:grid-cols-7 bg-gray-800 border-2 ${
+            className={`grid w-full ${tournamentTab === "libertadores" ? "grid-cols-2 md:grid-cols-7" : "grid-cols-2 md:grid-cols-6"} bg-gray-800 border-2 ${
               tournamentTab === "libertadores" ? "border-primary/30" : "border-pink-500/30"
             }`}
           >
             <TabsTrigger value="news">Noticias</TabsTrigger>
-            <TabsTrigger value="groups">Grupos</TabsTrigger>
+            {tournamentTab === "libertadores" && <TabsTrigger value="groups">Grupos</TabsTrigger>}
             <TabsTrigger value="matches">Partidos</TabsTrigger>
             <TabsTrigger value="results">Resultados</TabsTrigger>
-            <TabsTrigger value="draw">Sorteo</TabsTrigger>
+            {tournamentTab === "libertadores" && <TabsTrigger value="draw">Sorteo</TabsTrigger>}
             <TabsTrigger value="teams">Equipos</TabsTrigger>
             <TabsTrigger value="players">Jugadores</TabsTrigger>
           </TabsList>
@@ -2070,30 +2099,15 @@ export default function AdminDashboard() {
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <Label className="text-base font-semibold">Seleccionar Torneo</Label>
-                  <Select
-                    value={selectedTournament.toString()}
-                    onValueChange={(value) => setSelectedTournament(Number.parseInt(value))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar torneo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tournaments.map((tournament) => (
-                        <SelectItem key={tournament.id} value={tournament.id.toString()}>
-                          {tournament.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 {matches.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <Trophy className="w-16 h-16 mx-auto mb-4 opacity-50 text-primary" />
                     <p className="text-lg">No hay partidos cargados</p>
-                    <p className="text-sm">Primero debes agregar equipos y crear el fixture de la Copa Libertadores</p>
+                    <p className="text-sm">
+                      {tournamentTab === "libertadores"
+                        ? "Primero debes agregar equipos y crear el fixture de la Copa Libertadores"
+                        : "Primero debes agregar equipos y crear el fixture de la SuperLiga Femenina"}
+                    </p>
                   </div>
                 ) : (
                   <>
@@ -2716,6 +2730,30 @@ export default function AdminDashboard() {
                   )}
                 </div>
 
+                {/* Add Group selection for new teams */}
+                {tournamentTab === "libertadores" && (
+                  <div className="space-y-2">
+                    <Label>Grupo</Label>
+                    <Select
+                      value={newTeam.group_id}
+                      onValueChange={(value) => setNewTeam({ ...newTeam, group_id: value === "none" ? "" : value })}
+                      disabled={groups.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar grupo (si aplica)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin grupo asignado</SelectItem>
+                        {groups.map((group) => (
+                          <SelectItem key={group.id} value={group.id.toString()}>
+                            {group.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <Button
                     onClick={handleAddTeam}
@@ -2760,6 +2798,12 @@ export default function AdminDashboard() {
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
                                 <h4 className="font-semibold">{team.name}</h4>
+                                {team.group_id && tournamentTab === "libertadores" && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Grupo:{" "}
+                                    {groups.find((g) => g.id.toString() === team.group_id)?.name || "Desconocido"}
+                                  </p>
+                                )}
                               </div>
                               <div className="flex items-center gap-2">
                                 <Badge className="bg-primary">ID: {team.id}</Badge>
@@ -3022,6 +3066,65 @@ export default function AdminDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <AlertDialog open={showTournamentDialog} onOpenChange={setShowTournamentDialog}>
+        <AlertDialogContent className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-primary/50 text-white max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl">
+              <Trophy
+                className={`w-6 h-6 ${pendingTournamentTab === "libertadores" ? "text-primary" : "text-pink-500"}`}
+              />
+              <span className="bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
+                Cambiar de Torneo
+              </span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-300 space-y-3 pt-2">
+              <div>
+                Estás a punto de cambiar de{" "}
+                <span className={`font-bold ${tournamentTab === "libertadores" ? "text-primary" : "text-pink-500"}`}>
+                  {tournamentTab === "libertadores" ? "Copa Libertadores" : "SuperLiga Femenina"}
+                </span>{" "}
+                a{" "}
+                <span
+                  className={`font-bold ${pendingTournamentTab === "libertadores" ? "text-primary" : "text-pink-500"}`}
+                >
+                  {pendingTournamentTab === "libertadores" ? "Copa Libertadores" : "SuperLiga Femenina"}
+                </span>
+              </div>
+
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-yellow-200">
+                  <div className="font-semibold mb-1">Importante:</div>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Se limpiarán todos los formularios</li>
+                    <li>Asegúrate de guardar cambios pendientes</li>
+                    <li>Los datos de cada torneo son independientes</li>
+                  </ul>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel
+              onClick={cancelTournamentChange}
+              className="bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmTournamentChange}
+              className={`${
+                pendingTournamentTab === "libertadores"
+                  ? "bg-gradient-to-r from-primary via-blue-500 to-primary hover:from-primary/90 hover:via-blue-500/90 hover:to-primary/90"
+                  : "bg-gradient-to-r from-pink-600 via-pink-500 to-pink-600 hover:from-pink-700 hover:via-pink-600 hover:to-pink-700"
+              } text-white`}
+            >
+              Cambiar a {pendingTournamentTab === "libertadores" ? "Libertadores" : "Femenino"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
