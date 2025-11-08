@@ -7,15 +7,40 @@ export async function createMatch(formData: FormData) {
   try {
     const supabase = await createClient()
 
+    console.log("[v0] ============ CREATE MATCH START ============")
+    console.log("[v0] FormData received:", {
+      home_team_id: formData.get("home_team_id"),
+      away_team_id: formData.get("away_team_id"),
+      group_id: formData.get("group_id"),
+      tournament_id: formData.get("tournament_id"),
+      round: formData.get("round"),
+      match_date: formData.get("match_date"),
+      match_time: formData.get("match_time"),
+      field: formData.get("field"),
+    })
+
     const home_team_id = Number.parseInt(formData.get("home_team_id") as string)
     const away_team_id = Number.parseInt(formData.get("away_team_id") as string)
     const group_id = Number.parseInt(formData.get("group_id") as string)
+    const tournament_id = Number.parseInt(formData.get("tournament_id") as string)
     const round = Number.parseInt(formData.get("round") as string)
     const match_date = formData.get("match_date") as string
     const match_time = formData.get("match_time") as string | null
     const field = formData.get("field") as string | null
 
+    console.log("[v0] Parsed values:", {
+      home_team_id,
+      away_team_id,
+      group_id,
+      tournament_id,
+      round,
+      match_date,
+      match_time,
+      field,
+    })
+
     if (home_team_id === away_team_id) {
+      console.error("[v0] ❌ Same team selected for both sides")
       return { success: false, error: "Un equipo no puede jugar contra sí mismo" }
     }
 
@@ -34,6 +59,7 @@ export async function createMatch(formData: FormData) {
       .single()
 
     if (!homeTeamGroup || !awayTeamGroup) {
+      console.error("[v0] ❌ Teams do not belong to the same group")
       return { success: false, error: "Ambos equipos deben pertenecer al mismo grupo" }
     }
 
@@ -41,6 +67,7 @@ export async function createMatch(formData: FormData) {
       home_team_id,
       away_team_id,
       group_id,
+      tournament_id,
       round,
       match_date,
       home_score: 0,
@@ -51,17 +78,27 @@ export async function createMatch(formData: FormData) {
     if (match_time) matchData.match_time = match_time
     if (field) matchData.field = field
 
+    console.log("[v0] Inserting match with data:", matchData)
+
     const { data, error } = await supabase.from("matches").insert([matchData]).select().single()
 
     if (error) {
-      console.error("[v0] Error creating match:", error)
+      console.error("[v0] ❌ Database error creating match:", error)
+      console.error("[v0] Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      })
       return { success: false, error: error.message }
     }
 
+    console.log("[v0] ✅ Match created successfully:", data)
+    console.log("[v0] ============ CREATE MATCH END ============")
     revalidatePath("/")
     return { success: true, data }
   } catch (error: any) {
-    console.error("[v0] Error in createMatch:", error)
+    console.error("[v0] ❌ Error in createMatch:", error)
     return { success: false, error: error.message || "Error al crear el partido" }
   }
 }

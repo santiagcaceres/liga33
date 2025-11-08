@@ -11,8 +11,10 @@ export async function createPlayer(formData: FormData) {
     const cedula = formData.get("cedula") as string
     const numberStr = formData.get("number") as string
     const teamIdStr = formData.get("team_id") as string
+    const tournamentIdStr = formData.get("tournament_id") as string
 
-    console.log("[v0] Raw form data:", { name, cedula, numberStr, teamIdStr })
+    console.log("[v0] ============ CREATE PLAYER START ============")
+    console.log("[v0] Raw form data:", { name, cedula, numberStr, teamIdStr, tournamentIdStr })
 
     const number = Number.parseInt(numberStr, 10)
     const team_id = Number.parseInt(teamIdStr, 10)
@@ -42,16 +44,26 @@ export async function createPlayer(formData: FormData) {
     console.log("[v0] Checking if team exists:", team_id)
     const { data: teamExists, error: teamError } = await supabase
       .from("teams")
-      .select("id, name")
+      .select("id, name, tournament_id")
       .eq("id", team_id)
       .single()
 
     if (teamError || !teamExists) {
-      console.error("[v0] Team not found:", team_id, teamError)
+      console.error("[v0] ❌ Team not found:", team_id, teamError)
       return { success: false, error: `El equipo con ID ${team_id} no existe` }
     }
 
     console.log("[v0] Team found:", teamExists)
+    console.log("[v0] Team tournament_id:", teamExists.tournament_id)
+
+    if (tournamentIdStr && teamExists.tournament_id !== Number.parseInt(tournamentIdStr)) {
+      console.warn(
+        "[v0] ⚠️ Tournament mismatch - Team belongs to tournament",
+        teamExists.tournament_id,
+        "but player form has",
+        tournamentIdStr,
+      )
+    }
 
     const playerData = {
       name: name.trim(),
@@ -69,11 +81,18 @@ export async function createPlayer(formData: FormData) {
     const { data, error } = await supabase.from("players").insert(playerData).select().single()
 
     if (error) {
-      console.error("[v0] Database error creating player:", error)
+      console.error("[v0] ❌ Database error creating player:", error)
+      console.error("[v0] Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      })
       return { success: false, error: `Error de base de datos: ${error.message}` }
     }
 
-    console.log("[v0] Player created successfully:", data)
+    console.log("[v0] ✅ Player created successfully:", data)
+    console.log("[v0] ============ CREATE PLAYER END ============")
     revalidatePath("/")
 
     return { success: true, data }
