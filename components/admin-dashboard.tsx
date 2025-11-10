@@ -77,6 +77,7 @@ interface Team {
   coach: string
   logo_url?: string // Added logo_url to Team interface
   group_id?: string // Added group_id to Team interface
+  tournament_id: number // Added tournament_id to Team interface
 }
 
 interface Player {
@@ -264,17 +265,25 @@ export default function AdminDashboard() {
   const loadTeams = async () => {
     setIsLoadingTeams(true)
     try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("teams")
-        .select("*")
-        .eq("tournament_id", selectedTournament)
-        .order("name")
+      console.log("[v0] ============ LOADING TEAMS START ============")
+      console.log("[v0] Current selectedTournament:", selectedTournament)
 
-      if (error) throw error
-      setTeams(data || [])
+      const { getTeams } = await import("@/lib/actions/teams")
+      const allTeams = await getTeams()
+
+      console.log("[v0] All teams fetched from DB:", allTeams)
+      console.log("[v0] Total teams:", allTeams.length)
+
+      const filteredTeams = allTeams.filter((team) => team.tournament_id === selectedTournament)
+
+      console.log("[v0] Teams filtered for tournament", selectedTournament, ":", filteredTeams)
+      console.log("[v0] Filtered teams count:", filteredTeams.length)
+
+      setTeams(filteredTeams)
+      console.log("[v0] ============ LOADING TEAMS END ============")
     } catch (error) {
-      console.error("[v0] Error loading teams:", error)
+      console.error("[v0] ❌ Error loading teams:", error)
+      console.error("[v0] Error details:", error instanceof Error ? error.message : "Unknown error")
       toast({
         title: "Error",
         description: "No se pudieron cargar los equipos",
@@ -288,17 +297,27 @@ export default function AdminDashboard() {
   const loadPlayers = async () => {
     setIsLoadingPlayers(true)
     try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("players")
-        .select("*, teams(name, id)")
-        .eq("tournament_id", selectedTournament)
-        .order("name")
+      console.log("[v0] ============ LOADING PLAYERS START ============")
+      console.log("[v0] Current selectedTournament:", selectedTournament)
 
-      if (error) throw error
-      setPlayers(data || [])
+      const { getPlayers } = await import("@/lib/actions/players")
+      const allPlayers = await getPlayers()
+
+      console.log("[v0] All players fetched from DB:", allPlayers.length, "players")
+
+      const tournamentTeamIds = teams.map((t) => t.id)
+      console.log("[v0] Current tournament team IDs:", tournamentTeamIds)
+
+      const filteredPlayers = allPlayers.filter((player) => tournamentTeamIds.includes(player.team_id))
+
+      console.log("[v0] Players filtered for tournament", selectedTournament, ":", filteredPlayers.length)
+      console.log("[v0] Sample filtered players:", filteredPlayers.slice(0, 3))
+
+      setPlayers(filteredPlayers)
+      console.log("[v0] ============ LOADING PLAYERS END ============")
     } catch (error) {
-      console.error("[v0] Error loading players:", error)
+      console.error("[v0] ❌ Error loading players:", error)
+      console.error("[v0] Error details:", error instanceof Error ? error.message : "Unknown error")
       toast({
         title: "Error",
         description: "No se pudieron cargar los jugadores",
@@ -962,7 +981,13 @@ export default function AdminDashboard() {
   }
 
   const handleAddPlayer = async () => {
+    console.log("[v0] ============ ADD PLAYER START ============")
+    console.log("[v0] Current teams:", teams.length)
+    console.log("[v0] Current selectedTournament:", selectedTournament)
+    console.log("[v0] New player data:", newPlayer)
+
     if (teams.length === 0) {
+      console.error("[v0] ❌ No teams available")
       toast({
         title: "❌ No hay equipos disponibles",
         description: "Debes crear al menos un equipo antes de agregar jugadores",
@@ -972,6 +997,12 @@ export default function AdminDashboard() {
     }
 
     if (!newPlayer.name.trim() || !newPlayer.team_id || !newPlayer.cedula.trim() || !newPlayer.number) {
+      console.error("[v0] ❌ Incomplete fields:", {
+        name: !!newPlayer.name.trim(),
+        team_id: !!newPlayer.team_id,
+        cedula: !!newPlayer.cedula.trim(),
+        number: !!newPlayer.number,
+      })
       toast({
         title: "❌ Campos incompletos",
         description: "Por favor completa todos los campos antes de crear el jugador",
@@ -990,9 +1021,13 @@ export default function AdminDashboard() {
 
     const selectedTeam = teams.find((t) => t.id === Number.parseInt(newPlayer.team_id, 10))
     console.log("[v0] Selected team:", selectedTeam)
-    console.log("[v0] Available teams:", teams)
+    console.log(
+      "[v0] Available teams for dropdown:",
+      teams.map((t) => ({ id: t.id, name: t.name, tournament_id: t.tournament_id })),
+    )
 
     if (!selectedTeam) {
+      console.error("[v0] ❌ Team not found in current list")
       toast({
         title: "❌ Error de sincronización",
         description: "El equipo seleccionado no está disponible. Por favor recarga la página e intenta nuevamente.",
@@ -1009,12 +1044,20 @@ export default function AdminDashboard() {
       formData.append("cedula", newPlayer.cedula.trim())
       formData.append("number", newPlayer.number)
       formData.append("team_id", newPlayer.team_id)
-      formData.append("tournament_id", selectedTournament.toString()) // Add tournament_id
+      formData.append("tournament_id", selectedTournament.toString())
+
+      console.log("[v0] FormData for createPlayer:")
+      for (const [key, value] of formData.entries()) {
+        console.log(`[v0]   ${key}: ${value}`)
+      }
 
       console.log("[v0] Calling createPlayer with formData")
       const result = await createPlayer(formData)
 
+      console.log("[v0] createPlayer result:", result)
+
       if (!result.success) {
+        console.error("[v0] ❌ Create player failed:", result.error)
         toast({
           title: "❌ Error al crear jugador",
           description: result.error || "Ocurrió un error inesperado",
@@ -1025,6 +1068,7 @@ export default function AdminDashboard() {
 
       const teamName = selectedTeam.name
 
+      console.log("[v0] ✅ Player created successfully")
       toast({
         title: "✅ ¡Jugador creado exitosamente!",
         description: `${newPlayer.name} ha sido agregado a ${teamName}`,
@@ -1033,8 +1077,10 @@ export default function AdminDashboard() {
 
       setNewPlayer({ name: "", team_id: "", cedula: "", number: "" })
       await loadPlayers()
+      console.log("[v0] ============ ADD PLAYER END ============")
     } catch (error) {
-      console.error("[v0] Error creating player:", error)
+      console.error("[v0] ❌ Error creating player:", error)
+      console.error("[v0] Error stack:", error instanceof Error ? error.stack : "No stack")
       toast({
         title: "❌ Error al crear jugador",
         description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
