@@ -108,7 +108,7 @@ export async function createPlayer(formData: FormData) {
 export async function getPlayers(teamId?: number) {
   const supabase = await createClient()
 
-  let query = supabase.from("players").select("*, teams(name)").order("team_id").order("number")
+  let query = supabase.from("players").select("*, teams(name, tournament_id)").order("team_id").order("number")
 
   if (teamId) {
     query = query.eq("team_id", teamId)
@@ -120,6 +120,30 @@ export async function getPlayers(teamId?: number) {
     console.error("[v0] Error fetching players:", error)
     return []
   }
+
+  return data || []
+}
+
+export async function getPlayersByTournament(tournamentId: number) {
+  console.log("[v0] ============ GET PLAYERS BY TOURNAMENT START ============")
+  console.log("[v0] Tournament ID:", tournamentId)
+
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("players")
+    .select("*, teams!inner(name, tournament_id)")
+    .eq("teams.tournament_id", tournamentId)
+    .order("team_id")
+    .order("number")
+
+  if (error) {
+    console.error("[v0] ❌ Error fetching players by tournament:", error)
+    return []
+  }
+
+  console.log("[v0] ✅ Players fetched for tournament", tournamentId, ":", data?.length || 0, "players")
+  console.log("[v0] ============ GET PLAYERS BY TOURNAMENT END ============")
 
   return data || []
 }

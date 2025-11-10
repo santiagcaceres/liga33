@@ -48,6 +48,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { createByeWeek, getByeWeeks, deleteByeWeek } from "@/lib/actions/bye-weeks"
 
 interface Match {
   id: number
@@ -86,7 +87,7 @@ interface Player {
   cedula: string
   number: number
   team_id: number
-  teams?: { name: string; id: number }
+  teams?: { name: string; id: number; tournament_id: number } // Added tournament_id to player's team relation
   goals?: number
   yellow_cards?: number
   red_cards?: number
@@ -188,6 +189,13 @@ export default function AdminDashboard() {
   })
   const [selectedGroupForMatch, setSelectedGroupForMatch] = useState("")
 
+  // Add bye week management for femenina
+  const [byeWeeks, setByeWeeks] = useState<any[]>([])
+  const [newByeWeek, setNewByeWeek] = useState({
+    team_id: "",
+    round: "",
+  })
+
   const handleTournamentChange = (value: string) => {
     setPendingTournamentTab(value as "libertadores" | "femenino")
     setShowTournamentDialog(true)
@@ -213,6 +221,8 @@ export default function AdminDashboard() {
     setSelectedMatchId(null)
     setEditingPlayer(null)
     setEditingTeam(null)
+    // Reset bye week state when changing tournament
+    setNewByeWeek({ team_id: "", round: "" })
 
     toast({
       title: "Torneo cambiado",
@@ -300,18 +310,19 @@ export default function AdminDashboard() {
       console.log("[v0] ============ LOADING PLAYERS START ============")
       console.log("[v0] Current selectedTournament:", selectedTournament)
 
-      const { getPlayers } = await import("@/lib/actions/players")
-      const allPlayers = await getPlayers()
+      const { getPlayersByTournament } = await import("@/lib/actions/players")
+      const filteredPlayers = await getPlayersByTournament(selectedTournament)
 
-      console.log("[v0] All players fetched from DB:", allPlayers.length, "players")
-
-      const tournamentTeamIds = teams.map((t) => t.id)
-      console.log("[v0] Current tournament team IDs:", tournamentTeamIds)
-
-      const filteredPlayers = allPlayers.filter((player) => tournamentTeamIds.includes(player.team_id))
-
-      console.log("[v0] Players filtered for tournament", selectedTournament, ":", filteredPlayers.length)
-      console.log("[v0] Sample filtered players:", filteredPlayers.slice(0, 3))
+      console.log("[v0] Players loaded for tournament", selectedTournament, ":", filteredPlayers.length)
+      console.log(
+        "[v0] Sample players:",
+        filteredPlayers.slice(0, 3).map((p) => ({
+          name: p.name,
+          team_id: p.team_id,
+          team_name: p.teams?.name,
+          tournament_id: p.teams?.tournament_id,
+        })),
+      )
 
       setPlayers(filteredPlayers)
       console.log("[v0] ============ LOADING PLAYERS END ============")
@@ -359,12 +370,26 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (isAuthenticated && selectedTournament) {
-      loadTeams()
-      loadPlayers()
-      loadMatches()
-      if (tournamentTab === "libertadores") {
-        loadGroups()
+      const loadDataSequentially = async () => {
+        console.log("[v0] ============ LOADING DATA SEQUENTIALLY ============")
+        console.log("[v0] Selected tournament:", selectedTournament)
+        console.log("[v0] Tournament tab:", tournamentTab)
+
+        // Load teams first
+        await loadTeams()
+
+        // Load groups if Libertadores
+        if (tournamentTab === "libertadores") {
+          await loadGroups()
+        }
+
+        // Then load players and matches (they depend on teams being loaded)
+        await Promise.all([loadPlayers(), loadMatches()])
+
+        console.log("[v0] ============ DATA LOADING COMPLETE ============")
       }
+
+      loadDataSequentially()
     }
   }, [selectedTournament, tournamentTab, isAuthenticated])
 
@@ -391,6 +416,102 @@ export default function AdminDashboard() {
       loadNews()
     }
   }, [activeTab])
+
+  useEffect(() => {
+    if (selectedTournament === 2) {
+      // Only for femenina
+      loadByeWeeks()
+    }
+  }, [selectedTournament])
+
+  const loadByeWeeks = async () => {
+    console.log("[v0] ============ LOAD BYE WEEKS START ============")
+    console.log("[v0] Selected tournament:", selectedTournament)
+
+    try {
+      const data = await getByeWeeks(selectedTournament)
+      console.log("[v0] ✅ Bye weeks loaded:", data.length)
+      setByeWeeks(data)
+    } catch (error) {
+      console.error("[v0] ❌ Error loading bye weeks:", error)
+      toast({
+        title: "Error al cargar fechas libres",
+        description: error instanceof Error ? error.message : "Error desconocido",
+        variant: "destructive",
+      })
+    }
+    console.log("[v0] ============ LOAD BYE WEEKS END ============")
+  }
+
+  const handleCreateByeWeek = async (e: React.FormEvent) => {
+    e.preventDefault()
+    console.log("[v0] ============ HANDLE CREATE BYE WEEK START ============")
+    console.log("[v0] New bye week state:", newByeWeek)
+    console.log("[v0] Selected tournament:", selectedTournament)
+
+    if (!newByeWeek.team_id || !newByeWeek.round) {
+      toast({
+        title: "Error",
+        description: "Debes seleccionar un equipo y una fecha",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const formData = new FormData()
+      formData.append("tournament_id", selectedTournament.toString())
+      formData.append("team_id", newByeWeek.team_id)
+      formData.append("round", newByeWeek.round)
+
+      console.log("[v0] FormData prepared:", {
+        tournament_id: selectedTournament,
+        team_id: newByeWeek.team_id,
+        round: newByeWeek.round,
+      })
+
+      await createByeWeek(formData)
+
+      toast({
+        title: "Fecha libre creada",
+        description: "La fecha libre se ha registrado exitosamente",
+        className: "bg-green-50 border-green-200",
+      })
+
+      setNewByeWeek({ team_id: "", round: "" })
+      await loadByeWeeks()
+    } catch (error) {
+      console.error("[v0] ❌ Error creating bye week:", error)
+      console.error("[v0] Error details:", error instanceof Error ? error.message : "Unknown error")
+      toast({
+        title: "Error al crear fecha libre",
+        description: error instanceof Error ? error.message : "Error desconocido",
+        variant: "destructive",
+      })
+    }
+    console.log("[v0] ============ HANDLE CREATE BYE WEEK END ============")
+  }
+
+  const handleDeleteByeWeek = async (id: number, teamName: string, round: number) => {
+    if (!confirm(`¿Eliminar fecha libre de ${teamName} en Fecha ${round}?`)) return
+
+    try {
+      await deleteByeWeek(id)
+      toast({
+        title: "Fecha libre eliminada",
+        description: "La fecha libre se ha eliminado exitosamente",
+        className: "bg-green-50 border-green-200",
+      })
+      await loadByeWeeks()
+    } catch (error) {
+      console.error("[v0] Error deleting bye week:", error)
+      toast({
+        title: "Error al eliminar fecha libre",
+        description: error instanceof Error ? error.message : "Error desconocido",
+        variant: "destructive",
+      })
+    }
+  }
 
   const loadGroups = async () => {
     setIsLoadingGroups(true)
@@ -430,14 +551,18 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && selectedTournament) {
       loadTeams()
       loadPlayers()
       loadGroups()
       loadNews()
       loadMatches()
+      // Load bye weeks if selected tournament is Femenina
+      if (selectedTournament === 2) {
+        loadByeWeeks()
+      }
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, selectedTournament])
 
   useEffect(() => {
     if (selectedMatchId !== null) {
@@ -763,7 +888,8 @@ export default function AdminDashboard() {
       })
       return
     }
-    if (!teamLogoFile && !newTeam.logo_url) {
+    // Modified condition: logo is only required if not editing
+    if (!teamLogoFile && !newTeam.logo_url && !editingTeam) {
       toast({
         title: "⚠️ Campo incompleto",
         description: "Por favor sube una foto del equipo",
@@ -838,19 +964,31 @@ export default function AdminDashboard() {
   }
 
   const handleEditTeam = (team: Team) => {
+    console.log("[v0] ============ EDIT TEAM CLICKED ============")
+    console.log("[v0] Team to edit:", team)
+
     setEditingTeam(team)
     setNewTeam({
       name: team.name,
       logo_url: team.logo_url || "",
-      group_id: team.group_id?.toString() || "", // Set group_id for editing
+      group_id: team.group_id?.toString() || "",
     })
-    // Scroll to form
-    window.scrollTo({ top: 0, behavior: "smooth" })
+    setTeamLogoFile(null) // Reset file, keep existing logo_url
+
+    console.log("[v0] Edit mode activated, state set")
+    console.log("[v0] ============ EDIT TEAM CLICKED END ============")
+
+    // Find the form element and scroll it into view instead
+    const formElement = document.querySelector("[data-team-form]")
+    if (formElement) {
+      formElement.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    }
   }
 
   const handleCancelEditTeam = () => {
+    console.log("[v0] Cancelling team edit")
     setEditingTeam(null)
-    setNewTeam({ name: "", logo_url: "", group_id: "" }) // Reset group_id
+    setNewTeam({ name: "", logo_url: "", group_id: "" })
     setTeamLogoFile(null)
   }
 
@@ -1437,13 +1575,21 @@ export default function AdminDashboard() {
 
   // Function to create a new match
   const handleCreateMatch = async () => {
-    if (
-      !newMatch.group_id ||
-      !newMatch.home_team_id ||
-      !newMatch.away_team_id ||
-      !newMatch.round ||
-      !newMatch.match_date
-    ) {
+    console.log("[v0] ============ CREATING MATCH START ============")
+    console.log("[v0] Tournament:", tournamentTab, "ID:", selectedTournament)
+    console.log("[v0] New match data:", newMatch)
+
+    const requiredFieldsMissing =
+      tournamentTab === "libertadores"
+        ? !newMatch.group_id ||
+          !newMatch.home_team_id ||
+          !newMatch.away_team_id ||
+          !newMatch.round ||
+          !newMatch.match_date
+        : !newMatch.home_team_id || !newMatch.away_team_id || !newMatch.round || !newMatch.match_date
+
+    if (requiredFieldsMissing) {
+      console.log("[v0] ❌ Required fields missing")
       toast({
         title: "❌ Campos incompletos",
         description: "Por favor completa todos los campos obligatorios.",
@@ -1453,37 +1599,35 @@ export default function AdminDashboard() {
     }
 
     try {
-      const matchData = {
-        ...newMatch,
-        tournament_id: selectedTournament, // Add tournament_id
-        round: Number.parseInt(newMatch.round),
-        group_id: Number.parseInt(newMatch.group_id),
-        home_team_id: Number.parseInt(newMatch.home_team_id),
-        away_team_id: Number.parseInt(newMatch.away_team_id),
-        match_date: newMatch.match_date, // Ensure date format is correct
-        match_time: newMatch.match_time || null, // Allow null for time
-        field: newMatch.field || null, // Allow null for field
+      const formData = new FormData()
+      formData.append("tournament_id", selectedTournament.toString())
+
+      if (tournamentTab === "libertadores") {
+        formData.append("group_id", newMatch.group_id)
       }
 
-      const result = await createMatch(matchData)
+      formData.append("home_team_id", newMatch.home_team_id)
+      formData.append("away_team_id", newMatch.away_team_id)
+      formData.append("round", newMatch.round)
+      formData.append("match_date", newMatch.match_date)
+      formData.append("match_time", newMatch.match_time || "")
+      formData.append("field", newMatch.field || "")
 
-      if (!result.success) {
-        toast({
-          title: "❌ Error al crear partido",
-          description: result.error || "Ocurrió un error inesperado",
-          variant: "destructive",
-        })
-        return
+      console.log("[v0] FormData prepared:")
+      for (const [key, value] of formData.entries()) {
+        console.log(`[v0]   ${key}:`, value)
       }
+
+      const result = await createMatch(formData)
+      console.log("[v0] ✅ Match created successfully:", result)
 
       toast({
-        title: "✅ ¡Partido creado exitosamente!",
-        description: `El partido entre ${
-          teams.find((t) => t.id === matchData.home_team_id)?.name
-        } y ${teams.find((t) => t.id === matchData.away_team_id)?.name} ha sido agregado`,
+        title: "✅ ¡Partido creado!",
+        description: "El partido ha sido agregado exitosamente.",
         className: "bg-green-50 border-green-200",
       })
 
+      // Reset form
       setNewMatch({
         group_id: "",
         home_team_id: "",
@@ -1494,9 +1638,12 @@ export default function AdminDashboard() {
         field: "",
       })
       setSelectedGroupForMatch("")
+
       await loadMatches()
+      console.log("[v0] ============ CREATING MATCH END ============")
     } catch (error) {
-      console.error("[v0] Error creating match:", error)
+      console.error("[v0] ❌ Error creating match:", error)
+      console.error("[v0] Error details:", error instanceof Error ? error.message : "Unknown error")
       toast({
         title: "❌ Error al crear partido",
         description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
@@ -1951,31 +2098,109 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="matches" className="space-y-6">
-            <Card className="border-primary/30 bg-card">
+            {selectedTournament === 2 && (
+              <Card className="border-pink-500/30 bg-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-pink-500">
+                    <Calendar className="w-5 h-5" />
+                    Fechas Libres
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleCreateByeWeek} className="space-y-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Equipo</label>
+                        <Select
+                          value={newByeWeek.team_id}
+                          onValueChange={(value) => setNewByeWeek({ ...newByeWeek, team_id: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar equipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teams.map((team) => (
+                              <SelectItem key={team.id} value={team.id.toString()}>
+                                {team.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Fecha</label>
+                        <Input
+                          type="number"
+                          min="1"
+                          placeholder="Número de fecha"
+                          value={newByeWeek.round}
+                          onChange={(e) => setNewByeWeek({ ...newByeWeek, round: e.target.value })}
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button type="submit" className="w-full bg-pink-500 hover:bg-pink-600">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Agregar Fecha Libre
+                        </Button>
+                      </div>
+                    </div>
+                  </form>
+
+                  {byeWeeks.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium mb-3">Fechas Libres Registradas</h3>
+                      {byeWeeks.map((bye) => (
+                        <div
+                          key={bye.id}
+                          className="flex items-center justify-between p-3 rounded-lg bg-pink-500/10 border border-pink-500/20"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Badge className="bg-pink-500">{bye.round}</Badge>
+                            <span className="font-medium">{bye.teams.name}</span>
+                            <span className="text-sm text-gray-400">- Fecha Libre</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteByeWeek(bye.id, bye.teams.name, bye.round)}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className={selectedTournament === 1 ? "border-primary/30" : "border-pink-500/30"}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-primary">
                   <Calendar className="w-5 h-5" />
                   Gestión de Partidos
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Crea los partidos de cada fecha. Solo pueden enfrentarse equipos del mismo grupo.
+                  {tournamentTab === "libertadores"
+                    ? "Programa los partidos de la fase de grupos"
+                    : "Programa los partidos de la liga"}
                 </p>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4">
                 {/* Create Match Section */}
                 <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/30">
                   <h3 className="font-semibold">Crear Nuevo Partido</h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {tournamentTab === "libertadores" && (
                     <div className="space-y-2">
-                      <Label>Seleccionar Grupo *</Label>
+                      <Label>Grupo *</Label>
                       <Select
-                        value={selectedGroupForMatch}
+                        value={newMatch.group_id}
                         onValueChange={(value) => {
-                          setSelectedGroupForMatch(value)
                           setNewMatch({ ...newMatch, group_id: value, home_team_id: "", away_team_id: "" })
+                          setSelectedGroupForMatch(value)
                         }}
-                        disabled={groups.length === 0}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar grupo" />
@@ -1989,30 +2214,21 @@ export default function AdminDashboard() {
                         </SelectContent>
                       </Select>
                     </div>
+                  )}
 
-                    <div className="space-y-2">
-                      <Label>Jornada/Fecha *</Label>
-                      <Input
-                        type="number"
-                        value={newMatch.round}
-                        onChange={(e) => setNewMatch({ ...newMatch, round: e.target.value })}
-                        placeholder="Ej: 1"
-                        min="1"
-                      />
-                    </div>
-
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Equipo Local *</Label>
                       <Select
                         value={newMatch.home_team_id}
                         onValueChange={(value) => setNewMatch({ ...newMatch, home_team_id: value })}
-                        disabled={!selectedGroupForMatch || teamsInSelectedGroup.length === 0}
+                        disabled={tournamentTab === "libertadores" && !newMatch.group_id}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar equipo local" />
                         </SelectTrigger>
                         <SelectContent>
-                          {teamsInSelectedGroup.map((team: any) => (
+                          {(tournamentTab === "femenino" ? teams : teamsInSelectedGroup).map((team) => (
                             <SelectItem key={team.id} value={team.id.toString()}>
                               {team.name}
                             </SelectItem>
@@ -2020,21 +2236,20 @@ export default function AdminDashboard() {
                         </SelectContent>
                       </Select>
                     </div>
-
                     <div className="space-y-2">
                       <Label>Equipo Visitante *</Label>
                       <Select
                         value={newMatch.away_team_id}
                         onValueChange={(value) => setNewMatch({ ...newMatch, away_team_id: value })}
-                        disabled={!selectedGroupForMatch || teamsInSelectedGroup.length === 0}
+                        disabled={tournamentTab === "libertadores" && !newMatch.group_id}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar equipo visitante" />
                         </SelectTrigger>
                         <SelectContent>
-                          {teamsInSelectedGroup
-                            .filter((team: any) => team.id.toString() !== newMatch.home_team_id)
-                            .map((team: any) => (
+                          {(tournamentTab === "femenino" ? teams : teamsInSelectedGroup)
+                            .filter((team) => team.id.toString() !== newMatch.home_team_id)
+                            .map((team) => (
                               <SelectItem key={team.id} value={team.id.toString()}>
                                 {team.name}
                               </SelectItem>
@@ -2042,33 +2257,44 @@ export default function AdminDashboard() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Fecha del Partido *</Label>
+                      <Label>Fecha *</Label>
                       <Input
                         type="date"
                         value={newMatch.match_date}
                         onChange={(e) => setNewMatch({ ...newMatch, match_date: e.target.value })}
                       />
                     </div>
-
                     <div className="space-y-2">
-                      <Label>Hora del Partido</Label>
+                      <Label>Hora</Label>
                       <Input
                         type="time"
                         value={newMatch.match_time}
                         onChange={(e) => setNewMatch({ ...newMatch, match_time: e.target.value })}
-                        placeholder="Ej: 17:00"
                       />
                     </div>
+                  </div>
 
-                    <div className="space-y-2 md:col-span-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Fecha {tournamentTab === "libertadores" ? "*" : "(Jornada) *"}</Label>
+                      <Input
+                        type="text"
+                        value={newMatch.round}
+                        onChange={(e) => setNewMatch({ ...newMatch, round: e.target.value })}
+                        placeholder={tournamentTab === "libertadores" ? "Ej: 1, 2, 3..." : "Ej: 1, 2, 3..."}
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label>Cancha</Label>
                       <Input
                         type="text"
                         value={newMatch.field}
                         onChange={(e) => setNewMatch({ ...newMatch, field: e.target.value })}
-                        placeholder="Ej: Cancha 1, Cancha Principal"
+                        placeholder="Ej: Cancha Principal"
                       />
                     </div>
                   </div>
@@ -2077,7 +2303,7 @@ export default function AdminDashboard() {
                     onClick={handleCreateMatch}
                     className="w-full bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
                     disabled={
-                      !newMatch.group_id ||
+                      (tournamentTab === "libertadores" && !newMatch.group_id) ||
                       !newMatch.home_team_id ||
                       !newMatch.away_team_id ||
                       !newMatch.round ||
@@ -2775,91 +3001,97 @@ export default function AdminDashboard() {
                 )}
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Nombre del Equipo *</Label>
-                  <Input
-                    value={newTeam.name}
-                    onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
-                    placeholder="Ej: Deportivo Central"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Foto del Equipo (JPG o PNG) *</Label>
-                  <div className="flex gap-2">
+                <div data-team-form className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Nombre del Equipo *</Label>
                     <Input
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png"
-                      onChange={handleTeamLogoUpload}
-                      className="flex-1"
+                      value={newTeam.name}
+                      onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
+                      placeholder="Ej: Deportivo Central"
                     />
-                    <Button variant="outline" size="icon" disabled>
-                      <Upload className="w-4 h-4" />
-                    </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">Selecciona una imagen JPG o PNG desde tu computadora</p>
-                  {newTeam.logo_url && (
-                    <div className="mt-2 w-24 h-24 border border-primary/30 rounded-lg overflow-hidden">
-                      <img
-                        src={newTeam.logo_url || "/placeholder.svg"}
-                        alt="Preview"
-                        className="w-full h-full object-contain bg-white"
-                        onError={(e) => {
-                          e.currentTarget.src = "/placeholder.svg?height=96&width=96"
-                        }}
+
+                  <div className="space-y-2">
+                    <Label>Foto del Equipo (JPG o PNG) {!editingTeam && "*"}</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png"
+                        onChange={handleTeamLogoUpload}
+                        className="flex-1"
                       />
+                      <Button variant="outline" size="icon" disabled>
+                        <Upload className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {editingTeam
+                        ? "Sube una nueva imagen para cambiar el logo actual (opcional)"
+                        : "Selecciona una imagen JPG o PNG desde tu computadora"}
+                    </p>
+                    {newTeam.logo_url && (
+                      <div className="mt-2 w-24 h-24 border border-primary/30 rounded-lg overflow-hidden">
+                        <img
+                          src={newTeam.logo_url || "/placeholder.svg"}
+                          alt="Preview"
+                          className="w-full h-full object-contain bg-white"
+                          onError={(e) => {
+                            e.currentTarget.src = "/placeholder.svg?height=96&width=96"
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add Group selection for new teams */}
+                  {tournamentTab === "libertadores" && (
+                    <div className="space-y-2">
+                      <Label>Grupo</Label>
+                      <Select
+                        value={newTeam.group_id}
+                        onValueChange={(value) => setNewTeam({ ...newTeam, group_id: value === "none" ? "" : value })}
+                        disabled={groups.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar grupo (si aplica)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin grupo asignado</SelectItem>
+                          {groups.map((group) => (
+                            <SelectItem key={group.id} value={group.id.toString()}>
+                              {group.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   )}
-                </div>
 
-                {/* Add Group selection for new teams */}
-                {tournamentTab === "libertadores" && (
-                  <div className="space-y-2">
-                    <Label>Grupo</Label>
-                    <Select
-                      value={newTeam.group_id}
-                      onValueChange={(value) => setNewTeam({ ...newTeam, group_id: value === "none" ? "" : value })}
-                      disabled={groups.length === 0}
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleAddTeam}
+                      className="flex-1 bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
+                      disabled={!newTeam.name.trim() || (!editingTeam && !newTeam.logo_url)}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar grupo (si aplica)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin grupo asignado</SelectItem>
-                        {groups.map((group) => (
-                          <SelectItem key={group.id} value={group.id.toString()}>
-                            {group.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleAddTeam}
-                    className="flex-1 bg-gradient-to-r from-black via-primary to-black hover:from-gray-900 hover:via-primary/90 hover:to-gray-900"
-                    disabled={!newTeam.name.trim() || !newTeam.logo_url}
-                  >
-                    {editingTeam ? (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        Actualizar Equipo
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Agregar Equipo
-                      </>
-                    )}
-                  </Button>
-                  {editingTeam && (
-                    <Button variant="outline" onClick={handleCancelEditTeam}>
-                      <X className="w-4 h-4 mr-2" />
-                      Cancelar
+                      {editingTeam ? (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Actualizar Equipo
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Agregar Equipo
+                        </>
+                      )}
                     </Button>
-                  )}
+                    {editingTeam && (
+                      <Button variant="outline" onClick={handleCancelEditTeam}>
+                        <X className="w-4 h-4 mr-2" />
+                        Cancelar
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-6">

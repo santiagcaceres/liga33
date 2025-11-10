@@ -21,15 +21,23 @@ interface Match {
   cards?: Array<{ player_id: number; players: { name: string }; card_type: string; team_id: number }>
 }
 
+interface ByeWeek {
+  id: number
+  team: { name: string; logo_url: string }
+  round: number
+}
+
 export default function LeagueFixtures() {
   const [matches, setMatches] = useState<Match[]>([])
+  const [byeWeeks, setByeWeeks] = useState<ByeWeek[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const loadMatches = async () => {
+    const loadData = async () => {
       const supabase = createClient()
 
-      const { data, error } = await supabase
+      // Load matches
+      const { data: matchData, error: matchError } = await supabase
         .from("matches")
         .select(
           `
@@ -41,8 +49,8 @@ export default function LeagueFixtures() {
           played,
           home_score,
           away_score,
-          home_team:teams!matches_home_team_id_fkey(name, logo_url, tournament_id),
-          away_team:teams!matches_away_team_id_fkey(name, logo_url, tournament_id),
+          home_team:teams!matches_home_team_id_fkey(name, logo_url),
+          away_team:teams!matches_away_team_id_fkey(name, logo_url),
           goals(player_id, team_id, players(name)),
           cards(player_id, team_id, card_type, players(name))
         `,
@@ -51,15 +59,30 @@ export default function LeagueFixtures() {
         .order("match_date", { ascending: false })
         .order("round", { ascending: false })
 
-      if (error) {
-        console.error("[v0] Error loading matches:", error)
+      if (matchError) {
+        console.error("[v0] Error loading matches:", matchError)
       }
 
-      setMatches(data || [])
+      const { data: byeData, error: byeError } = await supabase
+        .from("bye_weeks")
+        .select(`
+          id,
+          round,
+          team:teams(name, logo_url)
+        `)
+        .eq("tournament_id", 2)
+        .order("round", { ascending: false })
+
+      if (byeError) {
+        console.error("[v0] Error loading bye weeks:", byeError)
+      }
+
+      setMatches(matchData || [])
+      setByeWeeks(byeData || [])
       setLoading(false)
     }
 
-    loadMatches()
+    loadData()
   }, [])
 
   const groupGoalsByPlayer = (goals: Match["goals"], teamId: number) => {
@@ -86,7 +109,7 @@ export default function LeagueFixtures() {
     )
   }
 
-  if (matches.length === 0) {
+  if (matches.length === 0 && byeWeeks.length === 0) {
     return (
       <Card className="border-pink-500/30 bg-gradient-to-br from-pink-500/5 to-purple-500/5">
         <CardHeader>
@@ -104,18 +127,25 @@ export default function LeagueFixtures() {
 
   const groupedByRound = matches.reduce(
     (acc, match) => {
-      if (!acc[match.round]) acc[match.round] = []
-      acc[match.round].push(match)
+      if (!acc[match.round]) acc[match.round] = { matches: [], byeWeeks: [] }
+      acc[match.round].matches.push(match)
       return acc
     },
-    {} as Record<number, Match[]>,
+    {} as Record<number, { matches: Match[]; byeWeeks: ByeWeek[] }>,
   )
+
+  byeWeeks.forEach((bye) => {
+    if (!groupedByRound[bye.round]) {
+      groupedByRound[bye.round] = { matches: [], byeWeeks: [] }
+    }
+    groupedByRound[bye.round].byeWeeks.push(bye)
+  })
 
   return (
     <div className="space-y-6">
       {Object.entries(groupedByRound)
         .sort(([a], [b]) => Number(b) - Number(a))
-        .map(([round, roundMatches]) => (
+        .map(([round, { matches: roundMatches, byeWeeks: roundByes }]) => (
           <Card key={round} className="border-pink-500/30 bg-gradient-to-br from-pink-500/5 to-purple-500/5">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-pink-500">
@@ -125,6 +155,28 @@ export default function LeagueFixtures() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {roundByes.map((bye) => (
+                  <div
+                    key={bye.id}
+                    className="p-4 rounded-lg border border-pink-500/30 bg-gradient-to-r from-pink-500/10 to-purple-500/5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={bye.team.logo_url || "/placeholder.svg"}
+                        alt={bye.team.name}
+                        className="w-12 h-12 object-contain"
+                      />
+                      <div>
+                        <span className="font-semibold text-white text-lg">{bye.team.name}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge className="bg-pink-500/20 text-pink-300 border-pink-500/30">Fecha Libre</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Existing matches */}
                 {roundMatches.map((match) => {
                   const homeGoals = groupGoalsByPlayer(match.goals, match.home_team.id)
                   const awayGoals = groupGoalsByPlayer(match.goals, match.away_team.id)
