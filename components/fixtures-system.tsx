@@ -23,7 +23,11 @@ interface Match {
   status?: string
 }
 
-export default function FixturesSystem() {
+interface FixturesSystemProps {
+  competition?: "libertadores" | "femenina"
+}
+
+export default function FixturesSystem({ competition }: FixturesSystemProps) {
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -38,7 +42,20 @@ export default function FixturesSystem() {
 
       console.log("[v0] Filtering matches from:", todayISO)
 
-      const { data, error } = await supabase
+      let groupsQuery = supabase.from("copa_groups").select("id, name")
+
+      if (competition === "libertadores") {
+        groupsQuery = groupsQuery.ilike("name", "%Grupo%")
+      } else if (competition === "femenina") {
+        groupsQuery = groupsQuery.eq("name", "SuperLiga Femenina")
+      }
+
+      const { data: groupsData } = await groupsQuery
+      const groupIds = groupsData?.map((g) => g.id) || []
+
+      console.log("[v0] Loading matches for groups:", groupIds)
+
+      let matchesQuery = supabase
         .from("matches")
         .select(
           `
@@ -50,6 +67,7 @@ export default function FixturesSystem() {
           played,
           home_score,
           away_score,
+          group_id,
           home_team:teams!matches_home_team_id_fkey(name, logo_url),
           away_team:teams!matches_away_team_id_fkey(name, logo_url),
           copa_groups(name),
@@ -60,6 +78,12 @@ export default function FixturesSystem() {
         )
         .order("match_date", { ascending: false })
         .order("round", { ascending: false })
+
+      if (groupIds.length > 0) {
+        matchesQuery = matchesQuery.in("group_id", groupIds)
+      }
+
+      const { data, error } = await matchesQuery
 
       if (error) {
         console.error("[v0] Error loading matches:", error)
@@ -72,7 +96,7 @@ export default function FixturesSystem() {
     }
 
     loadMatches()
-  }, [])
+  }, [competition])
 
   if (loading) {
     return (

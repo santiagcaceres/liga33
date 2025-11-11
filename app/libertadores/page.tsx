@@ -224,7 +224,7 @@ export default function LibertadoresPage() {
       {activeSection === "fixtures" && (
         <section className="py-8 md:py-12">
           <div className="container mx-auto px-4">
-            <FixturesSystem />
+            <FixturesSystem competition="libertadores" />
           </div>
         </section>
       )}

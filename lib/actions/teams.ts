@@ -16,25 +16,63 @@ export async function createTeam(formData: FormData) {
     name,
     logo_url,
     tournament_id,
-    logoFile: logoFile ? `File: ${logoFile.name}, Size: ${logoFile.size}` : "null",
+    logoFile: logoFile ? `File: ${logoFile.name}, Size: ${logoFile.size}, Type: ${logoFile.type}` : "null",
   })
   console.log("[v0] tournament_id type:", typeof tournament_id)
   console.log("[v0] tournament_id parsed:", Number.parseInt(tournament_id))
 
   if (logoFile && logoFile.size > 0) {
     console.log("[v0] Processing logo file upload...")
+    console.log("[v0] File details:", {
+      name: logoFile.name,
+      size: logoFile.size,
+      type: logoFile.type,
+      lastModified: logoFile.lastModified,
+    })
+
     try {
+      // Check if bucket exists
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
+
+      if (bucketsError) {
+        console.error("[v0] ❌ Error listing buckets:", bucketsError)
+      } else {
+        console.log(
+          "[v0] Available buckets:",
+          buckets?.map((b) => b.name),
+        )
+        const bucketExists = buckets?.some((b) => b.name === "team-logos")
+
+        if (!bucketExists) {
+          console.log("[v0] ⚠️ Bucket 'team-logos' does not exist. Creating it...")
+          const { data: newBucket, error: createError } = await supabase.storage.createBucket("team-logos", {
+            public: true,
+            fileSizeLimit: 5242880, // 5MB
+          })
+
+          if (createError) {
+            console.error("[v0] ❌ Error creating bucket:", createError)
+          } else {
+            console.log("[v0] ✅ Bucket 'team-logos' created successfully")
+          }
+        } else {
+          console.log("[v0] ✅ Bucket 'team-logos' already exists")
+        }
+      }
+
       const fileExt = logoFile.name.split(".").pop()
       const fileName = `team-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-      const filePath = `team-logos/${fileName}`
+      const filePath = `${fileName}`
 
       console.log("[v0] Uploading to path:", filePath)
+      console.log("[v0] File extension:", fileExt)
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("team-logos")
         .upload(filePath, logoFile, {
           cacheControl: "3600",
           upsert: false,
+          contentType: logoFile.type,
         })
 
       if (uploadError) {
@@ -42,6 +80,7 @@ export async function createTeam(formData: FormData) {
         console.error("[v0] Upload error details:", {
           message: uploadError.message,
           name: uploadError.name,
+          cause: uploadError.cause,
         })
       } else {
         console.log("[v0] ✅ Logo uploaded successfully:", uploadData)
@@ -49,11 +88,13 @@ export async function createTeam(formData: FormData) {
         const { data: urlData } = supabase.storage.from("team-logos").getPublicUrl(filePath)
 
         logo_url = urlData.publicUrl
-        console.log("[v0] Public URL generated:", logo_url)
+        console.log("[v0] ✅ Public URL generated:", logo_url)
       }
     } catch (uploadError) {
       console.error("[v0] ❌ Exception during logo upload:", uploadError)
     }
+  } else {
+    console.log("[v0] ⚠️ No logo file provided or file is empty")
   }
 
   if (!name || !name.trim()) {
@@ -127,23 +168,61 @@ export async function updateTeam(id: number, formData: FormData) {
     name,
     logo_url,
     tournament_id,
-    logoFile: logoFile ? `File: ${logoFile.name}, Size: ${logoFile.size}` : "null",
+    logoFile: logoFile ? `File: ${logoFile.name}, Size: ${logoFile.size}, Type: ${logoFile.type}` : "null",
   })
 
   if (logoFile && logoFile.size > 0) {
     console.log("[v0] Processing logo file upload for update...")
+    console.log("[v0] File details:", {
+      name: logoFile.name,
+      size: logoFile.size,
+      type: logoFile.type,
+      lastModified: logoFile.lastModified,
+    })
+
     try {
+      // Check if bucket exists
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
+
+      if (bucketsError) {
+        console.error("[v0] ❌ Error listing buckets:", bucketsError)
+      } else {
+        console.log(
+          "[v0] Available buckets:",
+          buckets?.map((b) => b.name),
+        )
+        const bucketExists = buckets?.some((b) => b.name === "team-logos")
+
+        if (!bucketExists) {
+          console.log("[v0] ⚠️ Bucket 'team-logos' does not exist. Creating it...")
+          const { data: newBucket, error: createError } = await supabase.storage.createBucket("team-logos", {
+            public: true,
+            fileSizeLimit: 5242880, // 5MB
+          })
+
+          if (createError) {
+            console.error("[v0] ❌ Error creating bucket:", createError)
+          } else {
+            console.log("[v0] ✅ Bucket 'team-logos' created successfully")
+          }
+        } else {
+          console.log("[v0] ✅ Bucket 'team-logos' already exists")
+        }
+      }
+
       const fileExt = logoFile.name.split(".").pop()
       const fileName = `team-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-      const filePath = `team-logos/${fileName}`
+      const filePath = `${fileName}`
 
       console.log("[v0] Uploading to path:", filePath)
+      console.log("[v0] File extension:", fileExt)
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("team-logos")
         .upload(filePath, logoFile, {
           cacheControl: "3600",
           upsert: false,
+          contentType: logoFile.type,
         })
 
       if (uploadError) {
@@ -154,13 +233,13 @@ export async function updateTeam(id: number, formData: FormData) {
         const { data: urlData } = supabase.storage.from("team-logos").getPublicUrl(filePath)
 
         logo_url = urlData.publicUrl
-        console.log("[v0] Public URL generated:", logo_url)
+        console.log("[v0] ✅ Public URL generated:", logo_url)
       }
     } catch (uploadError) {
       console.error("[v0] ❌ Exception during logo upload:", uploadError)
     }
   } else {
-    console.log("[v0] No new logo file provided, keeping existing logo_url:", logo_url)
+    console.log("[v0] ⚠️ No new logo file provided, keeping existing logo_url:", logo_url)
   }
 
   const updateData: any = {
