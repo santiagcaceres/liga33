@@ -20,7 +20,6 @@ interface Match {
   copa_groups: { name: string }
   goals?: Array<{ player_id: number; players: { name: string }; team_id: number }>
   cards?: Array<{ player_id: number; players: { name: string }; card_type: string; team_id: number }>
-  status?: string
 }
 
 interface FixturesSystemProps {
@@ -35,12 +34,6 @@ export default function FixturesSystem({ competition }: FixturesSystemProps) {
     const loadMatches = async () => {
       console.log("[v0] Loading matches for fixtures...")
       const supabase = createClient()
-
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const todayISO = today.toISOString().split("T")[0]
-
-      console.log("[v0] Filtering matches from:", todayISO)
 
       let matchesQuery = supabase
         .from("matches")
@@ -60,8 +53,7 @@ export default function FixturesSystem({ competition }: FixturesSystemProps) {
           away_team:teams!matches_away_team_id_fkey(name, logo_url),
           copa_groups(name),
           goals(player_id, team_id, players(name)),
-          cards(player_id, team_id, card_type, players(name)),
-          status
+          cards(player_id, team_id, card_type, players(name))
         `,
         )
         .order("match_date", { ascending: false })
@@ -209,7 +201,7 @@ export default function FixturesSystem({ competition }: FixturesSystemProps) {
                                 )}
                               </div>
 
-                              {match.status === "played" && (match.goals?.length > 0 || match.cards?.length > 0) && (
+                              {(match.goals?.length > 0 || match.cards?.length > 0) && (
                                 <div className="mt-3 pt-3 border-t border-primary/20 space-y-2 text-sm">
                                   {match.goals && match.goals.length > 0 && (
                                     <div className="flex items-start gap-2">
