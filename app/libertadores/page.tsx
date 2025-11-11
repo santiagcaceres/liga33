@@ -208,7 +208,7 @@ export default function LibertadoresPage() {
       {activeSection === "equipos" && (
         <section className="py-8 md:py-12">
           <div className="container mx-auto px-4">
-            <TeamsRoster />
+            <TeamsRoster tournament_id={1} />
           </div>
         </section>
       )}

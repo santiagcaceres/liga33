@@ -154,6 +154,19 @@ export async function getTeams() {
   return data || []
 }
 
+export async function getTeamsByTournament(tournament_id: number) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.from("teams").select("*").eq("tournament_id", tournament_id).order("name")
+
+  if (error) {
+    console.error("[v0] Error fetching teams by tournament:", error)
+    return []
+  }
+
+  return data || []
+}
+
 export async function updateTeam(id: number, formData: FormData) {
   const supabase = await createClient()
 

@@ -45,12 +45,17 @@ export default function FixturesSystem({ competition }: FixturesSystemProps) {
       let groupsQuery = supabase.from("copa_groups").select("id, name")
 
       if (competition === "libertadores") {
-        groupsQuery = groupsQuery.ilike("name", "%Grupo%")
+        groupsQuery = groupsQuery.eq("tournament_id", 1)
       } else if (competition === "femenina") {
-        groupsQuery = groupsQuery.eq("name", "SuperLiga Femenina")
+        groupsQuery = groupsQuery.eq("tournament_id", 2)
       }
 
-      const { data: groupsData } = await groupsQuery
+      const { data: groupsData, error: groupsError } = await groupsQuery
+
+      if (groupsError) {
+        console.error("[v0] Error loading groups:", groupsError)
+      }
+
       const groupIds = groupsData?.map((g) => g.id) || []
 
       console.log("[v0] Loading matches for groups:", groupIds)

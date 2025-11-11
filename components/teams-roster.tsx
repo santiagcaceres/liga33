@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Users, AlertCircle } from "lucide-react"
-import { getTeams } from "@/lib/actions/teams"
+import { getTeamsByTournament } from "@/lib/actions/teams"
 import { getPlayers } from "@/lib/actions/players"
 
 interface Player {
@@ -27,7 +27,11 @@ interface Team {
   logo_url?: string
 }
 
-export default function TeamsRoster() {
+interface TeamsRosterProps {
+  tournament_id?: number
+}
+
+export default function TeamsRoster({ tournament_id }: TeamsRosterProps) {
   const [selectedTeam, setSelectedTeam] = useState("")
   const [teams, setTeams] = useState<Team[]>([])
   const [players, setPlayers] = useState<Player[]>([])
@@ -35,12 +39,13 @@ export default function TeamsRoster() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [tournament_id])
 
   const loadData = async () => {
     setIsLoading(true)
     try {
-      const [teamsData, playersData] = await Promise.all([getTeams(), getPlayers()])
+      const teamsData = tournament_id ? await getTeamsByTournament(tournament_id) : []
+      const playersData = await getPlayers()
       setTeams(teamsData)
       setPlayers(playersData)
     } catch (error) {
