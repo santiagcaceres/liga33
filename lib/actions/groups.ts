@@ -134,6 +134,29 @@ export async function getGroupStandings() {
   return data || []
 }
 
+export async function getStandingsByTournament(tournamentId: number) {
+  console.log("[v0] 🔍 Getting standings for tournament:", tournamentId)
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("team_groups")
+    .select(`
+      *,
+      teams!inner(id, name, tournament_id),
+      copa_groups(id, name)
+    `)
+    .eq("teams.tournament_id", tournamentId)
+    .order("points", { ascending: false })
+
+  if (error) {
+    console.error("[v0] ❌ Error fetching standings for tournament:", error)
+    return []
+  }
+
+  console.log("[v0] ✅ Fetched standings for tournament:", data?.length || 0, "records")
+  return data || []
+}
+
 export async function deleteGroup(groupId: number) {
   const supabase = await createClient()
 

@@ -30,11 +30,11 @@ import {
   Edit,
   X,
 } from "lucide-react"
-import { createTeam, deleteTeam, updateTeam } from "@/lib/actions/teams" // Import updateTeam
-import { createPlayer, deletePlayer } from "@/lib/actions/players"
+import { createTeam, deleteTeam, updateTeam, getTeams } from "@/lib/actions/teams" // Import updateTeam
+import { createPlayer, deletePlayer, getPlayersByTournament, updatePlayer } from "@/lib/actions/players"
 import { createNews, getNews, deleteNews } from "@/lib/actions/news"
 import { useToast } from "@/hooks/use-toast"
-import { createMatch, deleteMatch, updateMatchResult } from "@/lib/actions/matches" // Import match actions
+import { createMatch, deleteMatch, updateMatchResult, getMatches } from "@/lib/actions/matches" // Import match actions
 import MatchDetailsDisplay from "@/components/match-details-display" // Fixed import to match kebab-case filename
 import { createClient } from "@/lib/supabase/client" // Fixed import path from utils to lib
 import { getTournaments } from "@/lib/actions/tournaments"
@@ -49,6 +49,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { createByeWeek, getByeWeeks, deleteByeWeek } from "@/lib/actions/bye-weeks"
+import {
+  getGroups,
+  getStandingsByTournament,
+  assignTeamToGroup,
+  removeTeamFromGroup,
+  createGroup,
+  deleteGroup,
+} from "@/lib/actions/groups"
 
 interface Match {
   id: number
@@ -77,7 +85,7 @@ interface Team {
   name: string
   coach: string
   logo_url?: string // Added logo_url to Team interface
-  group_id?: string // Added group_id to Team interface
+  group_id?: string | number | null // Added group_id to Team interface, allow null
   tournament_id: number // Added tournament_id to Team interface
 }
 
@@ -100,6 +108,7 @@ interface News {
   content: string
   image_url?: string // Changed from image to image_url
   published_date?: string // Changed from date to published_date
+  tournament_id?: number // Added tournament_id to News interface
 }
 
 export default function AdminDashboard() {
@@ -111,7 +120,7 @@ export default function AdminDashboard() {
 
   const [selectedTournament, setSelectedTournament] = useState<number>(1) // Default: Copa Libertadores
   const [tournaments, setTournaments] = useState<any[]>([])
-  const [tournamentTab, setTournamentTab] = useState<string>("libertadores") // 'libertadores' o 'femenino'
+  const [tournamentTab, setTournamentTab] = useState<"libertadores" | "femenino">("libertadores") // 'libertadores' o 'femenino'
 
   const [showTournamentDialog, setShowTournamentDialog] = useState(false)
   const [pendingTournamentTab, setPendingTournamentTab] = useState<"libertadores" | "femenino">("libertadores")
@@ -196,17 +205,13 @@ export default function AdminDashboard() {
     round: "",
   })
 
-  const handleTournamentChange = (value: string) => {
-    setPendingTournamentTab(value as "libertadores" | "femenino")
-    setShowTournamentDialog(true)
-  }
-
-  const confirmTournamentChange = () => {
+  const confirmTournamentChange = async () => {
     console.log("[v0] ============ TOURNAMENT CHANGE START ============")
     console.log("[v0] Changing from", tournamentTab, "to", pendingTournamentTab)
 
-    setTournamentTab(pendingTournamentTab)
-    setSelectedTournament(pendingTournamentTab === "libertadores" ? 1 : 2)
+    const newTournamentTab = pendingTournamentTab
+    const newTournamentId = pendingTournamentTab === "libertadores" ? 1 : 2
+
     setShowTournamentDialog(false)
 
     console.log("[v0] Resetting all state...")
@@ -237,13 +242,60 @@ export default function AdminDashboard() {
     setNewsList([])
     setGroups([])
     setGroupStandings([])
-
-    // Reset bye week state
-    setNewByeWeek({ team_id: "", round: "" })
     setByeWeeks([])
 
-    console.log("[v0] State reset complete")
-    console.log("[v0] ============ TOURNAMENT CHANGE END ============")
+    console.log("[v0] State reset complete. Now setting tournament and reloading...")
+
+    setTournamentTab(newTournamentTab)
+    setSelectedTournament(newTournamentId)
+
+    try {
+      console.log("[v0] Starting fresh data load for tournament:", newTournamentId)
+
+      // Set loading states
+      setIsLoadingTeams(true)
+      setIsLoadingPlayers(true)
+
+      // Load teams first
+      const teamsResult = await getTeams(newTournamentId)
+      console.log("[v0] Loaded teams after tournament change:", teamsResult)
+      setTeams(teamsResult)
+      setIsLoadingTeams(false)
+
+      // Load players with new tournament
+      const playersResult = await getPlayersByTournament(newTournamentId)
+      console.log("[v0] Loaded players after tournament change:", playersResult)
+      setPlayers(playersResult)
+      setIsLoadingPlayers(false)
+
+      // Load other data
+      const matchesResult = await getMatches()
+      const matchesForTournament = matchesResult.filter((m: any) => m.tournament_id === newTournamentId)
+      console.log("[v0] Loaded matches after tournament change:", matchesForTournament)
+      setMatches(matchesForTournament)
+
+      const newsResult = await getNews()
+      const newsForTournament = newsResult.filter((n: any) => n.tournament_id === newTournamentId)
+      setNewsList(newsForTournament)
+
+      // Load tournament-specific data
+      if (newTournamentTab === "libertadores") {
+        const groupsResult = await getGroups()
+        setGroups(groupsResult)
+        const standingsResult = await getStandingsByTournament(newTournamentId)
+        setGroupStandings(standingsResult)
+      } else {
+        // Load bye weeks for femenina
+        const byeWeeksResult = await getByeWeeks(newTournamentId)
+        setByeWeeks(byeWeeksResult)
+      }
+
+      console.log("[v0] ============ TOURNAMENT CHANGE COMPLETE ============")
+    } catch (error) {
+      console.error("[v0] Error loading data after tournament change:", error)
+      setIsLoadingTeams(false)
+      setIsLoadingPlayers(false)
+    }
 
     toast({
       title: "Torneo cambiado",
@@ -299,8 +351,8 @@ export default function AdminDashboard() {
       console.log("[v0] ============ LOADING TEAMS START ============")
       console.log("[v0] Current selectedTournament:", selectedTournament)
 
-      const { getTeams } = await import("@/lib/actions/teams")
-      const allTeams = await getTeams()
+      // const { getTeams } = await import("@/lib/actions/teams") // Already imported
+      const allTeams = await getTeams() // Fetch all teams
 
       console.log("[v0] All teams fetched from DB:", allTeams)
       console.log("[v0] Total teams:", allTeams.length)
@@ -331,7 +383,7 @@ export default function AdminDashboard() {
       console.log("[v0] ============ LOADING PLAYERS START ============")
       console.log("[v0] Current selectedTournament:", selectedTournament)
 
-      const { getPlayersByTournament } = await import("@/lib/actions/players")
+      // const { getPlayersByTournament } = await import("@/lib/actions/players") // Already imported
       const filteredPlayers = await getPlayersByTournament(selectedTournament)
 
       console.log("[v0] Players loaded for tournament", selectedTournament, ":", filteredPlayers.length)
@@ -363,20 +415,10 @@ export default function AdminDashboard() {
   const loadMatches = async () => {
     setIsLoadingMatches(true)
     try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("matches")
-        .select(`
-          *,
-          home_team:teams!matches_home_team_id_fkey(name, id),
-          away_team:teams!matches_away_team_id_fkey(name, id),
-          copa_groups(name, id)
-        `)
-        .eq("tournament_id", selectedTournament)
-        .order("match_date")
-
-      if (error) throw error
-      setMatches(data || [])
+      // const { getMatches } = await import("@/lib/actions/matches") // Already imported
+      const allMatches = await getMatches()
+      const filteredMatches = allMatches.filter((m: any) => m.tournament_id === selectedTournament)
+      setMatches(filteredMatches || [])
     } catch (error) {
       console.error("[v0] Error loading matches:", error)
       toast({
@@ -389,6 +431,7 @@ export default function AdminDashboard() {
     }
   }
 
+  // Effect to load data when tournament changes or user is authenticated
   useEffect(() => {
     if (isAuthenticated && selectedTournament) {
       const loadDataSequentially = async () => {
@@ -432,7 +475,8 @@ export default function AdminDashboard() {
     setIsLoadingNews(true)
     try {
       const data = await getNews() // Assuming getNews is available and fetches news
-      setNewsList(data)
+      const filteredNews = data.filter((n: any) => n.tournament_id === selectedTournament)
+      setNewsList(filteredNews)
     } catch (error) {
       console.error("[v0] Error loading news:", error)
       toast({
@@ -451,6 +495,7 @@ export default function AdminDashboard() {
     }
   }, [activeTab])
 
+  // Effect to load bye weeks specifically for the Femenina tournament
   useEffect(() => {
     if (selectedTournament === 2) {
       // Only for femenina
@@ -550,10 +595,11 @@ export default function AdminDashboard() {
   const loadGroups = async () => {
     setIsLoadingGroups(true)
     try {
-      const { getGroups, getGroupStandings } = await import("@/lib/actions/groups")
+      // const { getGroups, getGroupStandings } = await import("@/lib/actions/groups") // Already imported
       const groupsData = await getGroups()
-      const standingsData = await getGroupStandings()
       setGroups(groupsData)
+
+      const standingsData = await getStandingsByTournament(selectedTournament) // Filter standings by tournament
       setGroupStandings(standingsData)
     } catch (error) {
       console.error("[v0] Error loading groups:", error)
@@ -584,20 +630,23 @@ export default function AdminDashboard() {
     setPassword("")
   }
 
+  // This effect might be redundant given the main useEffect listening to selectedTournament and tournamentTab.
+  // However, it ensures data is loaded if isAuthenticated becomes true while already on a specific tournament tab.
   useEffect(() => {
     if (isAuthenticated && selectedTournament) {
       loadTeams()
       loadPlayers()
-      loadGroups()
+      if (tournamentTab === "libertadores") {
+        loadGroups()
+      } else {
+        loadByeWeeks() // Load bye weeks for Femenina
+      }
       loadNews()
       loadMatches()
-      // Load bye weeks if selected tournament is Femenina
-      if (selectedTournament === 2) {
-        loadByeWeeks()
-      }
     }
-  }, [isAuthenticated, selectedTournament])
+  }, [isAuthenticated, selectedTournament, tournamentTab]) // Added tournamentTab as dependency
 
+  // Effect to reset match-specific states when a new match is selected
   useEffect(() => {
     if (selectedMatchId !== null) {
       setHomeScore("")
@@ -935,7 +984,8 @@ export default function AdminDashboard() {
       return
     }
 
-    if (!teamLogoFile && !newTeam.logo_url && !editingTeam) {
+    // Logo is required only for new teams
+    if (!editingTeam && !teamLogoFile && !newTeam.logo_url) {
       toast({
         title: "⚠️ Campo incompleto",
         description: "Por favor sube una foto del equipo",
@@ -1024,7 +1074,7 @@ export default function AdminDashboard() {
     setNewTeam({
       name: team.name,
       logo_url: team.logo_url || "",
-      group_id: team.group_id?.toString() || "",
+      group_id: team.group_id?.toString() || "", // Ensure group_id is string or empty
     })
     setTeamLogoFile(null) // Reset file, keep existing logo_url
 
@@ -1056,8 +1106,8 @@ export default function AdminDashboard() {
     }
 
     try {
-      const { createGroup } = await import("@/lib/actions/groups")
-      await createGroup(newGroupName.trim())
+      // const { createGroup } = await import("@/lib/actions/groups") // Already imported
+      await createGroup(newGroupName.trim(), selectedTournament) // Pass tournament_id
 
       toast({
         title: "¡Grupo creado exitosamente!",
@@ -1088,7 +1138,7 @@ export default function AdminDashboard() {
     }
 
     try {
-      const { assignTeamToGroup } = await import("@/lib/actions/groups")
+      // const { assignTeamToGroup } = await import("@/lib/actions/groups") // Already imported
       await assignTeamToGroup(Number.parseInt(selectedTeamForAssignment), Number.parseInt(selectedGroupForAssignment))
 
       const teamName = teams.find((t) => t.id === Number.parseInt(selectedTeamForAssignment))?.name
@@ -1120,7 +1170,7 @@ export default function AdminDashboard() {
     }
 
     try {
-      const { removeTeamFromGroup } = await import("@/lib/actions/groups")
+      // const { removeTeamFromGroup } = await import("@/lib/actions/groups") // Already imported
       await removeTeamFromGroup(teamId)
 
       toast({
@@ -1150,7 +1200,7 @@ export default function AdminDashboard() {
     }
 
     try {
-      const { deleteGroup } = await import("@/lib/actions/groups")
+      // const { deleteGroup } = await import("@/lib/actions/groups") // Already imported
       await deleteGroup(groupId)
 
       toast({
@@ -1326,7 +1376,7 @@ export default function AdminDashboard() {
         console.log(`  ${key}: ${value}`)
       }
 
-      const { updatePlayer } = await import("@/lib/actions/players")
+      // const { updatePlayer } = await import("@/lib/actions/players") // Already imported
       const result = await updatePlayer(editingPlayer.id, formData)
 
       console.log("[v0] DEBUG - Update result:", result)
@@ -1382,7 +1432,7 @@ export default function AdminDashboard() {
       const formData = new FormData()
       formData.append("title", newNews.title.trim())
       formData.append("content", newNews.content.trim())
-      formData.append("image_url", newNews.image)
+      formData.append("image_url", newNews.image) // Use image_url field for the base64 string
       formData.append("published_date", newNews.date)
       formData.append("tournament_id", selectedTournament.toString()) // Add tournament_id
 
@@ -1727,6 +1777,13 @@ export default function AdminDashboard() {
         variant: "destructive",
       })
     }
+  }
+
+  const handleTournamentChange = (value: string) => {
+    console.log("[v0] ============ HANDLE TOURNAMENT CHANGE ============")
+    console.log("[v0] Value received:", value)
+    setPendingTournamentTab(value as "libertadores" | "femenino")
+    setShowTournamentDialog(true)
   }
 
   if (!isAuthenticated) {
@@ -2383,10 +2440,30 @@ export default function AdminDashboard() {
                     <div className="space-y-3">
                       {/* Group matches by round */}
                       {Array.from(new Set(matches.map((m) => m.round)))
-                        .sort((a, b) => a - b)
+                        .sort((a, b) => {
+                          // Custom sort for "cuartos", "semi", "final" to come after numbers
+                          const order = ["cuartos", "semi", "final"]
+                          if (typeof a === "number" && typeof b === "number") return a - b
+                          if (typeof a === "number" && order.includes(b as string)) return -1
+                          if (order.includes(a as string) && typeof b === "number") return 1
+                          if (typeof a === "string" && typeof b === "string") {
+                            const indexA = order.indexOf(a)
+                            const indexB = order.indexOf(b)
+                            if (indexA !== -1 && indexB !== -1) return indexA - indexB
+                          }
+                          return 0 // Default sort if types are mixed or not in order
+                        })
                         .map((round) => (
                           <div key={round} className="space-y-2">
-                            <h4 className="font-semibold text-sm text-primary">Fecha {round}</h4>
+                            <h4 className="font-semibold text-sm text-primary">
+                              {round === "cuartos"
+                                ? "Cuartos de Final"
+                                : round === "semi"
+                                  ? "Semifinales"
+                                  : round === "final"
+                                    ? "Final"
+                                    : `Fecha ${round}`}
+                            </h4>
                             <div className="grid gap-2">
                               {matches
                                 .filter((m) => m.round === round)
@@ -2410,9 +2487,9 @@ export default function AdminDashboard() {
                                           </div>
                                           <p className="text-sm text-muted-foreground">
                                             {new Date(match.match_date).toLocaleDateString("es-ES", {
-                                              weekday: "long",
+                                              weekday: "short",
                                               year: "numeric",
-                                              month: "long",
+                                              month: "short",
                                               day: "numeric",
                                             })}
                                           </p>
@@ -2476,7 +2553,19 @@ export default function AdminDashboard() {
                       <Label className="text-base font-semibold">Seleccionar Fecha</Label>
                       <div className="flex flex-wrap gap-2">
                         {Array.from(new Set(matches.map((m) => m.round)))
-                          .sort((a, b) => a - b)
+                          .sort((a, b) => {
+                            // Custom sort for "cuartos", "semi", "final" to come after numbers
+                            const order = ["cuartos", "semi", "final"]
+                            if (typeof a === "number" && typeof b === "number") return a - b
+                            if (typeof a === "number" && order.includes(b as string)) return -1
+                            if (order.includes(a as string) && typeof b === "number") return 1
+                            if (typeof a === "string" && typeof b === "string") {
+                              const indexA = order.indexOf(a)
+                              const indexB = order.indexOf(b)
+                              if (indexA !== -1 && indexB !== -1) return indexA - indexB
+                            }
+                            return 0 // Default sort if types are mixed or not in order
+                          })
                           .map((round) => (
                             <Button
                               key={round}
@@ -2491,51 +2580,15 @@ export default function AdminDashboard() {
                                 setSelectedMatchId(null)
                               }}
                             >
-                              Fecha {round}
+                              {round === "cuartos"
+                                ? "Cuartos de Final"
+                                : round === "semi"
+                                  ? "Semifinales"
+                                  : round === "final"
+                                    ? "Final"
+                                    : `Fecha ${round}`}
                             </Button>
                           ))}
-                        <Button
-                          variant={selectedRound === "cuartos" ? "default" : "outline"}
-                          className={
-                            selectedRound === "cuartos"
-                              ? "bg-gradient-to-r from-primary to-primary/80"
-                              : "border-primary/30"
-                          }
-                          onClick={() => {
-                            setSelectedRound("cuartos")
-                            setSelectedMatchId(null)
-                          }}
-                        >
-                          Cuartos de Final
-                        </Button>
-                        <Button
-                          variant={selectedRound === "semi" ? "default" : "outline"}
-                          className={
-                            selectedRound === "semi"
-                              ? "bg-gradient-to-r from-primary to-primary/80"
-                              : "border-primary/30"
-                          }
-                          onClick={() => {
-                            setSelectedRound("semi")
-                            setSelectedMatchId(null)
-                          }}
-                        >
-                          Semifinales
-                        </Button>
-                        <Button
-                          variant={selectedRound === "final" ? "default" : "outline"}
-                          className={
-                            selectedRound === "final"
-                              ? "bg-gradient-to-r from-primary to-primary/80"
-                              : "border-primary/30"
-                          }
-                          onClick={() => {
-                            setSelectedRound("final")
-                            setSelectedMatchId(null)
-                          }}
-                        >
-                          Final
-                        </Button>
                       </div>
                     </div>
 
@@ -2572,7 +2625,12 @@ export default function AdminDashboard() {
                                         )}
                                       </div>
                                       <span className="text-xs opacity-80">
-                                        {new Date(match.match_date).toLocaleDateString("es-ES")}
+                                        {new Date(match.match_date).toLocaleDateString("es-ES", {
+                                          weekday: "short",
+                                          year: "numeric",
+                                          month: "short",
+                                          day: "numeric",
+                                        })}
                                       </span>
                                     </div>
                                   </Button>
@@ -3168,7 +3226,8 @@ export default function AdminDashboard() {
                                 {team.group_id && tournamentTab === "libertadores" && (
                                   <p className="text-sm text-muted-foreground">
                                     Grupo:{" "}
-                                    {groups.find((g) => g.id.toString() === team.group_id)?.name || "Desconocido"}
+                                    {groups.find((g) => g.id.toString() === team.group_id?.toString())?.name ||
+                                      "Desconocido"}
                                   </p>
                                 )}
                               </div>
@@ -3445,8 +3504,8 @@ export default function AdminDashboard() {
                 Cambiar de Torneo
               </span>
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-300 space-y-3 pt-2">
-              <div>
+            <div className="space-y-3 pt-2">
+              <AlertDialogDescription className="text-gray-300">
                 Estás a punto de cambiar de{" "}
                 <span className={`font-bold ${tournamentTab === "libertadores" ? "text-primary" : "text-pink-500"}`}>
                   {tournamentTab === "libertadores" ? "Copa Libertadores" : "SuperLiga Femenina"}
@@ -3457,7 +3516,7 @@ export default function AdminDashboard() {
                 >
                   {pendingTournamentTab === "libertadores" ? "Copa Libertadores" : "SuperLiga Femenina"}
                 </span>
-              </div>
+              </AlertDialogDescription>
 
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-2">
                 <AlertCircle className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
@@ -3470,7 +3529,7 @@ export default function AdminDashboard() {
                   </ul>
                 </div>
               </div>
-            </AlertDialogDescription>
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel
