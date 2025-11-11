@@ -202,12 +202,18 @@ export default function AdminDashboard() {
   }
 
   const confirmTournamentChange = () => {
+    console.log("[v0] ============ TOURNAMENT CHANGE START ============")
+    console.log("[v0] Changing from", tournamentTab, "to", pendingTournamentTab)
+
     setTournamentTab(pendingTournamentTab)
     setSelectedTournament(pendingTournamentTab === "libertadores" ? 1 : 2)
     setShowTournamentDialog(false)
 
-    // Reset all forms and selections
-    setNewTeam({ name: "", logo_url: "", group_id: "" }) // Ensure group_id is reset
+    console.log("[v0] Resetting all state...")
+
+    // Reset form states
+    setNewTeam({ name: "", logo_url: "", group_id: "" })
+    setTeamLogoFile(null)
     setNewPlayer({ name: "", cedula: "", team_id: "", number: "" })
     setNewMatch({
       group_id: "",
@@ -218,11 +224,26 @@ export default function AdminDashboard() {
       round: "",
       field: "",
     })
+
+    // Reset selections
     setSelectedMatchId(null)
     setEditingPlayer(null)
     setEditingTeam(null)
-    // Reset bye week state when changing tournament
+    setSelectedGroupForMatch("")
+
+    setTeams([])
+    setPlayers([])
+    setMatches([])
+    setNewsList([])
+    setGroups([])
+    setGroupStandings([])
+
+    // Reset bye week state
     setNewByeWeek({ team_id: "", round: "" })
+    setByeWeeks([])
+
+    console.log("[v0] State reset complete")
+    console.log("[v0] ============ TOURNAMENT CHANGE END ============")
 
     toast({
       title: "Torneo cambiado",
@@ -375,15 +396,28 @@ export default function AdminDashboard() {
         console.log("[v0] Selected tournament:", selectedTournament)
         console.log("[v0] Tournament tab:", tournamentTab)
 
+        console.log("[v0] Clearing existing data arrays...")
+        setTeams([])
+        setPlayers([])
+        setMatches([])
+        setNewsList([])
+
         // Load teams first
+        console.log("[v0] Loading teams...")
         await loadTeams()
 
         // Load groups if Libertadores
         if (tournamentTab === "libertadores") {
+          console.log("[v0] Loading groups for Libertadores...")
           await loadGroups()
+        } else {
+          console.log("[v0] Clearing groups data for Femenina...")
+          setGroups([])
+          setGroupStandings([])
         }
 
         // Then load players and matches (they depend on teams being loaded)
+        console.log("[v0] Loading players and matches in parallel...")
         await Promise.all([loadPlayers(), loadMatches()])
 
         console.log("[v0] ============ DATA LOADING COMPLETE ============")
@@ -853,8 +887,16 @@ export default function AdminDashboard() {
   const handleTeamLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      console.log("[v0] ============ TEAM LOGO UPLOAD ============")
+      console.log("[v0] File selected:", {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      })
+
       // Validate file type
       if (!file.type.startsWith("image/")) {
+        console.log("[v0] ❌ Invalid file type:", file.type)
         toast({
           title: "❌ Archivo inválido",
           description: "Por favor selecciona una imagen JPG o PNG",
@@ -864,8 +906,11 @@ export default function AdminDashboard() {
       }
 
       setTeamLogoFile(file)
+      console.log("[v0] ✅ Logo file stored in state")
+
       const reader = new FileReader()
       reader.onloadend = () => {
+        console.log("[v0] ✅ Logo preview generated")
         setNewTeam({ ...newTeam, logo_url: reader.result as string })
       }
       reader.readAsDataURL(file)
@@ -873,9 +918,10 @@ export default function AdminDashboard() {
   }
 
   const handleAddTeam = async () => {
+    console.log("[v0] ============ HANDLE ADD TEAM START ============")
     console.log("[v0] handleAddTeam called with:", {
       newTeam,
-      teamLogoFile,
+      teamLogoFile: teamLogoFile ? `File: ${teamLogoFile.name}` : "null",
       selectedTournament,
       editingTeam,
     })
@@ -888,7 +934,7 @@ export default function AdminDashboard() {
       })
       return
     }
-    // Modified condition: logo is only required if not editing
+
     if (!teamLogoFile && !newTeam.logo_url && !editingTeam) {
       toast({
         title: "⚠️ Campo incompleto",
@@ -903,29 +949,35 @@ export default function AdminDashboard() {
       formData.append("name", newTeam.name.trim())
 
       if (teamLogoFile) {
-        formData.append("logo", teamLogoFile) // Assuming backend expects 'logo' for file upload
+        console.log("[v0] Adding new logo file to FormData")
+        formData.append("logo", teamLogoFile)
+      } else if (editingTeam && editingTeam.logo_url) {
+        console.log("[v0] Preserving existing logo_url:", editingTeam.logo_url)
+        formData.append("logo_url", editingTeam.logo_url)
       } else if (newTeam.logo_url) {
-        formData.append("logo_url", newTeam.logo_url) // Fallback if no file is selected but logo_url exists
+        console.log("[v0] Using logo_url from state")
+        formData.append("logo_url", newTeam.logo_url)
       }
 
       // Append group_id only if it's not empty and tournament is Libertadores
       if (tournamentTab === "libertadores" && newTeam.group_id) {
         formData.append("group_id", newTeam.group_id)
       }
-      // </CHANGE> Adding tournament_id to formData
+
       formData.append("tournament_id", selectedTournament.toString())
 
-      console.log("[v0] ============ ADMIN CREATE TEAM ============")
-      console.log("[v0] Current tournament:", selectedTournament)
-      console.log("[v0] Tournament tab:", tournamentTab)
       console.log("[v0] FormData contents:")
       for (const [key, value] of formData.entries()) {
-        console.log(`[v0]   ${key}: ${value}`)
+        if (key === "logo" && value instanceof File) {
+          console.log(`[v0]   ${key}: File(${value.name}, ${value.size} bytes)`)
+        } else {
+          console.log(`[v0]   ${key}:`, value)
+        }
       }
 
       if (editingTeam) {
         console.log("[v0] Updating team:", editingTeam.id)
-        await updateTeam(editingTeam.id, formData) // Pass formData to updateTeam
+        await updateTeam(editingTeam.id, formData)
         toast({
           title: "✅ ¡Equipo actualizado exitosamente!",
           description: `${newTeam.name} ha sido actualizado`,
@@ -934,7 +986,7 @@ export default function AdminDashboard() {
         setEditingTeam(null)
       } else {
         console.log("[v0] Creating new team...")
-        const result = await createTeam(formData) // Pass formData to createTeam
+        const result = await createTeam(formData)
         console.log("[v0] createTeam result:", result)
         toast({
           title: "✅ ¡Equipo creado exitosamente!",
@@ -943,24 +995,25 @@ export default function AdminDashboard() {
         })
       }
 
-      setNewTeam({ name: "", logo_url: "", group_id: "" }) // Reset group_id
+      setNewTeam({ name: "", logo_url: "", group_id: "" })
       setTeamLogoFile(null)
 
       console.log("[v0] Reloading teams...")
       await loadTeams()
-      console.log("[v0] ============ ADMIN CREATE TEAM END ============")
-    } catch (error) {
+
+      document.querySelector("[data-teams-list]")?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+
+      console.log("[v0] ✅ Team operation completed successfully")
+    } catch (error: any) {
       console.error("[v0] ❌ Error creating/updating team:", error)
-      console.error("[v0] Error details:", {
-        message: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined,
-      })
+      console.error("[v0] Error details:", error.message)
       toast({
-        title: `❌ Error al ${editingTeam ? "actualizar" : "crear"} equipo`,
-        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
+        title: "❌ Error",
+        description: error.message || "No se pudo guardar el equipo",
         variant: "destructive",
       })
     }
+    console.log("[v0] ============ HANDLE ADD TEAM END ============")
   }
 
   const handleEditTeam = (team: Team) => {
@@ -3105,7 +3158,7 @@ export default function AdminDashboard() {
                       <p className="text-sm">Agrega equipos usando el formulario de arriba</p>
                     </div>
                   ) : (
-                    <div className="grid gap-3">
+                    <div className="grid gap-3" data-teams-list>
                       {teams.map((team) => (
                         <Card key={team.id} className="border-primary/30">
                           <CardContent className="p-4">

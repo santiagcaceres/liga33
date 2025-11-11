@@ -159,11 +159,16 @@ export async function updateTeam(id: number, formData: FormData) {
     } catch (uploadError) {
       console.error("[v0] ❌ Exception during logo upload:", uploadError)
     }
+  } else {
+    console.log("[v0] No new logo file provided, keeping existing logo_url:", logo_url)
   }
 
-  const updateData: { name: string; logo_url: string; tournament_id?: number } = {
+  const updateData: any = {
     name,
-    logo_url,
+  }
+
+  if (logo_url) {
+    updateData.logo_url = logo_url
   }
 
   if (tournament_id) {
