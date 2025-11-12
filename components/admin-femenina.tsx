@@ -1364,20 +1364,24 @@ export default function AdminFemenina() {
                             {match.home_team?.name} vs {match.away_team?.name}
                           </p>
                           <p className="text-sm text-gray-400">
-                            {match.played ? `Resultado: ${match.home_score} - ${match.away_score}` : "Por jugar"}
+                            {match.played ? `Resultado: ${match.home_score} - ${match.away_score}` : "VS"}
                           </p>
                           <p className="text-xs text-gray-500">
                             Fecha {match.round} - {match.match_date}
                             {match.field && ` - ${match.field}`}
                           </p>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => loadMatchDetails(match)}
-                          className="bg-pink-600 hover:bg-pink-700"
-                        >
-                          {match.played ? "Editar" : "Asignar"} Resultado
-                        </Button>
+                        {!match.played ? (
+                          <Button
+                            size="sm"
+                            onClick={() => loadMatchDetails(match)}
+                            className="bg-pink-600 hover:bg-pink-700"
+                          >
+                            Asignar Resultado
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-gray-500 italic">Resultado ya asignado</span>
+                        )}
                       </div>
                     </div>
                   ))

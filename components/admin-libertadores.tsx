@@ -1353,20 +1353,24 @@ export default function AdminLibertadores() {
                             {match.home_team?.name} vs {match.away_team?.name}
                           </p>
                           <p className="text-sm text-gray-400">
-                            {match.played ? `Resultado: ${match.home_score} - ${match.away_score}` : "Por jugar"}
+                            {match.played ? `Resultado: ${match.home_score} - ${match.away_score}` : "VS"}
                           </p>
                           <p className="text-xs text-gray-500">
                             Fecha {match.round} - Grupo {match.copa_groups?.name} - {match.match_date}
                             {match.field && ` - ${match.field}`}
                           </p>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => loadMatchDetails(match)}
-                          className="bg-yellow-600 hover:bg-yellow-700"
-                        >
-                          {match.played ? "Editar" : "Asignar"} Resultado
-                        </Button>
+                        {!match.played ? (
+                          <Button
+                            size="sm"
+                            onClick={() => loadMatchDetails(match)}
+                            className="bg-yellow-600 hover:bg-yellow-700"
+                          >
+                            Asignar Resultado
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-gray-500 italic">Resultado ya asignado</span>
+                        )}
                       </div>
                     </div>
                   ))
