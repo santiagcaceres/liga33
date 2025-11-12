@@ -57,6 +57,9 @@ export default function AdminLibertadores() {
 
   const loadAllData = async () => {
     setIsLoading(true)
+    console.log("[v0] 🚀 Admin Libertadores: Loading all data in parallel...")
+    const startTime = Date.now()
+
     try {
       const [teamsData, playersData, matchesData, groupsData] = await Promise.all([
         getTeamsByTournament(TOURNAMENT_ID),
@@ -69,6 +72,9 @@ export default function AdminLibertadores() {
       setPlayers(playersData)
       setMatches(matchesData)
       setGroups(groupsData)
+
+      const endTime = Date.now()
+      console.log(`[v0] ✅ Admin Libertadores data loaded in ${endTime - startTime}ms`)
     } catch (error) {
       console.error("[v0] Error loading data:", error)
       toast({
@@ -1177,6 +1183,85 @@ export default function AdminLibertadores() {
 
                       <form onSubmit={handleAddCard} className="grid grid-cols-3 gap-2">
                         <input type="hidden" name="card_type" value="yellow" />
+                        <Select name="team_id" required>
+                          <SelectTrigger className="bg-gray-800 border-gray-700">
+                            <SelectValue placeholder="Equipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={selectedMatch.home_team_id.toString()}>
+                              {selectedMatch.home_team?.name}
+                            </SelectItem>
+                            <SelectItem value={selectedMatch.away_team_id.toString()}>
+                              {selectedMatch.away_team?.name}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select name="player_id" required>
+                          <SelectTrigger className="bg-gray-800 border-gray-700">
+                            <SelectValue placeholder="Jugador" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <div className="px-2 py-1 text-xs font-semibold text-yellow-500">
+                              {selectedMatch.home_team?.name}
+                            </div>
+                            {homeTeamPlayers.map((player: any) => (
+                              <SelectItem key={player.id} value={player.id.toString()}>
+                                {player.name} (#{player.number})
+                              </SelectItem>
+                            ))}
+                            <div className="px-2 py-1 text-xs font-semibold text-yellow-500 border-t">
+                              {selectedMatch.away_team?.name}
+                            </div>
+                            {awayTeamPlayers.map((player: any) => (
+                              <SelectItem key={player.id} value={player.id.toString()}>
+                                {player.name} (#{player.number})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex gap-1">
+                          <Input
+                            name="minute"
+                            type="number"
+                            min="0"
+                            max="120"
+                            placeholder="Min"
+                            className="bg-gray-800 border-gray-700"
+                          />
+                          <Button type="submit" size="sm" className="bg-yellow-600 hover:bg-yellow-700">
+                            +
+                          </Button>
+                        </div>
+                      </form>
+                    </div>
+
+                    <div className="border-t border-gray-700 pt-4">
+                      <h4 className="text-lg font-semibold text-yellow-500 mb-3">
+                        Tarjetas Rojas ({localCards.filter((c) => c.card_type === "red").length})
+                      </h4>
+                      {localCards.filter((c: any) => c.card_type === "red").length > 0 && (
+                        <div className="mb-4 space-y-2">
+                          {localCards
+                            .filter((c: any) => c.card_type === "red")
+                            .map((card: any) => (
+                              <div key={card.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
+                                <span className="text-sm text-white">
+                                  {card.players?.name} - Min {card.minute || "?"}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleRemoveCard(card.id)}
+                                  className="text-red-500 hover:text-red-400"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                      <form onSubmit={handleAddCard} className="grid grid-cols-3 gap-2">
+                        <input type="hidden" name="card_type" value="red" />
                         <Select name="team_id" required>
                           <SelectTrigger className="bg-gray-800 border-gray-700">
                             <SelectValue placeholder="Equipo" />

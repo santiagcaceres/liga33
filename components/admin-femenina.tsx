@@ -72,6 +72,9 @@ export default function AdminFemenina() {
 
   const loadAllData = async () => {
     setIsLoading(true)
+    console.log("[v0] 🚀 Admin Femenina: Loading all data in parallel...")
+    const startTime = Date.now()
+
     try {
       const [teamsData, playersData, matchesData, byeWeeksData] = await Promise.all([
         getTeamsByTournament(TOURNAMENT_ID),
@@ -84,6 +87,9 @@ export default function AdminFemenina() {
       setPlayers(playersData)
       setMatches(matchesData)
       setByeWeeks(byeWeeksData)
+
+      const endTime = Date.now()
+      console.log(`[v0] ✅ Admin Femenina data loaded in ${endTime - startTime}ms`)
     } catch (error) {
       console.error("[v0] Error loading data:", error)
       toast({
