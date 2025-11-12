@@ -1380,7 +1380,17 @@ export default function AdminFemenina() {
                             Asignar Resultado
                           </Button>
                         ) : (
-                          <span className="text-xs text-gray-500 italic">Resultado ya asignado</span>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => loadMatchDetails(match)}
+                              className="border-pink-500/50 text-pink-500"
+                            >
+                              <Pencil className="w-4 h-4 mr-1" />
+                              Editar
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>

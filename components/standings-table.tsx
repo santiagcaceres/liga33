@@ -10,6 +10,7 @@ import Image from "next/image"
 interface Team {
   pos: number
   team: string
+  team_id: number // Added team_id for filtering players
   logo_url: string | null
   pts: number
   pj: number
@@ -22,8 +23,16 @@ interface Team {
   group_name: string
 }
 
+interface SuspendedPlayer {
+  name: string
+  team_name: string
+  team_id: number
+  red_cards: number
+}
+
 export default function StandingsTable() {
   const [teamsData, setTeamsData] = useState<Team[]>([])
+  const [suspendedPlayers, setSuspendedPlayers] = useState<SuspendedPlayer[]>([]) // Added state for suspended players
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,32 +42,47 @@ export default function StandingsTable() {
   const loadStandings = async () => {
     const supabase = createClient()
 
-    const { data: teamGroups, error } = await supabase
-      .from("team_groups")
-      .select(`
-        *,
-        teams (
+    const [standingsResult, suspendedResult] = await Promise.all([
+      supabase
+        .from("team_groups")
+        .select(`
+          *,
+          teams (
+            id,
+            name,
+            logo_url
+          ),
+          copa_groups (
+            name
+          )
+        `)
+        .order("points", { ascending: false })
+        .order("goal_difference", { ascending: false })
+        .order("goals_for", { ascending: false }),
+      supabase
+        .from("players")
+        .select(`
           name,
-          logo_url
-        ),
-        copa_groups (
-          name
-        )
-      `)
-      .order("points", { ascending: false })
-      .order("goal_difference", { ascending: false })
-      .order("goals_for", { ascending: false })
+          red_cards,
+          suspended,
+          teams!inner(
+            id,
+            name,
+            tournament_id
+          )
+        `)
+        .eq("teams.tournament_id", 1) // Only Libertadores
+        .gt("red_cards", 0)
+        .order("red_cards", { ascending: false }),
+    ])
 
-    if (error) {
-      console.error("[v0] Error loading standings:", error)
-      setLoading(false)
-      return
-    }
-
-    if (teamGroups) {
-      const formattedTeams: Team[] = teamGroups.map((tg: any, index: number) => ({
+    if (standingsResult.error) {
+      console.error("[v0] Error loading standings:", standingsResult.error)
+    } else if (standingsResult.data) {
+      const formattedTeams: Team[] = standingsResult.data.map((tg: any, index: number) => ({
         pos: index + 1,
         team: tg.teams?.name || "Equipo sin nombre",
+        team_id: tg.teams?.id || 0,
         logo_url: tg.teams?.logo_url || null,
         pts: tg.points || 0,
         pj: tg.played || 0,
@@ -70,8 +94,19 @@ export default function StandingsTable() {
         dif: tg.goal_difference || 0,
         group_name: tg.copa_groups?.name || "Sin grupo",
       }))
-
       setTeamsData(formattedTeams)
+    }
+
+    if (suspendedResult.error) {
+      console.error("[v0] Error loading suspended players:", suspendedResult.error)
+    } else if (suspendedResult.data) {
+      const suspended: SuspendedPlayer[] = suspendedResult.data.map((p: any) => ({
+        name: p.name,
+        team_name: p.teams.name,
+        team_id: p.teams.id,
+        red_cards: p.red_cards,
+      }))
+      setSuspendedPlayers(suspended)
     }
 
     setLoading(false)
@@ -115,6 +150,33 @@ export default function StandingsTable() {
         </div>
       </CardHeader>
       <CardContent>
+        {suspendedPlayers.length > 0 && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <h4 className="text-lg font-semibold text-red-700 mb-3 flex items-center gap-2">⚠️ Jugadores Suspendidos</h4>
+            <div className="space-y-2">
+              {suspendedPlayers.map((player, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-2 bg-white rounded border border-red-100"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      {player.red_cards}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">{player.name}</p>
+                      <p className="text-sm text-gray-600">{player.team_name}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-red-600 font-medium px-2 py-1 bg-red-100 rounded">
+                    Se pierde el siguiente partido
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Desktop Table */}
         <div className="hidden lg:block overflow-x-auto">
           <table className="w-full">

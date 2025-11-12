@@ -22,31 +22,56 @@ interface Standing {
   points: number
 }
 
+interface SuspendedPlayer {
+  name: string
+  team_name: string
+  team_id: number
+  red_cards: number
+}
+
 export default function LeagueStandings() {
   const [standings, setStandings] = useState<Standing[]>([])
+  const [suspendedPlayers, setSuspendedPlayers] = useState<SuspendedPlayer[]>([]) // Added state for suspended players
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const loadStandings = async () => {
       const supabase = createClient()
 
-      const { data, error } = await supabase
-        .from("league_standings")
-        .select(
-          `
+      const [standingsResult, suspendedResult] = await Promise.all([
+        supabase
+          .from("league_standings")
+          .select(
+            `
           *,
           teams!inner(id, name, logo_url, tournament_id)
         `,
-        )
-        .eq("teams.tournament_id", 2)
-        .order("points", { ascending: false })
-        .order("goal_difference", { ascending: false })
-        .order("goals_for", { ascending: false })
+          )
+          .eq("teams.tournament_id", 2)
+          .order("points", { ascending: false })
+          .order("goal_difference", { ascending: false })
+          .order("goals_for", { ascending: false }),
+        supabase
+          .from("players")
+          .select(`
+            name,
+            red_cards,
+            suspended,
+            teams!inner(
+              id,
+              name,
+              tournament_id
+            )
+          `)
+          .eq("teams.tournament_id", 2) // Only Femenina
+          .gt("red_cards", 0)
+          .order("red_cards", { ascending: false }),
+      ])
 
-      if (error) {
-        console.error("[v0] Error loading standings:", error)
+      if (standingsResult.error) {
+        console.error("[v0] Error loading standings:", standingsResult.error)
       } else {
-        const formattedData = data?.map((item: any, index: number) => ({
+        const formattedData = standingsResult.data?.map((item: any, index: number) => ({
           position: index + 1,
           team: {
             id: item.teams.id,
@@ -63,6 +88,18 @@ export default function LeagueStandings() {
           points: item.points,
         }))
         setStandings(formattedData || [])
+      }
+
+      if (suspendedResult.error) {
+        console.error("[v0] Error loading suspended players:", suspendedResult.error)
+      } else if (suspendedResult.data) {
+        const suspended: SuspendedPlayer[] = suspendedResult.data.map((p: any) => ({
+          name: p.name,
+          team_name: p.teams.name,
+          team_id: p.teams.id,
+          red_cards: p.red_cards,
+        }))
+        setSuspendedPlayers(suspended)
       }
 
       setLoading(false)
@@ -108,6 +145,33 @@ export default function LeagueStandings() {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {suspendedPlayers.length > 0 && (
+          <div className="mb-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
+            <h4 className="text-lg font-semibold text-red-400 mb-3 flex items-center gap-2">⚠️ Jugadoras Suspendidas</h4>
+            <div className="space-y-2">
+              {suspendedPlayers.map((player, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-2 bg-gray-800/50 rounded border border-red-500/20"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      {player.red_cards}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-white">{player.name}</p>
+                      <p className="text-sm text-gray-400">{player.team_name}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-red-400 font-medium px-2 py-1 bg-red-900/30 rounded">
+                    Se pierde el siguiente partido
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Desktop view */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
