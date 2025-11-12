@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 
 interface Player {
   id: number
@@ -25,6 +27,7 @@ interface Team {
 export default function LeagueTeamsRoster() {
   const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("all")
 
   useEffect(() => {
     const loadTeams = async () => {
@@ -64,6 +67,8 @@ export default function LeagueTeamsRoster() {
     loadTeams()
   }, [])
 
+  const filteredTeams = selectedTeamId === "all" ? teams : teams.filter((team) => team.id.toString() === selectedTeamId)
+
   if (loading) {
     return (
       <Card className="border-pink-500/30 bg-gradient-to-br from-pink-500/5 to-purple-500/5">
@@ -92,7 +97,30 @@ export default function LeagueTeamsRoster() {
 
   return (
     <div className="space-y-6">
-      {teams.map((team) => (
+      <Card className="border-pink-500/30 bg-gradient-to-br from-pink-500/5 to-purple-500/5">
+        <CardContent className="p-4">
+          <div>
+            <Label htmlFor="team-filter" className="text-pink-500 mb-2 block">
+              Filtrar por Equipo
+            </Label>
+            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+              <SelectTrigger id="team-filter" className="bg-gray-800 border-gray-700">
+                <SelectValue placeholder="Todos los equipos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los equipos</SelectItem>
+                {teams.map((team) => (
+                  <SelectItem key={team.id} value={team.id.toString()}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {filteredTeams.map((team) => (
         <Card key={team.id} className="border-pink-500/30 bg-gradient-to-br from-pink-500/5 to-purple-500/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-3">

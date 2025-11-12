@@ -191,6 +191,17 @@ export async function updateMatchResult(
 
     console.log("[v0] Starting updateMatchResult:", { matchId, homeScore, awayScore, goals, cards })
 
+    const { data: match, error: matchFetchError } = await supabase
+      .from("matches")
+      .select("home_team_id, away_team_id, home_score, away_score, group_id, tournament_id")
+      .eq("id", matchId)
+      .single()
+
+    if (matchFetchError || !match) {
+      console.error("[v0] Error fetching match:", matchFetchError)
+      return { success: false, error: "Match not found" }
+    }
+
     const { error: matchError } = await supabase
       .from("matches")
       .update({
@@ -353,21 +364,20 @@ export async function updateMatchResult(
       }
     }
 
-    const { data: match } = await supabase
-      .from("matches")
-      .select("home_team_id, away_team_id, home_score, away_score, group_id")
-      .eq("id", matchId)
-      .single()
-
-    if (match) {
-      console.log("[v0] Updating team standings for match:", match)
-      await updateTeamStandings(
+    if (match.tournament_id === 2) {
+      // Women's tournament uses league_standings
+      console.log("[v0] Updating league_standings for women's tournament")
+      await updateLeagueStandingsForMatch(
         match.home_team_id,
         match.away_team_id,
-        match.home_score,
-        match.away_score,
-        match.group_id,
+        homeScore,
+        awayScore,
+        match.tournament_id,
       )
+    } else if (match.group_id) {
+      // Libertadores uses team_groups
+      console.log("[v0] Updating team_groups for Libertadores")
+      await updateTeamStandings(match.home_team_id, match.away_team_id, homeScore, awayScore, match.group_id)
     }
 
     revalidatePath("/")
@@ -472,6 +482,120 @@ async function updateTeamStandings(
     .update(awayUpdates)
     .eq("team_id", awayTeamId)
     .eq("group_id", groupId)
+
+  if (awayUpdateError) {
+    console.error("[v0] Error updating away team standing:", awayUpdateError)
+  } else {
+    console.log("[v0] Away team standing updated successfully")
+  }
+}
+
+async function updateLeagueStandingsForMatch(
+  homeTeamId: number,
+  awayTeamId: number,
+  homeScore: number,
+  awayScore: number,
+  tournamentId: number,
+) {
+  const supabase = await createClient()
+
+  console.log("[v0] Starting updateLeagueStandingsForMatch:", {
+    homeTeamId,
+    awayTeamId,
+    homeScore,
+    awayScore,
+    tournamentId,
+  })
+
+  // Get current standings for both teams
+  const { data: homeStanding, error: homeError } = await supabase
+    .from("league_standings")
+    .select("*")
+    .eq("team_id", homeTeamId)
+    .eq("tournament_id", tournamentId)
+    .single()
+
+  if (homeError) {
+    console.error("[v0] Error fetching home team standing:", homeError)
+  }
+  console.log("[v0] Home team standing:", homeStanding)
+
+  const { data: awayStanding, error: awayError } = await supabase
+    .from("league_standings")
+    .select("*")
+    .eq("team_id", awayTeamId)
+    .eq("tournament_id", tournamentId)
+    .single()
+
+  if (awayError) {
+    console.error("[v0] Error fetching away team standing:", awayError)
+  }
+  console.log("[v0] Away team standing:", awayStanding)
+
+  if (!homeStanding || !awayStanding) {
+    console.error("[v0] Missing team standings - cannot update")
+    return
+  }
+
+  // Calculate updates for home team
+  const homeUpdates: any = {
+    played: homeStanding.played + 1,
+    goals_for: homeStanding.goals_for + homeScore,
+    goals_against: homeStanding.goals_against + awayScore,
+  }
+
+  // Calculate updates for away team
+  const awayUpdates: any = {
+    played: awayStanding.played + 1,
+    goals_for: awayStanding.goals_for + awayScore,
+    goals_against: awayStanding.goals_against + homeScore,
+  }
+
+  // Determine match result and update points
+  if (homeScore > awayScore) {
+    homeUpdates.won = homeStanding.won + 1
+    homeUpdates.points = homeStanding.points + 3
+    awayUpdates.lost = awayStanding.lost + 1
+    console.log("[v0] Home team wins")
+  } else if (homeScore < awayScore) {
+    awayUpdates.won = awayStanding.won + 1
+    awayUpdates.points = awayStanding.points + 3
+    homeUpdates.lost = homeStanding.lost + 1
+    console.log("[v0] Away team wins")
+  } else {
+    homeUpdates.drawn = homeStanding.drawn + 1
+    homeUpdates.points = homeStanding.points + 1
+    awayUpdates.drawn = awayStanding.drawn + 1
+    awayUpdates.points = awayStanding.points + 1
+    console.log("[v0] Draw")
+  }
+
+  // Calculate goal difference
+  homeUpdates.goal_difference = homeUpdates.goals_for - homeUpdates.goals_against
+  awayUpdates.goal_difference = awayUpdates.goals_for - awayUpdates.goals_against
+
+  console.log("[v0] Home team updates:", homeUpdates)
+  console.log("[v0] Away team updates:", awayUpdates)
+
+  // Update home team standing
+  const { error: homeUpdateError } = await supabase
+    .from("league_standings")
+    .update(homeUpdates)
+    .eq("team_id", homeTeamId)
+    .eq("tournament_id", tournamentId)
+
+  if (homeUpdateError) {
+    console.error("[v0] Error updating home team standing:", homeUpdateError)
+  } else {
+    console.log("[v0] Home team standing updated successfully")
+  }
+
+  // Update away team standing
+  const { error: awayUpdateError } = await supabase
+    .from("league_standings")
+    .update(awayUpdates)
+    .eq("team_id", awayTeamId)
+    .eq("tournament_id", tournamentId)
 
   if (awayUpdateError) {
     console.error("[v0] Error updating away team standing:", awayUpdateError)
