@@ -135,6 +135,35 @@ export async function getMatches(groupId?: number, round?: number) {
   return data || []
 }
 
+export async function getMatchesByTournament(tournamentId: number) {
+  console.log("[v0] ============ GET MATCHES BY TOURNAMENT START ============")
+  console.log("[v0] Tournament ID:", tournamentId)
+
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("matches")
+    .select(`
+      *,
+      home_team:teams!matches_home_team_id_fkey(id, name, logo_url),
+      away_team:teams!matches_away_team_id_fkey(id, name, logo_url),
+      copa_groups(id, name)
+    `)
+    .eq("tournament_id", tournamentId)
+    .order("match_date", { ascending: false })
+    .order("round", { ascending: false })
+
+  if (error) {
+    console.error("[v0] ❌ Error fetching matches by tournament:", error)
+    return []
+  }
+
+  console.log("[v0] ✅ Matches fetched for tournament", tournamentId, ":", data?.length || 0, "matches")
+  console.log("[v0] ============ GET MATCHES BY TOURNAMENT END ============")
+
+  return data || []
+}
+
 export async function updateMatchResult(
   matchId: number,
   homeScore: number,

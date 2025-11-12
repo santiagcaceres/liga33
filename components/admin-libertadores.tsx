@@ -1,1053 +1,863 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
+import Link from "next/link"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Trophy, Users, UserPlus, Calendar, Plus, Pencil, Trash2, Eye } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { Trash2, Plus, Users, Calendar, Trophy, Settings, Eye, EyeOff, ImageIcon } from "lucide-react"
-import { getTeams, addTeam, deleteTeam } from "@/lib/actions/teams"
-import { getPlayersByTournament, addPlayer, deletePlayer } from "@/lib/actions/players"
-import { getMatches, addMatch, deleteMatch, updateMatchResult } from "@/lib/actions/matches"
-import { getNews, addNews, deleteNews } from "@/lib/actions/news"
-import { getGroups, addGroup, deleteGroup, getGroupStandings } from "@/lib/actions/groups"
-import { generateDraw } from "@/lib/actions/draw"
-import { Textarea } from "@/components/ui/textarea"
-import Link from "next/link"
-
-const TOURNAMENT_ID = 1 // Copa Libertadores
+import { getTeamsByTournament, createTeam, updateTeam, deleteTeam } from "@/lib/actions/teams"
+import { getPlayersByTournament, createPlayer, updatePlayer, deletePlayer } from "@/lib/actions/players"
+import { getMatchesByTournament, createMatch, updateMatchResult } from "@/lib/actions/matches"
+import { getGroupsByTournament, getTeamsByGroup } from "@/lib/actions/groups"
 
 export default function AdminLibertadores() {
   const { toast } = useToast()
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
+  const TOURNAMENT_ID = 1 // Copa Libertadores
 
-  // State
   const [teams, setTeams] = useState<any[]>([])
   const [players, setPlayers] = useState<any[]>([])
   const [matches, setMatches] = useState<any[]>([])
-  const [newsList, setNewsList] = useState<any[]>([])
   const [groups, setGroups] = useState<any[]>([])
-  const [groupStandings, setGroupStandings] = useState<any[]>([])
-  const [byeWeeks, setByeWeeks] = useState<any[]>([])
 
-  const [isLoadingTeams, setIsLoadingTeams] = useState(false)
-  const [isLoadingPlayers, setIsLoadingPlayers] = useState(false)
-  const [isLoadingMatches, setIsLoadingMatches] = useState(false)
-  const [isLoadingNews, setIsLoadingNews] = useState(false)
+  const [showTeamForm, setShowTeamForm] = useState(false)
+  const [showPlayerForm, setShowPlayerForm] = useState(false)
+  const [showMatchForm, setShowMatchForm] = useState(false)
+  const [showResultForm, setShowResultForm] = useState(false)
 
-  const [selectedRound, setSelectedRound] = useState("1")
-  const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
+  const [viewMode, setViewMode] = useState<"all" | "group" | "round">("all")
+  const [selectedGroup, setSelectedGroup] = useState<number | null>(null)
+  const [selectedRound, setSelectedRound] = useState<number | null>(null)
 
-  const [showDrawConfirm, setShowDrawConfirm] = useState(false)
-  const [showResultConfirm, setShowResultConfirm] = useState(false)
-  const [showDraw, setShowDraw] = useState(false)
-  const [drawResults, setDrawResults] = useState<string[]>([])
-
-  // Forms
-  const [newTeam, setNewTeam] = useState({ name: "", logo_url: "" })
-  const [newPlayer, setNewPlayer] = useState({ name: "", team_id: "", position: "", number: "" })
-  const [newMatch, setNewMatch] = useState({
-    home_team_id: "",
-    away_team_id: "",
-    match_date: "",
-    match_time: "",
-    field: "",
-    round: "1",
-    group_id: "",
-  })
-  const [matchResult, setMatchResult] = useState({ match_id: "", home_score: "", away_score: "" })
-  const [newNewsItem, setNewNewsItem] = useState({ title: "", content: "", image_url: "" })
-  const [newGroup, setNewGroup] = useState({ name: "" })
-
-  // Auth
-  const handleLogin = () => {
-    if (password === "admin123") {
-      setIsAuthenticated(true)
-      toast({ title: "Acceso concedido", description: "Bienvenido al panel de administración de Copa Libertadores" })
-    } else {
-      toast({ title: "Error", description: "Contraseña incorrecta", variant: "destructive" })
-    }
-  }
-
-  // Load data
-  const loadTeams = async () => {
-    setIsLoadingTeams(true)
-    try {
-      const allTeams = await getTeams()
-      const filteredTeams = allTeams.filter((team) => team.tournament_id === TOURNAMENT_ID)
-      setTeams(filteredTeams)
-    } catch (error) {
-      console.error("Error loading teams:", error)
-      toast({ title: "Error", description: "No se pudieron cargar los equipos", variant: "destructive" })
-    } finally {
-      setIsLoadingTeams(false)
-    }
-  }
-
-  const loadPlayers = async () => {
-    setIsLoadingPlayers(true)
-    try {
-      const filteredPlayers = await getPlayersByTournament(TOURNAMENT_ID)
-      setPlayers(filteredPlayers)
-    } catch (error) {
-      console.error("Error loading players:", error)
-      toast({ title: "Error", description: "No se pudieron cargar los jugadores", variant: "destructive" })
-    } finally {
-      setIsLoadingPlayers(false)
-    }
-  }
-
-  const loadMatches = async () => {
-    setIsLoadingMatches(true)
-    try {
-      const allMatches = await getMatches()
-      const filteredMatches = allMatches.filter((m: any) => m.tournament_id === TOURNAMENT_ID)
-      setMatches(filteredMatches || [])
-    } catch (error) {
-      console.error("Error loading matches:", error)
-      toast({ title: "Error", description: "No se pudieron cargar los partidos", variant: "destructive" })
-    } finally {
-      setIsLoadingMatches(false)
-    }
-  }
-
-  const loadNews = async () => {
-    setIsLoadingNews(true)
-    try {
-      const newsResult = await getNews()
-      const newsForTournament = newsResult.filter((n: any) => n.tournament_id === TOURNAMENT_ID)
-      setNewsList(newsForTournament)
-    } catch (error) {
-      console.error("Error loading news:", error)
-      toast({ title: "Error", description: "No se pudieron cargar las noticias", variant: "destructive" })
-    } finally {
-      setIsLoadingNews(false)
-    }
-  }
-
-  const loadGroups = async () => {
-    try {
-      const groupsResult = await getGroups()
-      const groupsForTournament = groupsResult.filter((g: any) => g.tournament_id === TOURNAMENT_ID)
-      setGroups(groupsForTournament)
-
-      const standingsResult = await getGroupStandings()
-      const standingsForTournament = standingsResult.filter((s: any) => {
-        const group = groupsResult.find((g: any) => g.id === s.group_id)
-        return group && group.tournament_id === TOURNAMENT_ID
-      })
-      setGroupStandings(standingsForTournament)
-    } catch (error) {
-      console.error("Error loading groups:", error)
-      toast({ title: "Error", description: "No se pudieron cargar los grupos", variant: "destructive" })
-    }
-  }
+  const [editingTeam, setEditingTeam] = useState<any>(null)
+  const [editingPlayer, setEditingPlayer] = useState<any>(null)
+  const [selectedMatch, setSelectedMatch] = useState<any>(null)
 
   useEffect(() => {
-    if (isAuthenticated) {
-      loadTeams()
-      loadPlayers()
-      loadMatches()
-      loadGroups()
-    }
-  }, [isAuthenticated])
+    loadAllData()
+  }, [])
 
-  // CRUD operations
-  const handleAddTeam = async () => {
-    if (!newTeam.name) {
-      toast({ title: "Error", description: "El nombre del equipo es requerido", variant: "destructive" })
-      return
-    }
+  const loadAllData = async () => {
     try {
-      await addTeam({ ...newTeam, tournament_id: TOURNAMENT_ID })
-      toast({ title: "Éxito", description: "Equipo agregado correctamente" })
-      setNewTeam({ name: "", logo_url: "" })
-      loadTeams()
+      const [teamsData, playersData, matchesData, groupsData] = await Promise.all([
+        getTeamsByTournament(TOURNAMENT_ID),
+        getPlayersByTournament(TOURNAMENT_ID),
+        getMatchesByTournament(TOURNAMENT_ID),
+        getGroupsByTournament(TOURNAMENT_ID),
+      ])
+
+      setTeams(teamsData)
+      setPlayers(playersData)
+      setMatches(matchesData)
+      setGroups(groupsData)
     } catch (error) {
-      toast({ title: "Error", description: "No se pudo agregar el equipo", variant: "destructive" })
+      console.error("[v0] Error loading data:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleDeleteTeam = async (id: number) => {
+  const handleCreateMatch = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    formData.append("tournament_id", TOURNAMENT_ID.toString())
+
+    try {
+      const result = await createMatch(formData)
+      if (result.success) {
+        toast({ title: "Éxito", description: "Partido creado correctamente" })
+        setShowMatchForm(false)
+        loadAllData()
+      } else {
+        toast({ title: "Error", description: result.error, variant: "destructive" })
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" })
+    }
+  }
+
+  const [teamsInGroup, setTeamsInGroup] = useState<any[]>([])
+  const loadTeamsInGroup = async (groupId: number) => {
+    try {
+      const teamsData = await getTeamsByGroup(groupId)
+      setTeamsInGroup(teamsData)
+    } catch (error) {
+      console.error("[v0] Error loading teams in group:", error)
+    }
+  }
+
+  const filteredMatches = matches.filter((match) => {
+    if (viewMode === "group" && selectedGroup) {
+      return match.group_id === selectedGroup
+    }
+    if (viewMode === "round" && selectedRound) {
+      return match.round === selectedRound
+    }
+    return true
+  })
+
+  const uniqueRounds = Array.from(new Set(matches.map((m) => m.round))).sort((a, b) => a - b)
+
+  async function handleCreateTeam(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    formData.append("tournament_id", TOURNAMENT_ID.toString())
+
+    try {
+      await createTeam(formData)
+      toast({ title: "Éxito", description: "Equipo creado correctamente" })
+      setShowTeamForm(false)
+      loadAllData()
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" })
+    }
+  }
+
+  async function handleUpdateTeam(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!editingTeam) return
+
+    const formData = new FormData(e.currentTarget)
+    formData.append("tournament_id", TOURNAMENT_ID.toString())
+
+    try {
+      await updateTeam(editingTeam.id, formData)
+      toast({ title: "Éxito", description: "Equipo actualizado correctamente" })
+      setEditingTeam(null)
+      loadAllData()
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" })
+    }
+  }
+
+  async function handleDeleteTeam(id: number) {
+    if (!confirm("¿Estás seguro de eliminar este equipo?")) return
+
     try {
       await deleteTeam(id)
       toast({ title: "Éxito", description: "Equipo eliminado correctamente" })
-      loadTeams()
-      loadPlayers()
-    } catch (error) {
-      toast({ title: "Error", description: "No se pudo eliminar el equipo", variant: "destructive" })
+      loadAllData()
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" })
     }
   }
 
-  const handleAddPlayer = async () => {
-    if (!newPlayer.name || !newPlayer.team_id) {
-      toast({ title: "Error", description: "Nombre y equipo son requeridos", variant: "destructive" })
-      return
-    }
+  async function handleCreatePlayer(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    formData.append("tournament_id", TOURNAMENT_ID.toString())
+
     try {
-      await addPlayer({
-        name: newPlayer.name,
-        team_id: Number.parseInt(newPlayer.team_id),
-        position: newPlayer.position,
-        number: newPlayer.number ? Number.parseInt(newPlayer.number) : null,
-      })
-      toast({ title: "Éxito", description: "Jugador agregado correctamente" })
-      setNewPlayer({ name: "", team_id: "", position: "", number: "" })
-      loadPlayers()
-    } catch (error) {
-      toast({ title: "Error", description: "No se pudo agregar el jugador", variant: "destructive" })
+      const result = await createPlayer(formData)
+      if (result.success) {
+        toast({ title: "Éxito", description: "Jugador creado correctamente" })
+        setShowPlayerForm(false)
+        loadAllData()
+      } else {
+        toast({ title: "Error", description: result.error, variant: "destructive" })
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" })
     }
   }
 
-  const handleDeletePlayer = async (id: number) => {
+  async function handleUpdatePlayer(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!editingPlayer) return
+
+    const formData = new FormData(e.currentTarget)
+
+    try {
+      await updatePlayer(editingPlayer.id, formData)
+      toast({ title: "Éxito", description: "Jugador actualizado correctamente" })
+      setEditingPlayer(null)
+      loadAllData()
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" })
+    }
+  }
+
+  async function handleDeletePlayer(id: number) {
+    if (!confirm("¿Estás seguro de eliminar este jugador?")) return
+
     try {
       await deletePlayer(id)
       toast({ title: "Éxito", description: "Jugador eliminado correctamente" })
-      loadPlayers()
-    } catch (error) {
-      toast({ title: "Error", description: "No se pudo eliminar el jugador", variant: "destructive" })
+      loadAllData()
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" })
     }
   }
 
-  const handleAddMatch = async () => {
-    if (!newMatch.home_team_id || !newMatch.away_team_id || !newMatch.match_date || !newMatch.group_id) {
-      toast({ title: "Error", description: "Todos los campos son requeridos", variant: "destructive" })
-      return
-    }
+  async function handleUpdateResult(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!selectedMatch) return
+
+    const formData = new FormData(e.currentTarget)
+    const homeScore = Number.parseInt(formData.get("home_score") as string)
+    const awayScore = Number.parseInt(formData.get("away_score") as string)
+
     try {
-      await addMatch({
-        home_team_id: Number.parseInt(newMatch.home_team_id),
-        away_team_id: Number.parseInt(newMatch.away_team_id),
-        match_date: newMatch.match_date,
-        match_time: newMatch.match_time || "20:00",
-        field: newMatch.field,
-        round: Number.parseInt(newMatch.round),
-        group_id: Number.parseInt(newMatch.group_id),
-        tournament_id: TOURNAMENT_ID,
-      })
-      toast({ title: "Éxito", description: "Partido agregado correctamente" })
-      setNewMatch({
-        home_team_id: "",
-        away_team_id: "",
-        match_date: "",
-        match_time: "",
-        field: "",
-        round: "1",
-        group_id: "",
-      })
-      loadMatches()
-    } catch (error) {
-      toast({ title: "Error", description: "No se pudo agregar el partido", variant: "destructive" })
+      const result = await updateMatchResult(selectedMatch.id, homeScore, awayScore, [], [])
+      if (result.success) {
+        toast({ title: "Éxito", description: "Resultado actualizado correctamente" })
+        setShowResultForm(false)
+        setSelectedMatch(null)
+        loadAllData()
+      } else {
+        toast({ title: "Error", description: result.error, variant: "destructive" })
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" })
     }
-  }
-
-  const handleDeleteMatch = async (id: number) => {
-    try {
-      await deleteMatch(id)
-      toast({ title: "Éxito", description: "Partido eliminado correctamente" })
-      loadMatches()
-    } catch (error) {
-      toast({ title: "Error", description: "No se pudo eliminar el partido", variant: "destructive" })
-    }
-  }
-
-  const handleUpdateMatchResult = async () => {
-    if (!matchResult.match_id || matchResult.home_score === "" || matchResult.away_score === "") {
-      toast({ title: "Error", description: "Todos los campos son requeridos", variant: "destructive" })
-      return
-    }
-    setSelectedMatchId(Number.parseInt(matchResult.match_id))
-    setShowResultConfirm(true)
-  }
-
-  const confirmUpdateResult = async () => {
-    try {
-      await updateMatchResult(
-        Number.parseInt(matchResult.match_id),
-        Number.parseInt(matchResult.home_score),
-        Number.parseInt(matchResult.away_score),
-      )
-      toast({ title: "Éxito", description: "Resultado actualizado correctamente" })
-      setMatchResult({ match_id: "", home_score: "", away_score: "" })
-      setShowResultConfirm(false)
-      setSelectedMatchId(null)
-      loadMatches()
-      loadGroups()
-    } catch (error) {
-      toast({ title: "Error", description: "No se pudo actualizar el resultado", variant: "destructive" })
-    }
-  }
-
-  const handleAddNews = async () => {
-    if (!newNewsItem.title || !newNewsItem.content) {
-      toast({ title: "Error", description: "Título y contenido son requeridos", variant: "destructive" })
-      return
-    }
-    try {
-      await addNews({ ...newNewsItem, tournament_id: TOURNAMENT_ID })
-      toast({ title: "Éxito", description: "Noticia agregada correctamente" })
-      setNewNewsItem({ title: "", content: "", image_url: "" })
-      loadNews()
-    } catch (error) {
-      toast({ title: "Error", description: "No se pudo agregar la noticia", variant: "destructive" })
-    }
-  }
-
-  const handleDeleteNews = async (id: number) => {
-    try {
-      await deleteNews(id)
-      toast({ title: "Éxito", description: "Noticia eliminada correctamente" })
-      loadNews()
-    } catch (error) {
-      toast({ title: "Error", description: "No se pudo eliminar la noticia", variant: "destructive" })
-    }
-  }
-
-  const handleAddGroup = async () => {
-    if (!newGroup.name) {
-      toast({ title: "Error", description: "El nombre del grupo es requerido", variant: "destructive" })
-      return
-    }
-    try {
-      await addGroup({ name: newGroup.name, tournament_id: TOURNAMENT_ID })
-      toast({ title: "Éxito", description: "Grupo agregado correctamente" })
-      setNewGroup({ name: "" })
-      loadGroups()
-    } catch (error) {
-      toast({ title: "Error", description: "No se pudo agregar el grupo", variant: "destructive" })
-    }
-  }
-
-  const handleDeleteGroup = async (id: number) => {
-    try {
-      await deleteGroup(id)
-      toast({ title: "Éxito", description: "Grupo eliminado correctamente" })
-      loadGroups()
-    } catch (error) {
-      toast({ title: "Error", description: "No se pudo eliminar el grupo", variant: "destructive" })
-    }
-  }
-
-  const handleGenerateDraw = async () => {
-    setShowDrawConfirm(true)
-  }
-
-  const confirmGenerateDraw = async () => {
-    try {
-      const result = await generateDraw(Number.parseInt(selectedRound), TOURNAMENT_ID)
-      setDrawResults(result)
-      setShowDraw(true)
-      setShowDrawConfirm(false)
-      toast({ title: "Éxito", description: "Sorteo generado correctamente" })
-      loadMatches()
-    } catch (error) {
-      toast({ title: "Error", description: "No se pudo generar el sorteo", variant: "destructive" })
-    }
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <Card className="max-w-md mx-auto mt-20 border-primary/30">
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2 text-primary">
-            <Settings className="w-6 h-6" />
-            Admin Copa Libertadores
-          </CardTitle>
-          <p className="text-muted-foreground">Ingresa la contraseña para acceder</p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                className="pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-          <Button onClick={handleLogin} className="w-full">
-            Ingresar
-          </Button>
-          <div className="text-center">
-            <Link href="/admin/femenina" className="text-sm text-primary hover:underline">
-              Ir a Admin SuperLiga Femenina
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-6">
-      <div className="max-w-7xl mx-auto">
-        <Card className="bg-gray-800/50 backdrop-blur border-primary/30 mb-6">
-          <CardHeader>
-            <CardTitle className="text-3xl font-bold flex items-center gap-3 text-primary">
-              <Trophy className="w-8 h-8" />
-              Panel de Administración - Copa Libertadores
-            </CardTitle>
-            <CardDescription className="text-gray-300">
-              Gestiona equipos, jugadores, partidos y noticias de la Copa Libertadores
-            </CardDescription>
-            <div className="mt-4">
-              <Link href="/admin/femenina">
-                <Button variant="outline" className="w-full sm:w-auto bg-transparent">
-                  Ir a Admin SuperLiga Femenina
-                </Button>
-              </Link>
-            </div>
-          </CardHeader>
-        </Card>
-
-        <Tabs defaultValue="teams" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5 bg-gray-700/50 p-1 h-auto gap-2">
-            <TabsTrigger value="teams" className="data-[state=active]:bg-primary py-3">
-              <Users className="w-4 h-4 mr-2" />
-              Equipos
-            </TabsTrigger>
-            <TabsTrigger value="players" className="data-[state=active]:bg-primary py-3">
-              <Users className="w-4 h-4 mr-2" />
-              Jugadores
-            </TabsTrigger>
-            <TabsTrigger value="matches" className="data-[state=active]:bg-primary py-3">
-              <Calendar className="w-4 h-4 mr-2" />
-              Partidos
-            </TabsTrigger>
-            <TabsTrigger value="news" className="data-[state=active]:bg-primary py-3" onClick={loadNews}>
-              <ImageIcon className="w-4 h-4 mr-2" />
-              Noticias
-            </TabsTrigger>
-            <TabsTrigger value="groups" className="data-[state=active]:bg-primary py-3">
-              <Trophy className="w-4 h-4 mr-2" />
-              Grupos
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Teams Tab */}
-          <TabsContent value="teams" className="space-y-6">
-            <Card className="bg-gray-800/50 backdrop-blur border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-primary">Agregar Equipo</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Nombre del Equipo</Label>
-                    <Input
-                      placeholder="Nombre del equipo"
-                      value={newTeam.name}
-                      onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>URL del Logo</Label>
-                    <Input
-                      placeholder="URL del logo"
-                      value={newTeam.logo_url}
-                      onChange={(e) => setNewTeam({ ...newTeam, logo_url: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleAddTeam} className="w-full md:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Agregar Equipo
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-800/50 backdrop-blur border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-primary">Lista de Equipos ({teams.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingTeams ? (
-                  <p className="text-center text-muted-foreground">Cargando equipos...</p>
-                ) : teams.length === 0 ? (
-                  <p className="text-center text-muted-foreground">No hay equipos registrados</p>
-                ) : (
-                  <div className="space-y-2">
-                    {teams.map((team) => (
-                      <div
-                        key={team.id}
-                        className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          {team.logo_url && (
-                            <img
-                              src={team.logo_url || "/placeholder.svg"}
-                              alt={team.name}
-                              className="w-8 h-8 object-contain"
-                            />
-                          )}
-                          <span className="font-medium">{team.name}</span>
-                        </div>
-                        <Button
-                          onClick={() => handleDeleteTeam(team.id)}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Players Tab */}
-          <TabsContent value="players" className="space-y-6">
-            <Card className="bg-gray-800/50 backdrop-blur border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-primary">Agregar Jugador</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Nombre del Jugador</Label>
-                    <Input
-                      placeholder="Nombre completo"
-                      value={newPlayer.name}
-                      onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Equipo</Label>
-                    <Select
-                      value={newPlayer.team_id}
-                      onValueChange={(value) => setNewPlayer({ ...newPlayer, team_id: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar equipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teams.map((team) => (
-                          <SelectItem key={team.id} value={team.id.toString()}>
-                            {team.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Posición</Label>
-                    <Input
-                      placeholder="Ej: Delantero, Mediocampista"
-                      value={newPlayer.position}
-                      onChange={(e) => setNewPlayer({ ...newPlayer, position: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Número</Label>
-                    <Input
-                      type="number"
-                      placeholder="Número de camiseta"
-                      value={newPlayer.number}
-                      onChange={(e) => setNewPlayer({ ...newPlayer, number: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleAddPlayer} className="w-full md:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Agregar Jugador
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-800/50 backdrop-blur border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-primary">Lista de Jugadores ({players.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingPlayers ? (
-                  <p className="text-center text-muted-foreground">Cargando jugadores...</p>
-                ) : players.length === 0 ? (
-                  <p className="text-center text-muted-foreground">No hay jugadores registrados</p>
-                ) : (
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {players.map((player) => (
-                      <div
-                        key={player.id}
-                        className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors"
-                      >
-                        <div>
-                          <p className="font-medium">
-                            {player.name} {player.number ? `#${player.number}` : ""}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {player.teams?.name} {player.position ? `• ${player.position}` : ""}
-                          </p>
-                        </div>
-                        <Button
-                          onClick={() => handleDeletePlayer(player.id)}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Matches Tab */}
-          <TabsContent value="matches" className="space-y-6">
-            <Card className="bg-gray-800/50 backdrop-blur border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-primary">Generar Sorteo de Jornada</CardTitle>
-                <CardDescription className="text-gray-300">
-                  Genera automáticamente los partidos para una jornada
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Jornada</Label>
-                    <Select value={selectedRound} onValueChange={setSelectedRound}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((round) => (
-                          <SelectItem key={round} value={round.toString()}>
-                            Jornada {round}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Button onClick={handleGenerateDraw} className="w-full md:w-auto">
-                  <Trophy className="w-4 h-4 mr-2" />
-                  Generar Sorteo
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-800/50 backdrop-blur border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-primary">Agregar Partido Manual</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Equipo Local</Label>
-                    <Select
-                      value={newMatch.home_team_id}
-                      onValueChange={(value) => setNewMatch({ ...newMatch, home_team_id: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar equipo local" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teams.map((team) => (
-                          <SelectItem key={team.id} value={team.id.toString()}>
-                            {team.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Equipo Visitante</Label>
-                    <Select
-                      value={newMatch.away_team_id}
-                      onValueChange={(value) => setNewMatch({ ...newMatch, away_team_id: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar equipo visitante" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teams.map((team) => (
-                          <SelectItem key={team.id} value={team.id.toString()}>
-                            {team.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Grupo</Label>
-                    <Select
-                      value={newMatch.group_id}
-                      onValueChange={(value) => setNewMatch({ ...newMatch, group_id: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar grupo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {groups.map((group) => (
-                          <SelectItem key={group.id} value={group.id.toString()}>
-                            {group.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Jornada</Label>
-                    <Select
-                      value={newMatch.round}
-                      onValueChange={(value) => setNewMatch({ ...newMatch, round: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((round) => (
-                          <SelectItem key={round} value={round.toString()}>
-                            Jornada {round}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Fecha</Label>
-                    <Input
-                      type="date"
-                      value={newMatch.match_date}
-                      onChange={(e) => setNewMatch({ ...newMatch, match_date: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Hora</Label>
-                    <Input
-                      type="time"
-                      value={newMatch.match_time}
-                      onChange={(e) => setNewMatch({ ...newMatch, match_time: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Cancha</Label>
-                    <Input
-                      placeholder="Nombre de la cancha"
-                      value={newMatch.field}
-                      onChange={(e) => setNewMatch({ ...newMatch, field: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleAddMatch} className="w-full md:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Agregar Partido
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-800/50 backdrop-blur border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-primary">Actualizar Resultado</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2 md:col-span-3">
-                    <Label>Partido</Label>
-                    <Select
-                      value={matchResult.match_id}
-                      onValueChange={(value) => setMatchResult({ ...matchResult, match_id: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar partido" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {matches.map((match) => (
-                          <SelectItem key={match.id} value={match.id.toString()}>
-                            {match.home_team?.name} vs {match.away_team?.name} - Jornada {match.round}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Goles Local</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      value={matchResult.home_score}
-                      onChange={(e) => setMatchResult({ ...matchResult, home_score: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Goles Visitante</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      value={matchResult.away_score}
-                      onChange={(e) => setMatchResult({ ...matchResult, away_score: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleUpdateMatchResult} className="w-full md:w-auto">
-                  Actualizar Resultado
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-800/50 backdrop-blur border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-primary">Lista de Partidos ({matches.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingMatches ? (
-                  <p className="text-center text-muted-foreground">Cargando partidos...</p>
-                ) : matches.length === 0 ? (
-                  <p className="text-center text-muted-foreground">No hay partidos registrados</p>
-                ) : (
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {matches.map((match) => (
-                      <div
-                        key={match.id}
-                        className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors"
-                      >
-                        <div className="flex-1">
-                          <p className="font-medium">
-                            {match.home_team?.name} vs {match.away_team?.name}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Jornada {match.round} • {match.match_date}
-                            {match.played && (
-                              <span className="ml-2 text-primary">
-                                ({match.home_score} - {match.away_score})
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                        <Button
-                          onClick={() => handleDeleteMatch(match.id)}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* News Tab */}
-          <TabsContent value="news" className="space-y-6">
-            <Card className="bg-gray-800/50 backdrop-blur border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-primary">Agregar Noticia</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Título</Label>
-                    <Input
-                      placeholder="Título de la noticia"
-                      value={newNewsItem.title}
-                      onChange={(e) => setNewNewsItem({ ...newNewsItem, title: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Contenido</Label>
-                    <Textarea
-                      placeholder="Contenido de la noticia"
-                      value={newNewsItem.content}
-                      onChange={(e) => setNewNewsItem({ ...newNewsItem, content: e.target.value })}
-                      rows={4}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>URL de Imagen</Label>
-                    <Input
-                      placeholder="URL de la imagen"
-                      value={newNewsItem.image_url}
-                      onChange={(e) => setNewNewsItem({ ...newNewsItem, image_url: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleAddNews} className="w-full md:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Agregar Noticia
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-800/50 backdrop-blur border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-primary">Lista de Noticias ({newsList.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingNews ? (
-                  <p className="text-center text-muted-foreground">Cargando noticias...</p>
-                ) : newsList.length === 0 ? (
-                  <p className="text-center text-muted-foreground">No hay noticias registradas</p>
-                ) : (
-                  <div className="space-y-2">
-                    {newsList.map((news) => (
-                      <div
-                        key={news.id}
-                        className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors"
-                      >
-                        <div className="flex-1">
-                          <p className="font-medium">{news.title}</p>
-                          <p className="text-sm text-muted-foreground line-clamp-2">{news.content}</p>
-                        </div>
-                        <Button
-                          onClick={() => handleDeleteNews(news.id)}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Groups Tab */}
-          <TabsContent value="groups" className="space-y-6">
-            <Card className="bg-gray-800/50 backdrop-blur border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-primary">Agregar Grupo</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Nombre del Grupo</Label>
-                  <Input
-                    placeholder="Ej: Grupo A"
-                    value={newGroup.name}
-                    onChange={(e) => setNewGroup({ name: e.target.value })}
-                  />
-                </div>
-                <Button onClick={handleAddGroup} className="w-full md:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Agregar Grupo
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-800/50 backdrop-blur border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-primary">Lista de Grupos ({groups.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {groups.length === 0 ? (
-                  <p className="text-center text-muted-foreground">No hay grupos registrados</p>
-                ) : (
-                  <div className="space-y-2">
-                    {groups.map((group) => (
-                      <div
-                        key={group.id}
-                        className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors"
-                      >
-                        <span className="font-medium">{group.name}</span>
-                        <Button
-                          onClick={() => handleDeleteGroup(group.id)}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Trophy className="w-8 h-8 text-yellow-500" />
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-yellow-500 to-yellow-300 bg-clip-text text-transparent">
+              Admin: Copa Libertadores
+            </h1>
+            <p className="text-sm text-gray-400 mt-1">Formato: Grupos + Eliminatorias</p>
+          </div>
+        </div>
+        <Link href="/admin/femenina">
+          <Button variant="outline" className="border-pink-500/50 text-pink-500 hover:bg-pink-500/10 bg-transparent">
+            Cambiar a Femenina
+          </Button>
+        </Link>
       </div>
 
-      {/* Dialogs */}
-      <Dialog open={showDrawConfirm} onOpenChange={setShowDrawConfirm}>
-        <DialogContent className="bg-gray-800 border-primary/30">
-          <DialogHeader>
-            <DialogTitle className="text-primary">Confirmar Sorteo</DialogTitle>
-            <DialogDescription className="text-gray-300">
-              ¿Estás seguro de generar el sorteo para la Jornada {selectedRound}? Esto creará partidos automáticamente.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDrawConfirm(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={confirmGenerateDraw}>Confirmar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Card className="border-2 border-yellow-500/50 bg-gradient-to-br from-gray-800 to-gray-900">
+        <CardContent className="p-6">
+          <Tabs defaultValue="teams" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 bg-gray-700/50">
+              <TabsTrigger value="teams">
+                <Users className="w-4 h-4 mr-2" />
+                Equipos
+              </TabsTrigger>
+              <TabsTrigger value="players">
+                <UserPlus className="w-4 h-4 mr-2" />
+                Jugadores
+              </TabsTrigger>
+              <TabsTrigger value="matches">
+                <Calendar className="w-4 h-4 mr-2" />
+                Partidos
+              </TabsTrigger>
+            </TabsList>
 
-      <Dialog open={showResultConfirm} onOpenChange={setShowResultConfirm}>
-        <DialogContent className="bg-gray-800 border-primary/30">
-          <DialogHeader>
-            <DialogTitle className="text-primary">Confirmar Resultado</DialogTitle>
-            <DialogDescription className="text-gray-300">
-              ¿Confirmas que el resultado es correcto? Esto actualizará las estadísticas y la tabla de posiciones.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowResultConfirm(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={confirmUpdateResult}>Confirmar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <TabsContent value="teams" className="mt-6 space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-semibold text-yellow-500">Equipos ({teams.length})</h3>
+                <Button onClick={() => setShowTeamForm(!showTeamForm)} className="bg-yellow-600 hover:bg-yellow-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Equipo
+                </Button>
+              </div>
 
-      <Dialog open={showDraw} onOpenChange={setShowDraw}>
-        <DialogContent className="bg-gray-800 border-primary/30">
-          <DialogHeader>
-            <DialogTitle className="text-primary">Sorteo Completado</DialogTitle>
-            <DialogDescription className="text-gray-300">
-              Se han generado los siguientes partidos para la Jornada {selectedRound}:
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
-            {drawResults.map((result, index) => (
-              <p key={index} className="text-sm text-gray-300">
-                {result}
-              </p>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setShowDraw(false)}>Cerrar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              {showTeamForm && (
+                <Card className="border-yellow-500/30">
+                  <CardHeader>
+                    <CardTitle className="text-yellow-500">Crear Equipo</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleCreateTeam} className="space-y-4">
+                      <div>
+                        <Label htmlFor="name">Nombre del Equipo</Label>
+                        <Input id="name" name="name" required className="bg-gray-800 border-gray-700" />
+                      </div>
+                      <div>
+                        <Label htmlFor="logo">Logo del Equipo</Label>
+                        <Input
+                          id="logo"
+                          name="logo"
+                          type="file"
+                          accept="image/*"
+                          className="bg-gray-800 border-gray-700"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Selecciona una imagen desde tu computadora</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" className="bg-yellow-600 hover:bg-yellow-700">
+                          Crear
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setShowTeamForm(false)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              {editingTeam && (
+                <Card className="border-yellow-500/30">
+                  <CardHeader>
+                    <CardTitle className="text-yellow-500">Editar Equipo</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleUpdateTeam} className="space-y-4">
+                      <div>
+                        <Label htmlFor="edit-name">Nombre del Equipo</Label>
+                        <Input
+                          id="edit-name"
+                          name="name"
+                          defaultValue={editingTeam.name}
+                          required
+                          className="bg-gray-800 border-gray-700"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-logo">Logo del Equipo</Label>
+                        {editingTeam.logo_url && (
+                          <div className="mb-2">
+                            <img
+                              src={editingTeam.logo_url || "/placeholder.svg"}
+                              alt="Logo actual"
+                              className="w-16 h-16 object-contain border border-gray-700 rounded p-1"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">Logo actual</p>
+                          </div>
+                        )}
+                        <Input
+                          id="edit-logo"
+                          name="logo"
+                          type="file"
+                          accept="image/*"
+                          className="bg-gray-800 border-gray-700"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">
+                          Selecciona una nueva imagen o déjalo vacío para mantener el actual
+                        </p>
+                        <input type="hidden" name="logo_url" value={editingTeam.logo_url || ""} />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" className="bg-yellow-600 hover:bg-yellow-700">
+                          Guardar
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setEditingTeam(null)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="grid gap-2">
+                {teams.map((team) => (
+                  <div key={team.id} className="p-3 bg-gray-800 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {team.logo_url && (
+                        <img
+                          src={team.logo_url || "/placeholder.svg"}
+                          alt={team.name}
+                          className="w-10 h-10 object-contain rounded"
+                        />
+                      )}
+                      <span className="text-white font-medium">{team.name}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingTeam(team)}
+                        className="border-yellow-500/50"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteTeam(team.id)}
+                        className="border-red-500/50 text-red-500"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="players" className="mt-6 space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-semibold text-yellow-500">Jugadores ({players.length})</h3>
+                <Button
+                  onClick={() => setShowPlayerForm(!showPlayerForm)}
+                  className="bg-yellow-600 hover:bg-yellow-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Jugador
+                </Button>
+              </div>
+
+              {showPlayerForm && (
+                <Card className="border-yellow-500/30">
+                  <CardHeader>
+                    <CardTitle className="text-yellow-500">Crear Jugador</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleCreatePlayer} className="space-y-4">
+                      <div>
+                        <Label htmlFor="player-name">Nombre del Jugador</Label>
+                        <Input id="player-name" name="name" required className="bg-gray-800 border-gray-700" />
+                      </div>
+                      <div>
+                        <Label htmlFor="cedula">Cédula</Label>
+                        <Input id="cedula" name="cedula" required className="bg-gray-800 border-gray-700" />
+                      </div>
+                      <div>
+                        <Label htmlFor="number">Número de Camiseta</Label>
+                        <Input
+                          id="number"
+                          name="number"
+                          type="number"
+                          required
+                          className="bg-gray-800 border-gray-700"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="team_id">Equipo</Label>
+                        <Select name="team_id" required>
+                          <SelectTrigger className="bg-gray-800 border-gray-700">
+                            <SelectValue placeholder="Seleccionar equipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teams.map((team) => (
+                              <SelectItem key={team.id} value={team.id.toString()}>
+                                {team.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" className="bg-yellow-600 hover:bg-yellow-700">
+                          Crear
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setShowPlayerForm(false)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              {editingPlayer && (
+                <Card className="border-yellow-500/30">
+                  <CardHeader>
+                    <CardTitle className="text-yellow-500">Editar Jugador</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleUpdatePlayer} className="space-y-4">
+                      <div>
+                        <Label htmlFor="edit-player-name">Nombre del Jugador</Label>
+                        <Input
+                          id="edit-player-name"
+                          name="name"
+                          defaultValue={editingPlayer.name}
+                          required
+                          className="bg-gray-800 border-gray-700"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-cedula">Cédula</Label>
+                        <Input
+                          id="edit-cedula"
+                          name="cedula"
+                          defaultValue={editingPlayer.cedula}
+                          required
+                          className="bg-gray-800 border-gray-700"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-number">Número de Camiseta</Label>
+                        <Input
+                          id="edit-number"
+                          name="number"
+                          type="number"
+                          defaultValue={editingPlayer.number}
+                          required
+                          className="bg-gray-800 border-gray-700"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-team_id">Equipo</Label>
+                        <Select name="team_id" defaultValue={editingPlayer.team_id.toString()} required>
+                          <SelectTrigger className="bg-gray-800 border-gray-700">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teams.map((team) => (
+                              <SelectItem key={team.id} value={team.id.toString()}>
+                                {team.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" className="bg-yellow-600 hover:bg-yellow-700">
+                          Guardar
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setEditingPlayer(null)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="max-h-96 overflow-y-auto space-y-2">
+                {players.map((player) => (
+                  <div key={player.id} className="p-3 bg-gray-800 rounded-lg flex items-center justify-between">
+                    <div>
+                      <p className="text-white font-medium">{player.name}</p>
+                      <p className="text-sm text-gray-400">
+                        #{player.number} - {player.teams?.name} - CI: {player.cedula}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Goles: {player.goals} | Amarillas: {player.yellow_cards} | Rojas: {player.red_cards}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingPlayer(player)}
+                        className="border-yellow-500/50"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeletePlayer(player.id)}
+                        className="border-red-500/50 text-red-500"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="matches" className="mt-6 space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-semibold text-yellow-500">Partidos ({matches.length})</h3>
+                <Button onClick={() => setShowMatchForm(!showMatchForm)} className="bg-yellow-600 hover:bg-yellow-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Partido
+                </Button>
+              </div>
+
+              {showMatchForm && (
+                <Card className="border-yellow-500/30">
+                  <CardHeader>
+                    <CardTitle className="text-yellow-500">Crear Partido</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleCreateMatch} className="space-y-4">
+                      <div>
+                        <Label htmlFor="match-group_id">Grupo</Label>
+                        <Select
+                          name="group_id"
+                          required
+                          onValueChange={(value) => {
+                            loadTeamsInGroup(Number.parseInt(value))
+                          }}
+                        >
+                          <SelectTrigger className="bg-gray-800 border-gray-700">
+                            <SelectValue placeholder="Seleccionar grupo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {groups.map((group) => (
+                              <SelectItem key={group.id} value={group.id.toString()}>
+                                Grupo {group.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="home_team_id">Equipo Local</Label>
+                          <Select name="home_team_id" required>
+                            <SelectTrigger className="bg-gray-800 border-gray-700">
+                              <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {teamsInGroup.map((tg) => (
+                                <SelectItem key={tg.teams.id} value={tg.teams.id.toString()}>
+                                  {tg.teams.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="away_team_id">Equipo Visitante</Label>
+                          <Select name="away_team_id" required>
+                            <SelectTrigger className="bg-gray-800 border-gray-700">
+                              <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {teamsInGroup.map((tg) => (
+                                <SelectItem key={tg.teams.id} value={tg.teams.id.toString()}>
+                                  {tg.teams.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="match_date">Fecha</Label>
+                          <Input
+                            id="match_date"
+                            name="match_date"
+                            type="date"
+                            required
+                            className="bg-gray-800 border-gray-700"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="match_time">Hora</Label>
+                          <Input
+                            id="match_time"
+                            name="match_time"
+                            type="time"
+                            className="bg-gray-800 border-gray-700"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="round">Fecha/Jornada</Label>
+                          <Input
+                            id="round"
+                            name="round"
+                            type="number"
+                            min="1"
+                            required
+                            className="bg-gray-800 border-gray-700"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="field">Cancha</Label>
+                          <Input
+                            id="field"
+                            name="field"
+                            placeholder="Ej: Cancha 1"
+                            className="bg-gray-800 border-gray-700"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" className="bg-yellow-600 hover:bg-yellow-700">
+                          Crear Partido
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setShowMatchForm(false)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card className="border-yellow-500/30">
+                <CardContent className="p-4">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <Label className="text-yellow-500">Filtrar por:</Label>
+                    <Button
+                      size="sm"
+                      variant={viewMode === "all" ? "default" : "outline"}
+                      onClick={() => {
+                        setViewMode("all")
+                        setSelectedGroup(null)
+                        setSelectedRound(null)
+                      }}
+                      className={viewMode === "all" ? "bg-yellow-600 hover:bg-yellow-700" : ""}
+                    >
+                      Todos
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={viewMode === "group" ? "default" : "outline"}
+                      onClick={() => setViewMode("group")}
+                      className={viewMode === "group" ? "bg-yellow-600 hover:bg-yellow-700" : ""}
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      Por Grupo
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={viewMode === "round" ? "default" : "outline"}
+                      onClick={() => setViewMode("round")}
+                      className={viewMode === "round" ? "bg-yellow-600 hover:bg-yellow-700" : ""}
+                    >
+                      <Calendar className="w-4 h-4 mr-1" />
+                      Por Fecha
+                    </Button>
+
+                    {viewMode === "group" && (
+                      <Select
+                        value={selectedGroup?.toString()}
+                        onValueChange={(value) => setSelectedGroup(Number.parseInt(value))}
+                      >
+                        <SelectTrigger className="w-[150px] bg-gray-800 border-gray-700">
+                          <SelectValue placeholder="Grupo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {groups.map((group) => (
+                            <SelectItem key={group.id} value={group.id.toString()}>
+                              Grupo {group.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    {viewMode === "round" && (
+                      <Select
+                        value={selectedRound?.toString()}
+                        onValueChange={(value) => setSelectedRound(Number.parseInt(value))}
+                      >
+                        <SelectTrigger className="w-[150px] bg-gray-800 border-gray-700">
+                          <SelectValue placeholder="Fecha" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {uniqueRounds.map((round) => (
+                            <SelectItem key={round} value={round.toString()}>
+                              Fecha {round}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {showResultForm && selectedMatch && (
+                <Card className="border-yellow-500/30">
+                  <CardHeader>
+                    <CardTitle className="text-yellow-500">Asignar Resultado</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleUpdateResult} className="space-y-4">
+                      <div className="text-white text-center mb-4">
+                        <p className="font-semibold">
+                          {selectedMatch.home_team?.name} vs {selectedMatch.away_team?.name}
+                        </p>
+                        <p className="text-sm text-gray-400">
+                          {selectedMatch.match_date} - Grupo {selectedMatch.copa_groups?.name}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="home_score">{selectedMatch.home_team?.name}</Label>
+                          <Input
+                            id="home_score"
+                            name="home_score"
+                            type="number"
+                            min="0"
+                            defaultValue={selectedMatch.home_score || 0}
+                            required
+                            className="bg-gray-800 border-gray-700"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="away_score">{selectedMatch.away_team?.name}</Label>
+                          <Input
+                            id="away_score"
+                            name="away_score"
+                            type="number"
+                            min="0"
+                            defaultValue={selectedMatch.away_score || 0}
+                            required
+                            className="bg-gray-800 border-gray-700"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" className="bg-yellow-600 hover:bg-yellow-700">
+                          Guardar Resultado
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setShowResultForm(false)
+                            setSelectedMatch(null)
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="max-h-[500px] overflow-y-auto space-y-2">
+                {filteredMatches.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    No hay partidos{viewMode !== "all" ? " en este filtro" : ""}
+                  </div>
+                ) : (
+                  filteredMatches.map((match) => (
+                    <div key={match.id} className="p-3 bg-gray-800 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-white font-medium">
+                            {match.home_team?.name} vs {match.away_team?.name}
+                          </p>
+                          <p className="text-sm text-gray-400">
+                            {match.played ? `Resultado: ${match.home_score} - ${match.away_score}` : "Por jugar"}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Fecha {match.round} - Grupo {match.copa_groups?.name} - {match.match_date}
+                            {match.field && ` - ${match.field}`}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedMatch(match)
+                            setShowResultForm(true)
+                          }}
+                          className="bg-yellow-600 hover:bg-yellow-700"
+                        >
+                          {match.played ? "Editar" : "Asignar"} Resultado
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   )
 }

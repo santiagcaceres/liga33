@@ -53,6 +53,19 @@ export async function getGroups() {
   return data || []
 }
 
+export async function getGroupsByTournament(tournamentId: number) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.from("copa_groups").select("*").eq("tournament_id", tournamentId).order("name")
+
+  if (error) {
+    console.error("[v0] Error fetching groups by tournament:", error)
+    return []
+  }
+
+  return data || []
+}
+
 export async function isTeamInGroup(teamId: number) {
   const supabase = await createClient()
 
@@ -154,6 +167,27 @@ export async function getStandingsByTournament(tournamentId: number) {
   }
 
   console.log("[v0] ✅ Fetched standings for tournament:", data?.length || 0, "records")
+  return data || []
+}
+
+export async function getTeamsByGroup(groupId: number) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("team_groups")
+    .select(`
+      *,
+      teams(id, name, logo_url),
+      copa_groups(id, name)
+    `)
+    .eq("group_id", groupId)
+    .order("points", { ascending: false })
+
+  if (error) {
+    console.error("[v0] Error fetching teams by group:", error)
+    return []
+  }
+
   return data || []
 }
 
