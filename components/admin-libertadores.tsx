@@ -49,6 +49,9 @@ export default function AdminLibertadores() {
 
   const [teamsInGroup, setTeamsInGroup] = useState<any[]>([])
 
+  const [playerTeamFilter, setPlayerTeamFilter] = useState<string>("all")
+  const [playerSearchQuery, setPlayerSearchQuery] = useState<string>("")
+
   useEffect(() => {
     loadAllData()
   }, [])
@@ -442,6 +445,13 @@ export default function AdminLibertadores() {
     }
   }
 
+  const filteredPlayers = players.filter((player) => {
+    const matchesTeam = playerTeamFilter === "all" || player.team_id.toString() === playerTeamFilter
+    const matchesSearch =
+      player.name.toLowerCase().includes(playerSearchQuery.toLowerCase()) || player.cedula.includes(playerSearchQuery)
+    return matchesTeam && matchesSearch
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -627,7 +637,7 @@ export default function AdminLibertadores() {
 
             <TabsContent value="players" className="mt-6 space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-yellow-500">Jugadores ({players.length})</h3>
+                <h3 className="text-xl font-semibold text-yellow-500">Jugadores ({filteredPlayers.length})</h3>
                 <Button
                   onClick={() => setShowPlayerForm(!showPlayerForm)}
                   className="bg-yellow-600 hover:bg-yellow-700"
@@ -636,6 +646,43 @@ export default function AdminLibertadores() {
                   Nuevo Jugador
                 </Button>
               </div>
+
+              <Card className="border-yellow-500/30">
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="player-search" className="text-yellow-500 mb-2 block">
+                        Buscar Jugador
+                      </Label>
+                      <Input
+                        id="player-search"
+                        placeholder="Buscar por nombre o cédula..."
+                        value={playerSearchQuery}
+                        onChange={(e) => setPlayerSearchQuery(e.target.value)}
+                        className="bg-gray-800 border-gray-700"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="player-team-filter" className="text-yellow-500 mb-2 block">
+                        Filtrar por Equipo
+                      </Label>
+                      <Select value={playerTeamFilter} onValueChange={setPlayerTeamFilter}>
+                        <SelectTrigger className="bg-gray-800 border-gray-700">
+                          <SelectValue placeholder="Todos los equipos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos los equipos</SelectItem>
+                          {teams.map((team) => (
+                            <SelectItem key={team.id} value={team.id.toString()}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               {showPlayerForm && (
                 <Card className="border-yellow-500/30">
@@ -761,14 +808,20 @@ export default function AdminLibertadores() {
                   <Loader2 className="w-8 h-8 animate-spin text-yellow-500 mb-3" />
                   <p>Cargando jugadores...</p>
                 </div>
-              ) : players.length === 0 ? (
+              ) : filteredPlayers.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
-                  <p>No hay jugadores registrados</p>
-                  <p className="text-sm mt-2">Crea tu primer jugador para comenzar</p>
+                  {players.length === 0 ? (
+                    <>
+                      <p>No hay jugadores registrados</p>
+                      <p className="text-sm mt-2">Crea tu primer jugador para comenzar</p>
+                    </>
+                  ) : (
+                    <p>No se encontraron jugadores con los filtros aplicados</p>
+                  )}
                 </div>
               ) : (
                 <div className="max-h-96 overflow-y-auto space-y-2">
-                  {players.map((player) => (
+                  {filteredPlayers.map((player) => (
                     <div key={player.id} className="p-3 bg-gray-800 rounded-lg flex items-center justify-between">
                       <div>
                         <p className="text-white font-medium">{player.name}</p>

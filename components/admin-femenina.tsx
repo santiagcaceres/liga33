@@ -23,6 +23,12 @@ export default function AdminFemenina() {
   const TOURNAMENT_ID = 2 // SuperLiga Femenina
 
   const [isLoading, setIsLoading] = useState(true)
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false)
+  const [isUpdatingTeam, setIsUpdatingTeam] = useState(false)
+  const [isCreatingPlayer, setIsCreatingPlayer] = useState(false)
+  const [isUpdatingPlayer, setIsUpdatingPlayer] = useState(false)
+  const [isCreatingMatch, setIsCreatingMatch] = useState(false)
+
   const [teams, setTeams] = useState<any[]>([])
   const [players, setPlayers] = useState<any[]>([])
   const [matches, setMatches] = useState<any[]>([])
@@ -43,6 +49,16 @@ export default function AdminFemenina() {
 
   const [viewMode, setViewMode] = useState<"all" | "round">("all")
   const [selectedRound, setSelectedRound] = useState<number | null>(null)
+
+  const [playerTeamFilter, setPlayerTeamFilter] = useState<string>("all")
+  const [playerSearchQuery, setPlayerSearchQuery] = useState<string>("")
+
+  const filteredPlayers = players.filter((player) => {
+    const matchesTeam = playerTeamFilter === "all" || player.team_id.toString() === playerTeamFilter
+    const matchesSearch =
+      player.name.toLowerCase().includes(playerSearchQuery.toLowerCase()) || player.cedula.includes(playerSearchQuery)
+    return matchesTeam && matchesSearch
+  })
 
   useEffect(() => {
     loadAllData()
@@ -75,6 +91,7 @@ export default function AdminFemenina() {
 
   const handleCreateTeam = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    setIsCreatingTeam(true) // Show loading state
     const formData = new FormData(e.currentTarget)
     formData.append("tournament_id", TOURNAMENT_ID.toString())
 
@@ -94,6 +111,8 @@ export default function AdminFemenina() {
         variant: "destructive",
         className: "border-pink-500/50 bg-gray-900",
       })
+    } finally {
+      setIsCreatingTeam(false) // Hide loading state
     }
   }
 
@@ -101,6 +120,7 @@ export default function AdminFemenina() {
     e.preventDefault()
     if (!editingTeam) return
 
+    setIsUpdatingTeam(true) // Show loading state
     const formData = new FormData(e.currentTarget)
 
     try {
@@ -119,6 +139,8 @@ export default function AdminFemenina() {
         variant: "destructive",
         className: "border-pink-500/50 bg-gray-900",
       })
+    } finally {
+      setIsUpdatingTeam(false) // Hide loading state
     }
   }
 
@@ -145,6 +167,7 @@ export default function AdminFemenina() {
 
   const handleCreatePlayer = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    setIsCreatingPlayer(true) // Show loading state
     const formData = new FormData(e.currentTarget)
     formData.append("tournament_id", TOURNAMENT_ID.toString())
 
@@ -173,6 +196,8 @@ export default function AdminFemenina() {
         variant: "destructive",
         className: "border-pink-500/50 bg-gray-900",
       })
+    } finally {
+      setIsCreatingPlayer(false) // Hide loading state
     }
   }
 
@@ -180,6 +205,7 @@ export default function AdminFemenina() {
     e.preventDefault()
     if (!editingPlayer) return
 
+    setIsUpdatingPlayer(true) // Show loading state
     const formData = new FormData(e.currentTarget)
 
     try {
@@ -198,6 +224,8 @@ export default function AdminFemenina() {
         variant: "destructive",
         className: "border-pink-500/50 bg-gray-900",
       })
+    } finally {
+      setIsUpdatingPlayer(false) // Hide loading state
     }
   }
 
@@ -382,12 +410,39 @@ export default function AdminFemenina() {
 
   const handleCreateMatch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    console.log("[v0] ============ HANDLE CREATE MATCH START ============")
+
+    setIsCreatingMatch(true) // Show loading state
     const formData = new FormData(e.currentTarget)
+
+    console.log("[v0] Form data before append:", {
+      home_team_id: formData.get("home_team_id"),
+      away_team_id: formData.get("away_team_id"),
+      round: formData.get("round"),
+      match_date: formData.get("match_date"),
+      match_time: formData.get("match_time"),
+      field: formData.get("field"),
+    })
+
     formData.append("tournament_id", TOURNAMENT_ID.toString())
     formData.append("group_id", "0")
 
+    console.log("[v0] Form data after append:", {
+      home_team_id: formData.get("home_team_id"),
+      away_team_id: formData.get("away_team_id"),
+      group_id: formData.get("group_id"),
+      tournament_id: formData.get("tournament_id"),
+      round: formData.get("round"),
+      match_date: formData.get("match_date"),
+      match_time: formData.get("match_time"),
+      field: formData.get("field"),
+    })
+
     try {
+      console.log("[v0] Calling createMatch...")
       const result = await createMatch(formData)
+      console.log("[v0] createMatch result:", result)
+
       if (result.success) {
         toast({
           title: "Éxito",
@@ -395,8 +450,10 @@ export default function AdminFemenina() {
           className: "border-pink-500/50 bg-gray-900 text-white",
         })
         setShowMatchForm(false)
-        loadAllData()
+        await loadAllData()
+        console.log("[v0] ✅ Match created and data reloaded")
       } else {
+        console.error("[v0] ❌ createMatch failed:", result.error)
         toast({
           title: "Error",
           description: result.error,
@@ -405,12 +462,16 @@ export default function AdminFemenina() {
         })
       }
     } catch (error: any) {
+      console.error("[v0] ❌ Exception in handleCreateMatch:", error)
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
         className: "border-pink-500/50 bg-gray-900",
       })
+    } finally {
+      setIsCreatingMatch(false) // Hide loading state
+      console.log("[v0] ============ HANDLE CREATE MATCH END ============")
     }
   }
 
@@ -495,8 +556,15 @@ export default function AdminFemenina() {
                         <p className="text-xs text-gray-400 mt-1">Selecciona una imagen desde tu computadora</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button type="submit" className="bg-pink-600 hover:bg-pink-700">
-                          Crear
+                        <Button type="submit" className="bg-pink-600 hover:bg-pink-700" disabled={isCreatingTeam}>
+                          {isCreatingTeam ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Creando...
+                            </>
+                          ) : (
+                            "Crear"
+                          )}
                         </Button>
                         <Button type="button" variant="outline" onClick={() => setShowTeamForm(false)}>
                           Cancelar
@@ -549,8 +617,15 @@ export default function AdminFemenina() {
                         <input type="hidden" name="logo_url" value={editingTeam.logo_url || ""} />
                       </div>
                       <div className="flex gap-2">
-                        <Button type="submit" className="bg-pink-600 hover:bg-pink-700">
-                          Guardar
+                        <Button type="submit" className="bg-pink-600 hover:bg-pink-700" disabled={isUpdatingTeam}>
+                          {isUpdatingTeam ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Guardando...
+                            </>
+                          ) : (
+                            "Guardar"
+                          )}
                         </Button>
                         <Button type="button" variant="outline" onClick={() => setEditingTeam(null)}>
                           Cancelar
@@ -611,12 +686,50 @@ export default function AdminFemenina() {
 
             <TabsContent value="players" className="mt-6 space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-pink-500">Jugadoras ({players.length})</h3>
+                <h3 className="text-xl font-semibold text-pink-500">Jugadoras ({filteredPlayers.length})</h3>
                 <Button onClick={() => setShowPlayerForm(!showPlayerForm)} className="bg-pink-600 hover:bg-pink-700">
                   <Plus className="w-4 h-4 mr-2" />
                   Nueva Jugadora
                 </Button>
               </div>
+
+              {/* Filter players by team and search query */}
+              <Card className="border-pink-500/30">
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="player-search" className="text-pink-500 mb-2 block">
+                        Buscar Jugadora
+                      </Label>
+                      <Input
+                        id="player-search"
+                        placeholder="Buscar por nombre o cédula..."
+                        value={playerSearchQuery}
+                        onChange={(e) => setPlayerSearchQuery(e.target.value)}
+                        className="bg-gray-800 border-gray-700"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="player-team-filter" className="text-pink-500 mb-2 block">
+                        Filtrar por Equipo
+                      </Label>
+                      <Select value={playerTeamFilter} onValueChange={setPlayerTeamFilter}>
+                        <SelectTrigger className="bg-gray-800 border-gray-700">
+                          <SelectValue placeholder="Todos los equipos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos los equipos</SelectItem>
+                          {teams.map((team) => (
+                            <SelectItem key={team.id} value={team.id.toString()}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               {showPlayerForm && (
                 <Card className="border-pink-500/30">
@@ -659,8 +772,15 @@ export default function AdminFemenina() {
                         </Select>
                       </div>
                       <div className="flex gap-2">
-                        <Button type="submit" className="bg-pink-600 hover:bg-pink-700">
-                          Crear
+                        <Button type="submit" className="bg-pink-600 hover:bg-pink-700" disabled={isCreatingPlayer}>
+                          {isCreatingPlayer ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Creando...
+                            </>
+                          ) : (
+                            "Crear"
+                          )}
                         </Button>
                         <Button type="button" variant="outline" onClick={() => setShowPlayerForm(false)}>
                           Cancelar
@@ -725,8 +845,15 @@ export default function AdminFemenina() {
                         </Select>
                       </div>
                       <div className="flex gap-2">
-                        <Button type="submit" className="bg-pink-600 hover:bg-pink-700">
-                          Guardar
+                        <Button type="submit" className="bg-pink-600 hover:bg-pink-700" disabled={isUpdatingPlayer}>
+                          {isUpdatingPlayer ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Guardando...
+                            </>
+                          ) : (
+                            "Guardar"
+                          )}
                         </Button>
                         <Button type="button" variant="outline" onClick={() => setEditingPlayer(null)}>
                           Cancelar
@@ -742,14 +869,20 @@ export default function AdminFemenina() {
                   <Loader2 className="w-8 h-8 animate-spin text-pink-500 mb-3" />
                   <p>Cargando jugadoras...</p>
                 </div>
-              ) : players.length === 0 ? (
+              ) : filteredPlayers.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
-                  <p>No hay jugadoras registradas</p>
-                  <p className="text-sm mt-2">Crea tu primera jugadora para comenzar</p>
+                  {players.length === 0 ? (
+                    <>
+                      <p>No hay jugadoras registradas</p>
+                      <p className="text-sm mt-2">Crea tu primera jugadora para comenzar</p>
+                    </>
+                  ) : (
+                    <p>No se encontraron jugadoras con los filtros aplicados</p>
+                  )}
                 </div>
               ) : (
                 <div className="max-h-96 overflow-y-auto space-y-2">
-                  {players.map((player) => (
+                  {filteredPlayers.map((player) => (
                     <div key={player.id} className="p-3 bg-gray-800 rounded-lg flex items-center justify-between">
                       <div>
                         <p className="text-white font-medium">{player.name}</p>
@@ -876,8 +1009,15 @@ export default function AdminFemenina() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button type="submit" className="bg-pink-600 hover:bg-pink-700">
-                          Crear Partido
+                        <Button type="submit" className="bg-pink-600 hover:bg-pink-700" disabled={isCreatingMatch}>
+                          {isCreatingMatch ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Creando Partido...
+                            </>
+                          ) : (
+                            "Crear Partido"
+                          )}
                         </Button>
                         <Button type="button" variant="outline" onClick={() => setShowMatchForm(false)}>
                           Cancelar
