@@ -27,6 +27,36 @@ interface ByeWeek {
   round: number
 }
 
+const formatMatchDate = (dateString: string, format: "short" | "long" = "short") => {
+  // Extraer año, mes, día directamente del string YYYY-MM-DD
+  const [year, month, day] = dateString.split("-").map(Number)
+
+  if (format === "short") {
+    const monthNames = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+    return `${day} ${monthNames[month - 1]}`
+  } else {
+    const weekdays = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"]
+    const monthNames = [
+      "enero",
+      "febrero",
+      "marzo",
+      "abril",
+      "mayo",
+      "junio",
+      "julio",
+      "agosto",
+      "septiembre",
+      "octubre",
+      "noviembre",
+      "diciembre",
+    ]
+    // Crear fecha con componentes locales
+    const date = new Date(year, month - 1, day)
+    const weekday = weekdays[date.getDay()]
+    return `${weekday}, ${day} de ${monthNames[month - 1]}`
+  }
+}
+
 export default function LeagueFixtures() {
   const [matches, setMatches] = useState<Match[]>([])
   const [byeWeeks, setByeWeeks] = useState<ByeWeek[]>([])
@@ -187,9 +217,13 @@ export default function LeagueFixtures() {
 
                                 {/* Marcador */}
                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                  <span className="text-lg md:text-2xl font-bold">
-                                    {match.home_score} - {match.away_score}
-                                  </span>
+                                  {match.played ? (
+                                    <span className="text-lg md:text-2xl font-bold">
+                                      {match.home_score} - {match.away_score}
+                                    </span>
+                                  ) : (
+                                    <span className="text-pink-500 font-bold text-base md:text-lg">VS</span>
+                                  )}
                                 </div>
 
                                 {/* Visitante */}
@@ -211,12 +245,7 @@ export default function LeagueFixtures() {
                               <div className="mt-3 flex flex-wrap gap-2 md:gap-3 text-xs md:text-sm text-muted-foreground">
                                 <div className="flex items-center gap-1">
                                   <Calendar className="w-3 h-3 md:w-4 md:h-4" />
-                                  <span>
-                                    {new Date(match.match_date).toLocaleDateString("es-ES", {
-                                      day: "numeric",
-                                      month: "short",
-                                    })}
-                                  </span>
+                                  <span>{formatMatchDate(match.match_date, "short")}</span>
                                 </div>
                                 {match.match_time && (
                                   <div className="flex items-center gap-1">
@@ -369,7 +398,13 @@ export default function LeagueFixtures() {
 
                                 {/* VS */}
                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                  <span className="text-pink-500 font-bold text-base md:text-lg">VS</span>
+                                  {match.played ? (
+                                    <span className="text-lg md:text-2xl font-bold">
+                                      {match.home_score} - {match.away_score}
+                                    </span>
+                                  ) : (
+                                    <span className="text-pink-500 font-bold text-base md:text-lg">VS</span>
+                                  )}
                                 </div>
 
                                 {/* Visitante */}
@@ -391,13 +426,7 @@ export default function LeagueFixtures() {
                               <div className="mt-3 flex flex-wrap gap-2 md:gap-3 text-xs md:text-sm text-muted-foreground">
                                 <div className="flex items-center gap-1">
                                   <Calendar className="w-3 h-3 md:w-4 md:h-4" />
-                                  <span>
-                                    {new Date(match.match_date).toLocaleDateString("es-ES", {
-                                      weekday: "long",
-                                      day: "numeric",
-                                      month: "long",
-                                    })}
-                                  </span>
+                                  <span>{formatMatchDate(match.match_date, "long")}</span>
                                 </div>
                                 {match.match_time && (
                                   <div className="flex items-center gap-1">

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X, ArrowLeft, Trophy, Calendar, Target, Users } from "lucide-react"
+import { Menu, X, ArrowLeft, Trophy, Calendar, Target, Users, FileText, Download } from "lucide-react"
 import { useRouter } from "next/navigation"
 import LoadingAnimation from "@/components/loading-animation"
 import WhatsAppButton from "@/components/whatsapp-button"
@@ -11,7 +11,7 @@ import LeagueFixtures from "@/components/league-fixtures"
 import LeagueTopScorers from "@/components/league-top-scorers"
 import LeagueTeamsRoster from "@/components/league-teams-roster"
 import NewsSection from "@/components/news-section"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function FemeninaPage() {
   const router = useRouter()
@@ -119,9 +119,9 @@ export default function FemeninaPage() {
               <Button
                 variant="ghost"
                 className="text-white hover:bg-pink-500/20 hover:text-pink-500 text-sm lg:text-base"
-                onClick={() => setActiveSection("goleadores")}
+                onClick={() => setActiveSection("goleadoras")}
               >
-                Goleadores
+                Goleadoras
               </Button>
               <Button
                 variant="ghost"
@@ -180,11 +180,11 @@ export default function FemeninaPage() {
                   variant="ghost"
                   className="text-white hover:bg-pink-500/20 hover:text-pink-500 justify-start"
                   onClick={() => {
-                    setActiveSection("goleadores")
+                    setActiveSection("goleadoras")
                     setIsMobileMenuOpen(false)
                   }}
                 >
-                  Goleadores
+                  Goleadoras
                 </Button>
                 <Button
                   variant="ghost"
@@ -205,49 +205,87 @@ export default function FemeninaPage() {
       <main className="py-8 md:py-12">
         <div className="container mx-auto px-4">
           {activeSection === "inicio" && (
-            <div className="text-center text-white mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4 text-pink-500">SuperLiga Femenina 2025</h2>
-              <p className="text-gray-300 text-lg mb-8">Formato de liga - Todos contra todos</p>
+            <div className="space-y-8">
+              <div className="text-center text-white mb-12">
+                <h2 className="text-3xl md:text-4xl font-bold mb-4 text-pink-500">SuperLiga Femenina 2025</h2>
+                <p className="text-gray-300 text-lg mb-8">Formato de liga - Todos contra todos</p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
-                <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
-                  <CardContent className="p-6 text-center">
-                    <Trophy className="w-12 h-12 mx-auto mb-3 text-pink-500" />
-                    <h3 className="text-xl font-bold mb-2">Tabla de Posiciones</h3>
-                    <p className="text-gray-400 text-sm">Seguí la clasificación en tiempo real</p>
-                  </CardContent>
-                </Card>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
+                  <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
+                    <CardContent className="p-6 text-center">
+                      <Trophy className="w-12 h-12 mx-auto mb-3 text-pink-500" />
+                      <h3 className="text-xl font-bold mb-2">Tabla de Posiciones</h3>
+                      <p className="text-gray-400 text-sm">Seguí la clasificación en tiempo real</p>
+                    </CardContent>
+                  </Card>
 
-                <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
-                  <CardContent className="p-6 text-center">
-                    <Calendar className="w-12 h-12 mx-auto mb-3 text-pink-500" />
-                    <h3 className="text-xl font-bold mb-2">Fixtures</h3>
-                    <p className="text-gray-400 text-sm">Calendario completo de partidos</p>
-                  </CardContent>
-                </Card>
+                  <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
+                    <CardContent className="p-6 text-center">
+                      <Calendar className="w-12 h-12 mx-auto mb-3 text-pink-500" />
+                      <h3 className="text-xl font-bold mb-2">Fixtures</h3>
+                      <p className="text-gray-400 text-sm">Calendario completo de partidos</p>
+                    </CardContent>
+                  </Card>
 
-                <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
-                  <CardContent className="p-6 text-center">
-                    <Target className="w-12 h-12 mx-auto mb-3 text-pink-500" />
-                    <h3 className="text-xl font-bold mb-2">Goleadoras</h3>
-                    <p className="text-gray-400 text-sm">Ranking de máximas anotadoras</p>
-                  </CardContent>
-                </Card>
+                  <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
+                    <CardContent className="p-6 text-center">
+                      <Target className="w-12 h-12 mx-auto mb-3 text-pink-500" />
+                      <h3 className="text-xl font-bold mb-2">Goleadoras</h3>
+                      <p className="text-gray-400 text-sm">Ranking de máximas anotadoras</p>
+                    </CardContent>
+                  </Card>
 
-                <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
-                  <CardContent className="p-6 text-center">
-                    <Users className="w-12 h-12 mx-auto mb-3 text-pink-500" />
-                    <h3 className="text-xl font-bold mb-2">Equipos</h3>
-                    <p className="text-gray-400 text-sm">Planteles completos</p>
-                  </CardContent>
-                </Card>
+                  <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
+                    <CardContent className="p-6 text-center">
+                      <Users className="w-12 h-12 mx-auto mb-3 text-pink-500" />
+                      <h3 className="text-xl font-bold mb-2">Equipos</h3>
+                      <p className="text-gray-400 text-sm">Planteles completos</p>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
+
+              <NewsSection tournamentColor="pink" />
+
+              <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-pink-500">
+                    <FileText className="w-6 h-6" />
+                    Reglamento Oficial
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-300 mb-4">
+                    Descarga el reglamento oficial de la SuperLiga Femenina 2025. Incluye sistema de competencia, reglas
+                    del juego y normativas específicas.
+                  </p>
+                  <ul className="list-disc list-inside text-gray-400 mb-6 space-y-1">
+                    <li>Sistema de puntuación y clasificación</li>
+                    <li>Reglamento completo del torneo</li>
+                    <li>Normativas y procedimientos</li>
+                  </ul>
+                  <Button
+                    className="bg-pink-500 hover:bg-pink-600 text-white"
+                    onClick={() => {
+                      const link = document.createElement("a")
+                      link.href = "/reglamento-femenina.txt"
+                      link.download = "Reglamento_SuperLiga_Femenina_2025.txt"
+                      document.body.appendChild(link)
+                      link.click()
+                      document.body.removeChild(link)
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Descargar Reglamento
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           )}
 
           {activeSection === "tabla" && <LeagueStandings />}
           {activeSection === "fixtures" && <LeagueFixtures />}
-          {activeSection === "goleadores" && <LeagueTopScorers />}
+          {activeSection === "goleadoras" && <LeagueTopScorers />}
           {activeSection === "equipos" && <LeagueTeamsRoster />}
           {activeSection === "noticias" && (
             <div className="text-white">

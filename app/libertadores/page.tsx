@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X, ArrowLeft } from "lucide-react"
+import { Menu, X, ArrowLeft, Trophy, Calendar, Target, Users, FileText, Download } from "lucide-react"
 import { useRouter } from "next/navigation"
 import LoadingAnimation from "@/components/loading-animation"
 import FixturesSystem from "@/components/fixtures-system"
@@ -10,7 +10,9 @@ import TopScorers from "@/components/top-scorers"
 import WhatsAppButton from "@/components/whatsapp-button"
 import CopaLibertadores from "@/components/copa-libertadores"
 import TeamsRoster from "@/components/teams-roster"
-import HomeSection from "@/components/home-section"
+import NewsSection from "@/components/news-section"
+import { Card } from "@/components/ui/card"
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function LibertadoresPage() {
   const router = useRouter()
@@ -192,7 +194,82 @@ export default function LibertadoresPage() {
       {activeSection === "inicio" && (
         <section className="py-8 md:py-12">
           <div className="container mx-auto px-4">
-            <HomeSection onNavigate={setActiveSection} />
+            <div className="space-y-8">
+              <div className="text-center text-white mb-12">
+                <h2 className="text-3xl md:text-4xl font-bold mb-4 text-yellow-500">Copa Libertadores 2025</h2>
+                <p className="text-gray-300 text-lg mb-8">Fase de grupos - Sistema de eliminación directa</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
+                  <Card className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/30">
+                    <CardContent className="p-6 text-center">
+                      <Trophy className="w-12 h-12 mx-auto mb-3 text-yellow-500" />
+                      <h3 className="text-xl font-bold mb-2">Tabla de Grupos</h3>
+                      <p className="text-gray-400 text-sm">Seguí la clasificación de cada grupo</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/30">
+                    <CardContent className="p-6 text-center">
+                      <Calendar className="w-12 h-12 mx-auto mb-3 text-yellow-500" />
+                      <h3 className="text-xl font-bold mb-2">Fixtures</h3>
+                      <p className="text-gray-400 text-sm">Calendario completo de partidos</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/30">
+                    <CardContent className="p-6 text-center">
+                      <Target className="w-12 h-12 mx-auto mb-3 text-yellow-500" />
+                      <h3 className="text-xl font-bold mb-2">Goleadores</h3>
+                      <p className="text-gray-400 text-sm">Ranking de máximos goleadores</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/30">
+                    <CardContent className="p-6 text-center">
+                      <Users className="w-12 h-12 mx-auto mb-3 text-yellow-500" />
+                      <h3 className="text-xl font-bold mb-2">Equipos</h3>
+                      <p className="text-gray-400 text-sm">Planteles completos</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              <NewsSection tournamentColor="yellow" />
+
+              <Card className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-yellow-500">
+                    <FileText className="w-6 h-6" />
+                    Reglamento Oficial
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-300 mb-4">
+                    Descarga el reglamento oficial de la Copa Libertadores 2025. Incluye sistema de competencia, reglas
+                    del juego y normativas específicas.
+                  </p>
+                  <ul className="list-disc list-inside text-gray-400 mb-6 space-y-1">
+                    <li>Fase de grupos y clasificación</li>
+                    <li>Reglamento completo del torneo</li>
+                    <li>Normativas y procedimientos</li>
+                  </ul>
+                  <Button
+                    className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
+                    onClick={() => {
+                      const link = document.createElement("a")
+                      link.href = "/reglamento.txt"
+                      link.download = "Reglamento_Copa_Libertadores_2025.txt"
+                      document.body.appendChild(link)
+                      link.click()
+                      document.body.removeChild(link)
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Descargar Reglamento
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </section>
       )}
