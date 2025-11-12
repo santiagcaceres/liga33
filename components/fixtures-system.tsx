@@ -175,9 +175,11 @@ export default function FixturesSystem({ competition }: FixturesSystemProps) {
                               </div>
 
                               <div className="mt-3 flex flex-wrap gap-2 md:gap-3 text-xs md:text-sm text-muted-foreground">
-                                <Badge variant="outline" className="text-xs">
-                                  {match.copa_groups.name}
-                                </Badge>
+                                {match.copa_groups?.name && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {match.copa_groups.name}
+                                  </Badge>
+                                )}
                                 <div className="flex items-center gap-1">
                                   <Calendar className="w-3 h-3 md:w-4 md:h-4" />
                                   <span>
@@ -326,9 +328,11 @@ export default function FixturesSystem({ competition }: FixturesSystemProps) {
                               </div>
 
                               <div className="mt-3 flex flex-wrap gap-2 md:gap-3 text-xs md:text-sm text-muted-foreground">
-                                <Badge variant="outline" className="text-xs">
-                                  {match.copa_groups.name}
-                                </Badge>
+                                {match.copa_groups?.name && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {match.copa_groups.name}
+                                  </Badge>
+                                )}
                                 <div className="flex items-center gap-1">
                                   <Calendar className="w-3 h-3 md:w-4 md:h-4" />
                                   <span>

@@ -1,11 +1,14 @@
 -- Crear grupo para SuperLiga Femenina y asignar todos los equipos
 -- Este script asigna todos los equipos del torneo femenino a un grupo único
 
--- Primero, alterar la constraint para permitir 'F' además de 'A', 'B', 'C'
+-- Expandir constraint para permitir más letras de grupos
 ALTER TABLE copa_groups DROP CONSTRAINT IF EXISTS copa_groups_name_check;
-ALTER TABLE copa_groups ADD CONSTRAINT copa_groups_name_check CHECK (name IN ('A', 'B', 'C', 'F'));
+ALTER TABLE copa_groups ADD CONSTRAINT copa_groups_name_check CHECK (name IN ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'));
 
--- Insertar grupo 'F' para SuperLiga Femenina
+-- Eliminar grupo F existente si no tiene tournament_id correcto
+DELETE FROM copa_groups WHERE name = 'F' AND (tournament_id IS NULL OR tournament_id != 2);
+
+-- Insertar grupo 'F' para SuperLiga Femenina con tournament_id = 2
 INSERT INTO copa_groups (name, tournament_id)
 VALUES ('F', 2)
 ON CONFLICT DO NOTHING;

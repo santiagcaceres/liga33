@@ -21,35 +21,24 @@ export async function createMatch(formData: FormData) {
 
     const home_team_id = Number.parseInt(formData.get("home_team_id") as string)
     const away_team_id = Number.parseInt(formData.get("away_team_id") as string)
-    let group_id = Number.parseInt(formData.get("group_id") as string)
+    const group_id = Number.parseInt(formData.get("group_id") as string)
     const tournament_id = Number.parseInt(formData.get("tournament_id") as string)
     const round = Number.parseInt(formData.get("round") as string)
     const match_date = formData.get("match_date") as string
     const match_time = formData.get("match_time") as string | null
     const field = formData.get("field") as string | null
 
-    if (group_id === 0 && tournament_id === 2) {
-      console.log("[v0] Getting default group for women's tournament...")
-      const { data: defaultGroup } = await supabase
-        .from("copa_groups")
-        .select("id")
-        .eq("tournament_id", 2)
-        .eq("name", "SuperLiga Femenina")
-        .single()
+    let finalGroupId: number | null = group_id
 
-      if (defaultGroup) {
-        group_id = defaultGroup.id
-        console.log("[v0] Using default group ID:", group_id)
-      } else {
-        console.error("[v0] ❌ Default group not found for women's tournament")
-        return { success: false, error: "Grupo no encontrado. Ejecuta el script 010_create_femenino_group.sql" }
-      }
+    if (tournament_id === 2) {
+      console.log("[v0] Women's tournament - using NULL for group_id")
+      finalGroupId = null
     }
 
     console.log("[v0] Parsed values:", {
       home_team_id,
       away_team_id,
-      group_id,
+      group_id: finalGroupId,
       tournament_id,
       round,
       match_date,
@@ -62,36 +51,37 @@ export async function createMatch(formData: FormData) {
       return { success: false, error: "Un equipo no puede jugar contra sí mismo" }
     }
 
-    const { data: homeTeamGroup } = await supabase
-      .from("team_groups")
-      .select("group_id")
-      .eq("team_id", home_team_id)
-      .eq("group_id", group_id)
-      .single()
+    if (tournament_id === 1 && finalGroupId) {
+      const { data: homeTeamGroup } = await supabase
+        .from("team_groups")
+        .select("group_id")
+        .eq("team_id", home_team_id)
+        .eq("group_id", finalGroupId)
+        .single()
 
-    const { data: awayTeamGroup } = await supabase
-      .from("team_groups")
-      .select("group_id")
-      .eq("team_id", away_team_id)
-      .eq("group_id", group_id)
-      .single()
+      const { data: awayTeamGroup } = await supabase
+        .from("team_groups")
+        .select("group_id")
+        .eq("team_id", away_team_id)
+        .eq("group_id", finalGroupId)
+        .single()
 
-    console.log("[v0] Team groups validation:", {
-      homeTeamGroup,
-      awayTeamGroup,
-      tournament_id,
-    })
+      console.log("[v0] Team groups validation:", {
+        homeTeamGroup,
+        awayTeamGroup,
+        tournament_id,
+      })
 
-    // Solo validar grupos para Copa Libertadores (tournament_id = 1)
-    if (tournament_id === 1 && (!homeTeamGroup || !awayTeamGroup)) {
-      console.error("[v0] ❌ Teams do not belong to the same group (Libertadores)")
-      return { success: false, error: "Ambos equipos deben pertenecer al mismo grupo" }
+      if (!homeTeamGroup || !awayTeamGroup) {
+        console.error("[v0] ❌ Teams do not belong to the same group (Libertadores)")
+        return { success: false, error: "Ambos equipos deben pertenecer al mismo grupo" }
+      }
     }
 
     const matchData: any = {
       home_team_id,
       away_team_id,
-      group_id,
+      group_id: finalGroupId,
       tournament_id,
       round,
       match_date,

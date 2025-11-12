@@ -36,7 +36,6 @@ export default function LeagueFixtures() {
     const loadData = async () => {
       const supabase = createClient()
 
-      // Load matches
       const { data: matchData, error: matchError } = await supabase
         .from("matches")
         .select(
@@ -85,25 +84,11 @@ export default function LeagueFixtures() {
     loadData()
   }, [])
 
-  const groupGoalsByPlayer = (goals: Match["goals"], teamId: number) => {
-    if (!goals) return []
-    const teamGoals = goals.filter((g) => g.team_id === teamId)
-    const grouped = teamGoals.reduce(
-      (acc, goal) => {
-        const playerName = goal.players.name
-        acc[playerName] = (acc[playerName] || 0) + 1
-        return acc
-      },
-      {} as Record<string, number>,
-    )
-    return Object.entries(grouped).map(([name, count]) => ({ name, count }))
-  }
-
   if (loading) {
     return (
-      <Card className="border-pink-500/30 bg-gradient-to-br from-pink-500/5 to-purple-500/5">
+      <Card className="border-pink-500/30 bg-card">
         <CardContent className="p-8">
-          <div className="text-center text-gray-400">Cargando fixtures...</div>
+          <div className="text-center text-muted-foreground">Cargando partidos...</div>
         </CardContent>
       </Card>
     )
@@ -111,212 +96,332 @@ export default function LeagueFixtures() {
 
   if (matches.length === 0 && byeWeeks.length === 0) {
     return (
-      <Card className="border-pink-500/30 bg-gradient-to-br from-pink-500/5 to-purple-500/5">
+      <Card className="border-pink-500/30 bg-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-pink-500">
             <Calendar className="w-6 h-6" />
-            Fixtures
+            Fixture
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center text-gray-400 py-8">Los fixtures estarán disponibles próximamente</div>
+          <div className="text-center py-12 text-muted-foreground">
+            <Calendar className="w-16 h-16 mx-auto mb-4 opacity-50 text-pink-500" />
+            <p className="text-lg">No hay partidos programados</p>
+          </div>
         </CardContent>
       </Card>
     )
   }
 
-  const groupedByRound = matches.reduce(
-    (acc, match) => {
-      if (!acc[match.round]) acc[match.round] = { matches: [], byeWeeks: [] }
-      acc[match.round].matches.push(match)
-      return acc
-    },
-    {} as Record<number, { matches: Match[]; byeWeeks: ByeWeek[] }>,
-  )
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayISO = today.toISOString().split("T")[0]
 
-  byeWeeks.forEach((bye) => {
-    if (!groupedByRound[bye.round]) {
-      groupedByRound[bye.round] = { matches: [], byeWeeks: [] }
-    }
-    groupedByRound[bye.round].byeWeeks.push(bye)
-  })
+  const pastMatches = matches.filter((m) => m.played || m.match_date < todayISO)
+  const upcomingMatches = matches.filter((m) => !m.played && m.match_date >= todayISO)
 
   return (
     <div className="space-y-6">
-      {Object.entries(groupedByRound)
-        .sort(([a], [b]) => Number(b) - Number(a))
-        .map(([round, { matches: roundMatches, byeWeeks: roundByes }]) => (
-          <Card key={round} className="border-pink-500/30 bg-gradient-to-br from-pink-500/5 to-purple-500/5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-pink-500">
-                <Calendar className="w-6 h-6" />
-                Fecha {round}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {roundByes.map((bye) => (
-                  <div
-                    key={bye.id}
-                    className="p-4 rounded-lg border border-pink-500/30 bg-gradient-to-r from-pink-500/10 to-purple-500/5"
-                  >
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={bye.team.logo_url || "/placeholder.svg"}
-                        alt={bye.team.name}
-                        className="w-12 h-12 object-contain"
-                      />
-                      <div>
-                        <span className="font-semibold text-white text-lg">{bye.team.name}</span>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge className="bg-pink-500/20 text-pink-300 border-pink-500/30">Fecha Libre</Badge>
-                        </div>
-                      </div>
+      {/* Resultados */}
+      {pastMatches.length > 0 && (
+        <Card className="border-pink-500/30 bg-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-pink-500">
+              <Calendar className="w-6 h-6" />
+              Resultados
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {Array.from(new Set(pastMatches.map((m) => m.round)))
+                .sort((a, b) => b - a)
+                .map((round) => (
+                  <div key={round} className="space-y-2">
+                    <h3 className="font-semibold text-pink-500">Fecha {round}</h3>
+                    <div className="grid gap-3">
+                      {/* Fechas libres */}
+                      {byeWeeks
+                        .filter((bye) => bye.round === round)
+                        .map((bye) => (
+                          <Card key={bye.id} className="border-pink-500/30 bg-pink-500/5">
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-3">
+                                {bye.team.logo_url && (
+                                  <img
+                                    src={bye.team.logo_url || "/placeholder.svg"}
+                                    alt={bye.team.name}
+                                    className="w-10 h-10 object-contain flex-shrink-0"
+                                  />
+                                )}
+                                <div className="flex-1">
+                                  <span className="font-semibold">{bye.team.name}</span>
+                                  <Badge className="ml-3 bg-pink-500/20 text-pink-300 border-pink-500/30">
+                                    Fecha Libre
+                                  </Badge>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+
+                      {/* Partidos */}
+                      {pastMatches
+                        .filter((m) => m.round === round)
+                        .map((match) => (
+                          <Card key={match.id} className="border-pink-500/30 bg-pink-500/5">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between gap-2 md:gap-4">
+                                {/* Local */}
+                                <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                                  {match.home_team.logo_url && (
+                                    <img
+                                      src={match.home_team.logo_url || "/placeholder.svg"}
+                                      alt={match.home_team.name}
+                                      className="w-8 h-8 md:w-12 md:h-12 object-contain flex-shrink-0"
+                                    />
+                                  )}
+                                  <span className="font-semibold text-xs md:text-base truncate">
+                                    {match.home_team.name}
+                                  </span>
+                                </div>
+
+                                {/* Marcador */}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className="text-lg md:text-2xl font-bold">
+                                    {match.home_score} - {match.away_score}
+                                  </span>
+                                </div>
+
+                                {/* Visitante */}
+                                <div className="flex items-center gap-2 md:gap-3 flex-1 justify-end min-w-0">
+                                  <span className="font-semibold text-xs md:text-base text-right truncate">
+                                    {match.away_team.name}
+                                  </span>
+                                  {match.away_team.logo_url && (
+                                    <img
+                                      src={match.away_team.logo_url || "/placeholder.svg"}
+                                      alt={match.away_team.name}
+                                      className="w-8 h-8 md:w-12 md:h-12 object-contain flex-shrink-0"
+                                    />
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Información del partido */}
+                              <div className="mt-3 flex flex-wrap gap-2 md:gap-3 text-xs md:text-sm text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3 md:w-4 md:h-4" />
+                                  <span>
+                                    {new Date(match.match_date).toLocaleDateString("es-ES", {
+                                      day: "numeric",
+                                      month: "short",
+                                    })}
+                                  </span>
+                                </div>
+                                {match.match_time && (
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3 md:w-4 md:h-4" />
+                                    <span>{match.match_time.slice(0, 5)}</span>
+                                  </div>
+                                )}
+                                {match.field && (
+                                  <div className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3 md:w-4 md:h-4" />
+                                    <span>{match.field}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Goles y tarjetas */}
+                              {(match.goals?.length > 0 || match.cards?.length > 0) && (
+                                <div className="mt-3 pt-3 border-t border-pink-500/20 space-y-2 text-sm">
+                                  {match.goals && match.goals.length > 0 && (
+                                    <div className="flex items-start gap-2">
+                                      <span className="font-medium">⚽</span>
+                                      <div className="flex-1">
+                                        {(() => {
+                                          const goalsByPlayer = match.goals.reduce(
+                                            (acc, goal) => {
+                                              const playerId = goal.player_id
+                                              const playerName = goal.players.name
+                                              if (!acc[playerId]) {
+                                                acc[playerId] = { name: playerName, count: 0 }
+                                              }
+                                              acc[playerId].count += 1
+                                              return acc
+                                            },
+                                            {} as Record<number, { name: string; count: number }>,
+                                          )
+
+                                          return Object.values(goalsByPlayer).map((player, idx) => (
+                                            <span key={idx} className="inline-block mr-2">
+                                              {player.name}
+                                              {player.count > 1 && ` x${player.count}`}
+                                            </span>
+                                          ))
+                                        })()}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {match.cards && match.cards.filter((c) => c.card_type === "yellow").length > 0 && (
+                                    <div className="flex items-start gap-2">
+                                      <span className="font-medium">🟨</span>
+                                      <div className="flex-1">
+                                        {match.cards
+                                          .filter((c) => c.card_type === "yellow")
+                                          .map((card, idx) => (
+                                            <span key={idx} className="inline-block mr-2">
+                                              {card.players.name}
+                                            </span>
+                                          ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {match.cards && match.cards.filter((c) => c.card_type === "red").length > 0 && (
+                                    <div className="flex items-start gap-2">
+                                      <span className="font-medium">🟥</span>
+                                      <div className="flex-1">
+                                        {match.cards
+                                          .filter((c) => c.card_type === "red")
+                                          .map((card, idx) => (
+                                            <span key={idx} className="inline-block mr-2">
+                                              {card.players.name}
+                                            </span>
+                                          ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
                     </div>
                   </div>
                 ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-                {/* Existing matches */}
-                {roundMatches.map((match) => {
-                  const homeGoals = groupGoalsByPlayer(match.goals, match.home_team.id)
-                  const awayGoals = groupGoalsByPlayer(match.goals, match.away_team.id)
-                  const homeCards = match.cards?.filter((c) => c.team_id === match.home_team.id) || []
-                  const awayCards = match.cards?.filter((c) => c.team_id === match.away_team.id) || []
+      {/* Próximos Partidos */}
+      {upcomingMatches.length > 0 && (
+        <Card className="border-pink-500/30 bg-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-pink-500">
+              <Calendar className="w-6 h-6" />
+              Próximos Partidos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {Array.from(new Set(upcomingMatches.map((m) => m.round)))
+                .sort((a, b) => a - b)
+                .map((round) => (
+                  <div key={round} className="space-y-2">
+                    <h3 className="font-semibold text-pink-500">Fecha {round}</h3>
+                    <div className="grid gap-3">
+                      {/* Fechas libres */}
+                      {byeWeeks
+                        .filter((bye) => bye.round === round)
+                        .map((bye) => (
+                          <Card key={bye.id} className="border-pink-500/30 bg-pink-500/5">
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-3">
+                                {bye.team.logo_url && (
+                                  <img
+                                    src={bye.team.logo_url || "/placeholder.svg"}
+                                    alt={bye.team.name}
+                                    className="w-10 h-10 object-contain flex-shrink-0"
+                                  />
+                                )}
+                                <div className="flex-1">
+                                  <span className="font-semibold">{bye.team.name}</span>
+                                  <Badge className="ml-3 bg-pink-500/20 text-pink-300 border-pink-500/30">
+                                    Fecha Libre
+                                  </Badge>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
 
-                  return (
-                    <div
-                      key={match.id}
-                      className="p-4 rounded-lg border border-pink-500/20 bg-gradient-to-r from-pink-500/5 to-transparent"
-                    >
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3 flex-1">
-                              <img
-                                src={match.home_team.logo_url || "/placeholder.svg"}
-                                alt={match.home_team.name}
-                                className="w-10 h-10 object-contain"
-                              />
-                              <span className="font-semibold text-white">{match.home_team.name}</span>
-                            </div>
-                            {match.played ? (
-                              <span className="text-2xl font-bold text-white mx-4">{match.home_score}</span>
-                            ) : (
-                              <span className="text-gray-500 mx-4">-</span>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3 flex-1">
-                              <img
-                                src={match.away_team.logo_url || "/placeholder.svg"}
-                                alt={match.away_team.name}
-                                className="w-10 h-10 object-contain"
-                              />
-                              <span className="font-semibold text-white">{match.away_team.name}</span>
-                            </div>
-                            {match.played ? (
-                              <span className="text-2xl font-bold text-white mx-4">{match.away_score}</span>
-                            ) : (
-                              <span className="text-gray-500 mx-4">-</span>
-                            )}
-                          </div>
-                        </div>
+                      {/* Partidos */}
+                      {upcomingMatches
+                        .filter((m) => m.round === round)
+                        .map((match) => (
+                          <Card key={match.id} className="border-pink-500/30 bg-pink-500/5">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between gap-2 md:gap-4">
+                                {/* Local */}
+                                <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                                  {match.home_team.logo_url && (
+                                    <img
+                                      src={match.home_team.logo_url || "/placeholder.svg"}
+                                      alt={match.home_team.name}
+                                      className="w-8 h-8 md:w-12 md:h-12 object-contain flex-shrink-0"
+                                    />
+                                  )}
+                                  <span className="font-semibold text-xs md:text-base truncate">
+                                    {match.home_team.name}
+                                  </span>
+                                </div>
 
-                        <div className="flex flex-col gap-2 text-sm text-gray-400 md:text-right">
-                          <div className="flex items-center gap-2 md:justify-end">
-                            <Calendar className="w-4 h-4" />
-                            {new Date(match.match_date).toLocaleDateString("es-UY")}
-                          </div>
-                          {match.match_time && (
-                            <div className="flex items-center gap-2 md:justify-end">
-                              <Clock className="w-4 h-4" />
-                              {match.match_time}
-                            </div>
-                          )}
-                          {match.field && (
-                            <div className="flex items-center gap-2 md:justify-end">
-                              <MapPin className="w-4 h-4" />
-                              {match.field}
-                            </div>
-                          )}
-                          <Badge
-                            variant={match.played ? "default" : "secondary"}
-                            className={match.played ? "bg-pink-500" : ""}
-                          >
-                            {match.played ? "Finalizado" : "Próximo"}
-                          </Badge>
-                        </div>
-                      </div>
+                                {/* VS */}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className="text-pink-500 font-bold text-base md:text-lg">VS</span>
+                                </div>
 
-                      {match.played &&
-                        (homeGoals.length > 0 ||
-                          awayGoals.length > 0 ||
-                          homeCards.length > 0 ||
-                          awayCards.length > 0) && (
-                          <div className="mt-4 pt-4 border-t border-pink-500/20 text-sm">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                {homeGoals.length > 0 && (
-                                  <div className="mb-2">
-                                    <div className="text-gray-400 mb-1">⚽ Goles:</div>
-                                    <div className="text-gray-300 space-y-1">
-                                      {homeGoals.map((goal, idx) => (
-                                        <div key={idx}>
-                                          {goal.name} {goal.count > 1 && `x${goal.count}`}
-                                        </div>
-                                      ))}
-                                    </div>
+                                {/* Visitante */}
+                                <div className="flex items-center gap-2 md:gap-3 flex-1 justify-end min-w-0">
+                                  <span className="font-semibold text-xs md:text-base text-right truncate">
+                                    {match.away_team.name}
+                                  </span>
+                                  {match.away_team.logo_url && (
+                                    <img
+                                      src={match.away_team.logo_url || "/placeholder.svg"}
+                                      alt={match.away_team.name}
+                                      className="w-8 h-8 md:w-12 md:h-12 object-contain flex-shrink-0"
+                                    />
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Información del partido */}
+                              <div className="mt-3 flex flex-wrap gap-2 md:gap-3 text-xs md:text-sm text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3 md:w-4 md:h-4" />
+                                  <span>
+                                    {new Date(match.match_date).toLocaleDateString("es-ES", {
+                                      weekday: "long",
+                                      day: "numeric",
+                                      month: "long",
+                                    })}
+                                  </span>
+                                </div>
+                                {match.match_time && (
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3 md:w-4 md:h-4" />
+                                    <span>{match.match_time.slice(0, 5)}</span>
                                   </div>
                                 )}
-                                {homeCards.length > 0 && (
-                                  <div>
-                                    <div className="text-gray-400 mb-1">🟨 Tarjetas:</div>
-                                    <div className="text-gray-300 space-y-1">
-                                      {homeCards.map((card, idx) => (
-                                        <div key={idx}>
-                                          {card.card_type === "yellow" ? "🟨" : "🟥"} {card.players.name}
-                                        </div>
-                                      ))}
-                                    </div>
+                                {match.field && (
+                                  <div className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3 md:w-4 md:h-4" />
+                                    <span>{match.field}</span>
                                   </div>
                                 )}
                               </div>
-                              <div>
-                                {awayGoals.length > 0 && (
-                                  <div className="mb-2">
-                                    <div className="text-gray-400 mb-1">⚽ Goles:</div>
-                                    <div className="text-gray-300 space-y-1">
-                                      {awayGoals.map((goal, idx) => (
-                                        <div key={idx}>
-                                          {goal.name} {goal.count > 1 && `x${goal.count}`}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                                {awayCards.length > 0 && (
-                                  <div>
-                                    <div className="text-gray-400 mb-1">🟨 Tarjetas:</div>
-                                    <div className="text-gray-300 space-y-1">
-                                      {awayCards.map((card, idx) => (
-                                        <div key={idx}>
-                                          {card.card_type === "yellow" ? "🟨" : "🟥"} {card.players.name}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
+                            </CardContent>
+                          </Card>
+                        ))}
                     </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

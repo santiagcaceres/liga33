@@ -18,13 +18,13 @@ import { getMatchesByTournament, createMatch, updateMatchResult } from "@/lib/ac
 import { addGoal, deleteGoal, getMatchGoals } from "@/lib/actions/goals"
 import { addCard, deleteCard, getMatchCards } from "@/lib/actions/cards"
 import { createByeWeek, getByeWeeks, deleteByeWeek } from "@/lib/actions/bye-weeks"
-import { getGroupsByTournament } from "@/lib/actions/groups" // Import getGroupsByTournament
+// Removed: import { getGroupsByTournament } from "@/lib/actions/groups" // Import getGroupsByTournament
 
 export default function AdminFemenina() {
   const { toast } = useToast()
   const TOURNAMENT_ID = 2 // SuperLiga Femenina
 
-  const [defaultGroupId, setDefaultGroupId] = useState<number | null>(null)
+  // Removed: const [defaultGroupId, setDefaultGroupId] = useState<number | null>(null)
 
   const [isLoading, setIsLoading] = useState(true)
   const [isCreatingTeam, setIsCreatingTeam] = useState(false)
@@ -74,24 +74,6 @@ export default function AdminFemenina() {
   const loadAllData = async () => {
     setIsLoading(true)
     try {
-      const groupsData = await getGroupsByTournament(TOURNAMENT_ID)
-      const groupF = groupsData.find((g: any) => g.name === "F")
-
-      console.log("[v0] 📋 Groups for tournament:", groupsData)
-      console.log("[v0] 🎯 Found group F:", groupF)
-
-      if (groupF) {
-        setDefaultGroupId(groupF.id)
-      } else {
-        console.error("[v0] ❌ No se encontró el grupo F para el torneo femenino")
-        toast({
-          title: "Advertencia",
-          description: "No se encontró el grupo por defecto. Ejecuta el script 010_create_femenino_group.sql",
-          variant: "destructive",
-          className: "border-pink-500/50 bg-gray-900",
-        })
-      }
-
       const [teamsData, playersData, matchesData, byeWeeksData] = await Promise.all([
         getTeamsByTournament(TOURNAMENT_ID),
         getPlayersByTournament(TOURNAMENT_ID),
@@ -439,16 +421,17 @@ export default function AdminFemenina() {
     e.preventDefault()
     console.log("[v0] ============ HANDLE CREATE MATCH START ============")
 
-    if (!defaultGroupId) {
-      toast({
-        title: "Error",
-        description: "No se pudo obtener el grupo por defecto. Ejecuta el script 010_create_femenino_group.sql",
-        variant: "destructive",
-        className: "border-pink-500/50 bg-gray-900",
-      })
-      console.error("[v0] ❌ Cannot create match: defaultGroupId is null")
-      return
-    }
+    // Removed group check - women's tournament doesn't use groups
+    // if (!defaultGroupId) {
+    //   toast({
+    //     title: "Error",
+    //     description: "No se pudo obtener el grupo por defecto. Ejecuta el script 010_create_femenino_group.sql",
+    //     variant: "destructive",
+    //     className: "border-pink-500/50 bg-gray-900",
+    //   })
+    //   console.error("[v0] ❌ Cannot create match: defaultGroupId is null")
+    //   return
+    // }
 
     setIsCreatingMatch(true) // Show loading state
     const formData = new FormData(e.currentTarget)
@@ -463,7 +446,7 @@ export default function AdminFemenina() {
     })
 
     formData.append("tournament_id", TOURNAMENT_ID.toString())
-    formData.append("group_id", defaultGroupId.toString())
+    formData.append("group_id", "0")
 
     console.log("[v0] Form data after append:", {
       home_team_id: formData.get("home_team_id"),
@@ -1185,7 +1168,7 @@ export default function AdminFemenina() {
                             name="home_score"
                             type="number"
                             min="0"
-                            defaultValue={selectedMatch.home_score}
+                            defaultValue={selectedMatch.home_score || 0}
                             required
                             className="bg-gray-800 border-gray-700"
                           />
@@ -1197,7 +1180,7 @@ export default function AdminFemenina() {
                             name="away_score"
                             type="number"
                             min="0"
-                            defaultValue={selectedMatch.away_score}
+                            defaultValue={selectedMatch.away_score || 0}
                             required
                             className="bg-gray-800 border-gray-700"
                           />
@@ -1378,7 +1361,7 @@ export default function AdminFemenina() {
                 </Card>
               )}
 
-              <div className="max-h-96 overflow-y-auto space-y-2">
+              <div className="max-h-[500px] overflow-y-auto space-y-2">
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                     <Loader2 className="w-8 h-8 animate-spin text-pink-500 mb-3" />
