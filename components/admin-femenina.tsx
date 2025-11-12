@@ -15,8 +15,6 @@ import { useToast } from "@/hooks/use-toast"
 import { getTeamsByTournament, createTeam, updateTeam, deleteTeam } from "@/lib/actions/teams"
 import { getPlayersByTournament, createPlayer, updatePlayer, deletePlayer } from "@/lib/actions/players"
 import { getMatchesByTournament, createMatch, updateMatchResult } from "@/lib/actions/matches"
-import { addGoal, deleteGoal, getMatchGoals } from "@/lib/actions/goals"
-import { addCard, deleteCard, getMatchCards } from "@/lib/actions/cards"
 import { createByeWeek, getByeWeeks, deleteByeWeek } from "@/lib/actions/bye-weeks"
 // Removed: import { getGroupsByTournament } from "@/lib/actions/groups" // Import getGroupsByTournament
 
@@ -49,8 +47,9 @@ export default function AdminFemenina() {
   const [editingPlayer, setEditingPlayer] = useState<any>(null)
   const [selectedMatch, setSelectedMatch] = useState<any>(null)
 
-  const [matchGoals, setMatchGoals] = useState<any[]>([])
-  const [matchCards, setMatchCards] = useState<any[]>([])
+  const [localGoals, setLocalGoals] = useState<any[]>([])
+  const [localCards, setLocalCards] = useState<any[]>([])
+
   const [homeTeamPlayers, setHomeTeamPlayers] = useState<any[]>([])
   const [awayTeamPlayers, setAwayTeamPlayers] = useState<any[]>([])
 
@@ -301,9 +300,7 @@ export default function AdminFemenina() {
     setShowResultForm(true)
 
     try {
-      const [goals, cards, homePlayers, awayPlayers] = await Promise.all([
-        getMatchGoals(match.id),
-        getMatchCards(match.id),
+      const [homePlayers, awayPlayers] = await Promise.all([
         getPlayersByTournament(TOURNAMENT_ID).then((allPlayers) =>
           allPlayers.filter((p: any) => p.team_id === match.home_team_id),
         ),
@@ -312,8 +309,8 @@ export default function AdminFemenina() {
         ),
       ])
 
-      setMatchGoals(goals)
-      setMatchCards(cards)
+      setLocalGoals([])
+      setLocalCards([])
       setHomeTeamPlayers(homePlayers)
       setAwayTeamPlayers(awayPlayers)
     } catch (error) {
@@ -321,92 +318,93 @@ export default function AdminFemenina() {
     }
   }
 
-  const handleAddGoal = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddGoal = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!selectedMatch) return
 
     const formData = new FormData(e.currentTarget)
-    formData.append("match_id", selectedMatch.id.toString())
+    const teamId = Number.parseInt(formData.get("team_id") as string)
+    const playerId = Number.parseInt(formData.get("player_id") as string)
+    const minute = formData.get("minute") as string
 
-    try {
-      await addGoal(formData)
-      toast({
-        title: "Éxito",
-        description: "Gol agregado correctamente",
-        className: "border-pink-500/50 bg-gray-900 text-white",
-      })
-      loadMatchDetails(selectedMatch)
-      loadAllData()
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-        className: "border-pink-500/50 bg-gray-900",
-      })
+    const player = [...homeTeamPlayers, ...awayTeamPlayers].find((p) => p.id === playerId)
+
+    const newGoal = {
+      id: Date.now(), // Temporary ID
+      team_id: teamId,
+      player_id: playerId,
+      minute: minute || null,
+      players: { name: player?.name },
     }
+
+    setLocalGoals([...localGoals, newGoal])
+    e.currentTarget.reset()
   }
 
-  const handleDeleteGoal = async (goalId: number) => {
-    if (!confirm("¿Eliminar este gol?")) return
-
-    try {
-      await deleteGoal(goalId)
-      toast({
-        title: "Éxito",
-        description: "Gol eliminado correctamente",
-        className: "border-pink-500/50 bg-gray-900 text-white",
-      })
-      loadMatchDetails(selectedMatch)
-      loadAllData()
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-        className: "border-pink-500/50 bg-gray-900",
-      })
-    }
+  const handleRemoveGoal = (goalId: number) => {
+    setLocalGoals(localGoals.filter((g) => g.id !== goalId))
   }
 
-  const handleAddCard = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddCard = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!selectedMatch) return
 
     const formData = new FormData(e.currentTarget)
-    formData.append("match_id", selectedMatch.id.toString())
+    const teamId = Number.parseInt(formData.get("team_id") as string)
+    const playerId = Number.parseInt(formData.get("player_id") as string)
+    const minute = formData.get("minute") as string
+    const cardType = formData.get("card_type") as string
 
-    try {
-      await addCard(formData)
-      toast({
-        title: "Éxito",
-        description: "Tarjeta agregada correctamente",
-        className: "border-pink-500/50 bg-gray-900 text-white",
-      })
-      loadMatchDetails(selectedMatch)
-      loadAllData()
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-        className: "border-pink-500/50 bg-gray-900",
-      })
+    const player = [...homeTeamPlayers, ...awayTeamPlayers].find((p) => p.id === playerId)
+
+    const newCard = {
+      id: Date.now(), // Temporary ID
+      team_id: teamId,
+      player_id: playerId,
+      minute: minute || null,
+      card_type: cardType,
+      players: { name: player?.name },
     }
+
+    setLocalCards([...localCards, newCard])
+    e.currentTarget.reset()
   }
 
-  const handleDeleteCard = async (cardId: number) => {
-    if (!confirm("¿Eliminar esta tarjeta?")) return
+  const handleRemoveCard = (cardId: number) => {
+    setLocalCards(localCards.filter((c) => c.id !== cardId))
+  }
+
+  const homeScore = localGoals.filter((g) => g.team_id === selectedMatch?.home_team_id).length
+  const awayScore = localGoals.filter((g) => g.team_id === selectedMatch?.away_team_id).length
+
+  async function handleSaveResult() {
+    if (!selectedMatch) return
+
+    console.log("[v0] Saving result with goals:", localGoals.length, "cards:", localCards.length)
+    console.log("[v0] Calculated score:", homeScore, "-", awayScore)
 
     try {
-      await deleteCard(cardId)
-      toast({
-        title: "Éxito",
-        description: "Tarjeta eliminada correctamente",
-        className: "border-pink-500/50 bg-gray-900 text-white",
-      })
-      loadMatchDetails(selectedMatch)
-      loadAllData()
+      const result = await updateMatchResult(selectedMatch.id, homeScore, awayScore, localGoals, localCards)
+
+      if (result.success) {
+        toast({
+          title: "Éxito",
+          description: "Resultado guardado correctamente",
+          className: "border-pink-500/50 bg-gray-900 text-white",
+        })
+        setShowResultForm(false)
+        setSelectedMatch(null)
+        setLocalGoals([])
+        setLocalCards([])
+        loadAllData()
+      } else {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+          className: "border-pink-500/50 bg-gray-900",
+        })
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -1150,65 +1148,26 @@ export default function AdminFemenina() {
               {showResultForm && selectedMatch && (
                 <Card className="border-pink-500/30">
                   <CardHeader>
-                    <CardTitle className="text-pink-500">Asignar Resultado y Detalles</CardTitle>
+                    <CardTitle className="text-pink-500">Asignar Resultado</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleUpdateResult} className="space-y-4">
-                      <div className="text-white text-center mb-4">
-                        <p className="font-semibold">
-                          {selectedMatch.home_team?.name} vs {selectedMatch.away_team?.name}
-                        </p>
-                        <p className="text-sm text-gray-400">{selectedMatch.match_date}</p>
+                  <CardContent className="space-y-6">
+                    <div className="text-white text-center">
+                      <p className="font-semibold">
+                        {selectedMatch.home_team?.name} vs {selectedMatch.away_team?.name}
+                      </p>
+                      <p className="text-sm text-gray-400">{selectedMatch.match_date}</p>
+                      <div className="text-4xl font-bold text-pink-500 mt-4">
+                        {homeScore} - {awayScore}
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="home_score">{selectedMatch.home_team?.name}</Label>
-                          <Input
-                            id="home_score"
-                            name="home_score"
-                            type="number"
-                            min="0"
-                            defaultValue={selectedMatch.home_score || 0}
-                            required
-                            className="bg-gray-800 border-gray-700"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="away_score">{selectedMatch.away_team?.name}</Label>
-                          <Input
-                            id="away_score"
-                            name="away_score"
-                            type="number"
-                            min="0"
-                            defaultValue={selectedMatch.away_score || 0}
-                            required
-                            className="bg-gray-800 border-gray-700"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button type="submit" className="bg-pink-600 hover:bg-pink-700">
-                          Guardar Resultado
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setShowResultForm(false)
-                            setSelectedMatch(null)
-                          }}
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    </form>
+                      <p className="text-xs text-gray-400 mt-2">Marcador calculado automáticamente según los goles</p>
+                    </div>
 
-                    <div className="mt-6 border-t border-gray-700 pt-4">
-                      <h4 className="text-lg font-semibold text-pink-500 mb-3">Goles</h4>
+                    <div className="border-t border-gray-700 pt-4">
+                      <h4 className="text-lg font-semibold text-pink-500 mb-3">Goles ({localGoals.length})</h4>
 
-                      {matchGoals.length > 0 && (
+                      {localGoals.length > 0 && (
                         <div className="mb-4 space-y-2">
-                          {matchGoals.map((goal: any) => (
+                          {localGoals.map((goal: any) => (
                             <div key={goal.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
                               <span className="text-sm text-white">
                                 {goal.players?.name} - Min {goal.minute || "?"}
@@ -1216,7 +1175,7 @@ export default function AdminFemenina() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleDeleteGoal(goal.id)}
+                                onClick={() => handleRemoveGoal(goal.id)}
                                 className="text-red-500 hover:text-red-400"
                               >
                                 <X className="w-4 h-4" />
@@ -1279,12 +1238,14 @@ export default function AdminFemenina() {
                       </form>
                     </div>
 
-                    <div className="mt-6 border-t border-gray-700 pt-4">
-                      <h4 className="text-lg font-semibold text-pink-500 mb-3">Tarjetas Amarillas</h4>
+                    <div className="border-t border-gray-700 pt-4">
+                      <h4 className="text-lg font-semibold text-pink-500 mb-3">
+                        Tarjetas Amarillas ({localCards.filter((c) => c.card_type === "yellow").length})
+                      </h4>
 
-                      {matchCards.filter((c: any) => c.card_type === "yellow").length > 0 && (
+                      {localCards.filter((c: any) => c.card_type === "yellow").length > 0 && (
                         <div className="mb-4 space-y-2">
-                          {matchCards
+                          {localCards
                             .filter((c: any) => c.card_type === "yellow")
                             .map((card: any) => (
                               <div key={card.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
@@ -1294,7 +1255,7 @@ export default function AdminFemenina() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => handleDeleteCard(card.id)}
+                                  onClick={() => handleRemoveCard(card.id)}
                                   className="text-red-500 hover:text-red-400"
                                 >
                                   <X className="w-4 h-4" />
@@ -1356,6 +1317,23 @@ export default function AdminFemenina() {
                           </Button>
                         </div>
                       </form>
+                    </div>
+
+                    <div className="border-t border-gray-700 pt-4 flex gap-2">
+                      <Button onClick={handleSaveResult} className="flex-1 bg-pink-600 hover:bg-pink-700">
+                        Guardar Resultado Completo
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowResultForm(false)
+                          setSelectedMatch(null)
+                          setLocalGoals([])
+                          setLocalCards([])
+                        }}
+                      >
+                        Cancelar
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
