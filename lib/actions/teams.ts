@@ -22,7 +22,7 @@ export async function createTeam(formData: FormData) {
   console.log("[v0] tournament_id parsed:", Number.parseInt(tournament_id))
 
   if (logoFile && logoFile.size > 0) {
-    console.log("[v0] Processing logo file upload...")
+    console.log("[v0] Processing logo file as Base64...")
     console.log("[v0] File details:", {
       name: logoFile.name,
       size: logoFile.size,
@@ -31,67 +31,21 @@ export async function createTeam(formData: FormData) {
     })
 
     try {
-      // Check if bucket exists
-      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
+      // Convertir archivo a Base64
+      const arrayBuffer = await logoFile.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
+      const base64 = buffer.toString("base64")
+      const mimeType = logoFile.type || "image/png"
 
-      if (bucketsError) {
-        console.error("[v0] ❌ Error listing buckets:", bucketsError)
-      } else {
-        console.log(
-          "[v0] Available buckets:",
-          buckets?.map((b) => b.name),
-        )
-        const bucketExists = buckets?.some((b) => b.name === "team-logos")
+      logo_url = `data:${mimeType};base64,${base64}`
 
-        if (!bucketExists) {
-          console.log("[v0] ⚠️ Bucket 'team-logos' does not exist. Creating it...")
-          const { data: newBucket, error: createError } = await supabase.storage.createBucket("team-logos", {
-            public: true,
-            fileSizeLimit: 5242880, // 5MB
-          })
-
-          if (createError) {
-            console.error("[v0] ❌ Error creating bucket:", createError)
-          } else {
-            console.log("[v0] ✅ Bucket 'team-logos' created successfully")
-          }
-        } else {
-          console.log("[v0] ✅ Bucket 'team-logos' already exists")
-        }
-      }
-
-      const fileExt = logoFile.name.split(".").pop()
-      const fileName = `team-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-      const filePath = `${fileName}`
-
-      console.log("[v0] Uploading to path:", filePath)
-      console.log("[v0] File extension:", fileExt)
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("team-logos")
-        .upload(filePath, logoFile, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: logoFile.type,
-        })
-
-      if (uploadError) {
-        console.error("[v0] ❌ Error uploading logo:", uploadError)
-        console.error("[v0] Upload error details:", {
-          message: uploadError.message,
-          name: uploadError.name,
-          cause: uploadError.cause,
-        })
-      } else {
-        console.log("[v0] ✅ Logo uploaded successfully:", uploadData)
-
-        const { data: urlData } = supabase.storage.from("team-logos").getPublicUrl(filePath)
-
-        logo_url = urlData.publicUrl
-        console.log("[v0] ✅ Public URL generated:", logo_url)
-      }
-    } catch (uploadError) {
-      console.error("[v0] ❌ Exception during logo upload:", uploadError)
+      console.log("[v0] ✅ Logo converted to Base64")
+      console.log("[v0] Base64 string length:", logo_url.length)
+      console.log("[v0] MIME type:", mimeType)
+      console.log("[v0] Base64 preview (first 100 chars):", logo_url.substring(0, 100))
+    } catch (error) {
+      console.error("[v0] ❌ Error converting logo to Base64:", error)
+      throw new Error("Error al procesar la imagen del logo")
     }
   } else {
     console.log("[v0] ⚠️ No logo file provided or file is empty")
@@ -119,7 +73,13 @@ export async function createTeam(formData: FormData) {
     tournament_id: parsedTournamentId,
   }
 
-  console.log("[v0] Inserting team with data:", insertData)
+  console.log("[v0] Inserting team with data:", {
+    name: insertData.name,
+    logo_url: insertData.logo_url
+      ? `${insertData.logo_url.substring(0, 50)}... (${insertData.logo_url.length} chars)`
+      : null,
+    tournament_id: insertData.tournament_id,
+  })
 
   const { data, error } = await supabase.from("teams").insert([insertData]).select().single()
 
@@ -134,7 +94,12 @@ export async function createTeam(formData: FormData) {
     throw new Error(error.message)
   }
 
-  console.log("[v0] ✅ Team created successfully:", data)
+  console.log("[v0] ✅ Team created successfully:", {
+    id: data.id,
+    name: data.name,
+    tournament_id: data.tournament_id,
+    logo_url_length: data.logo_url?.length || 0,
+  })
   console.log("[v0] ============ CREATE TEAM END ============")
 
   revalidatePath("/")
@@ -179,13 +144,13 @@ export async function updateTeam(id: number, formData: FormData) {
   console.log("[v0] Updating team ID:", id)
   console.log("[v0] FormData received:", {
     name,
-    logo_url,
+    logo_url: logo_url ? `${logo_url.substring(0, 50)}... (${logo_url.length} chars)` : null,
     tournament_id,
     logoFile: logoFile ? `File: ${logoFile.name}, Size: ${logoFile.size}, Type: ${logoFile.type}` : "null",
   })
 
   if (logoFile && logoFile.size > 0) {
-    console.log("[v0] Processing logo file upload for update...")
+    console.log("[v0] Processing logo file as Base64 for update...")
     console.log("[v0] File details:", {
       name: logoFile.name,
       size: logoFile.size,
@@ -194,65 +159,24 @@ export async function updateTeam(id: number, formData: FormData) {
     })
 
     try {
-      // Check if bucket exists
-      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
+      // Convertir archivo a Base64
+      const arrayBuffer = await logoFile.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
+      const base64 = buffer.toString("base64")
+      const mimeType = logoFile.type || "image/png"
 
-      if (bucketsError) {
-        console.error("[v0] ❌ Error listing buckets:", bucketsError)
-      } else {
-        console.log(
-          "[v0] Available buckets:",
-          buckets?.map((b) => b.name),
-        )
-        const bucketExists = buckets?.some((b) => b.name === "team-logos")
+      logo_url = `data:${mimeType};base64,${base64}`
 
-        if (!bucketExists) {
-          console.log("[v0] ⚠️ Bucket 'team-logos' does not exist. Creating it...")
-          const { data: newBucket, error: createError } = await supabase.storage.createBucket("team-logos", {
-            public: true,
-            fileSizeLimit: 5242880, // 5MB
-          })
-
-          if (createError) {
-            console.error("[v0] ❌ Error creating bucket:", createError)
-          } else {
-            console.log("[v0] ✅ Bucket 'team-logos' created successfully")
-          }
-        } else {
-          console.log("[v0] ✅ Bucket 'team-logos' already exists")
-        }
-      }
-
-      const fileExt = logoFile.name.split(".").pop()
-      const fileName = `team-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-      const filePath = `${fileName}`
-
-      console.log("[v0] Uploading to path:", filePath)
-      console.log("[v0] File extension:", fileExt)
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("team-logos")
-        .upload(filePath, logoFile, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: logoFile.type,
-        })
-
-      if (uploadError) {
-        console.error("[v0] ❌ Error uploading logo:", uploadError)
-      } else {
-        console.log("[v0] ✅ Logo uploaded successfully:", uploadData)
-
-        const { data: urlData } = supabase.storage.from("team-logos").getPublicUrl(filePath)
-
-        logo_url = urlData.publicUrl
-        console.log("[v0] ✅ Public URL generated:", logo_url)
-      }
-    } catch (uploadError) {
-      console.error("[v0] ❌ Exception during logo upload:", uploadError)
+      console.log("[v0] ✅ Logo converted to Base64")
+      console.log("[v0] Base64 string length:", logo_url.length)
+      console.log("[v0] MIME type:", mimeType)
+      console.log("[v0] Base64 preview (first 100 chars):", logo_url.substring(0, 100))
+    } catch (error) {
+      console.error("[v0] ❌ Error converting logo to Base64:", error)
+      throw new Error("Error al procesar la imagen del logo")
     }
   } else {
-    console.log("[v0] ⚠️ No new logo file provided, keeping existing logo_url:", logo_url)
+    console.log("[v0] ⚠️ No new logo file provided, keeping existing logo_url")
   }
 
   const updateData: any = {
@@ -267,7 +191,13 @@ export async function updateTeam(id: number, formData: FormData) {
     updateData.tournament_id = Number.parseInt(tournament_id)
   }
 
-  console.log("[v0] Updating with data:", updateData)
+  console.log("[v0] Updating with data:", {
+    name: updateData.name,
+    logo_url: updateData.logo_url
+      ? `${updateData.logo_url.substring(0, 50)}... (${updateData.logo_url.length} chars)`
+      : null,
+    tournament_id: updateData.tournament_id,
+  })
 
   const { error } = await supabase.from("teams").update(updateData).eq("id", id)
 
