@@ -10,13 +10,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Trophy, Users, UserPlus, Calendar, Plus, Pencil, Trash2, X, Loader2 } from "lucide-react"
+import { Trophy, Users, UserPlus, Calendar, Plus, Pencil, Trash2, X, Loader2, Coffee } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getTeamsByTournament, createTeam, updateTeam, deleteTeam } from "@/lib/actions/teams"
 import { getPlayersByTournament, createPlayer, updatePlayer, deletePlayer } from "@/lib/actions/players"
 import { getMatchesByTournament, createMatch, updateMatchResult } from "@/lib/actions/matches"
 import { addGoal, deleteGoal, getMatchGoals } from "@/lib/actions/goals"
 import { addCard, deleteCard, getMatchCards } from "@/lib/actions/cards"
+import { createByeWeek, getByeWeeks, deleteByeWeek } from "@/lib/actions/bye-weeks"
 
 export default function AdminFemenina() {
   const { toast } = useToast()
@@ -28,15 +29,18 @@ export default function AdminFemenina() {
   const [isCreatingPlayer, setIsCreatingPlayer] = useState(false)
   const [isUpdatingPlayer, setIsUpdatingPlayer] = useState(false)
   const [isCreatingMatch, setIsCreatingMatch] = useState(false)
+  const [isCreatingByeWeek, setIsCreatingByeWeek] = useState(false)
 
   const [teams, setTeams] = useState<any[]>([])
   const [players, setPlayers] = useState<any[]>([])
   const [matches, setMatches] = useState<any[]>([])
+  const [byeWeeks, setByeWeeks] = useState<any[]>([])
 
   const [showTeamForm, setShowTeamForm] = useState(false)
   const [showPlayerForm, setShowPlayerForm] = useState(false)
   const [showMatchForm, setShowMatchForm] = useState(false)
   const [showResultForm, setShowResultForm] = useState(false)
+  const [showByeWeekForm, setShowByeWeekForm] = useState(false)
 
   const [editingTeam, setEditingTeam] = useState<any>(null)
   const [editingPlayer, setEditingPlayer] = useState<any>(null)
@@ -67,15 +71,17 @@ export default function AdminFemenina() {
   const loadAllData = async () => {
     setIsLoading(true)
     try {
-      const [teamsData, playersData, matchesData] = await Promise.all([
+      const [teamsData, playersData, matchesData, byeWeeksData] = await Promise.all([
         getTeamsByTournament(TOURNAMENT_ID),
         getPlayersByTournament(TOURNAMENT_ID),
         getMatchesByTournament(TOURNAMENT_ID),
+        getByeWeeks(TOURNAMENT_ID),
       ])
 
       setTeams(teamsData)
       setPlayers(playersData)
       setMatches(matchesData)
+      setByeWeeks(byeWeeksData)
     } catch (error) {
       console.error("[v0] Error loading data:", error)
       toast({
@@ -475,6 +481,54 @@ export default function AdminFemenina() {
     }
   }
 
+  const handleCreateByeWeek = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setIsCreatingByeWeek(true)
+    const formData = new FormData(e.currentTarget)
+    formData.append("tournament_id", TOURNAMENT_ID.toString())
+
+    try {
+      await createByeWeek(formData)
+      toast({
+        title: "Éxito",
+        description: "Fecha libre creada correctamente",
+        className: "border-pink-500/50 bg-gray-900 text-white",
+      })
+      setShowByeWeekForm(false)
+      loadAllData()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+        className: "border-pink-500/50 bg-gray-900",
+      })
+    } finally {
+      setIsCreatingByeWeek(false)
+    }
+  }
+
+  const handleDeleteByeWeek = async (id: number) => {
+    if (!confirm("¿Estás seguro de eliminar esta fecha libre?")) return
+
+    try {
+      await deleteByeWeek(id)
+      toast({
+        title: "Éxito",
+        description: "Fecha libre eliminada correctamente",
+        className: "border-pink-500/50 bg-gray-900 text-white",
+      })
+      loadAllData()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+        className: "border-pink-500/50 bg-gray-900",
+      })
+    }
+  }
+
   const filteredMatches = matches.filter((match) => {
     if (viewMode === "round" && selectedRound) {
       return match.round === selectedRound
@@ -509,7 +563,7 @@ export default function AdminFemenina() {
       <Card className="border-2 border-pink-500/50 bg-gradient-to-br from-gray-800 to-gray-900">
         <CardContent className="p-6">
           <Tabs defaultValue="teams" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-gray-700/50">
+            <TabsList className="grid w-full grid-cols-4 bg-gray-700/50">
               <TabsTrigger value="teams">
                 <Users className="w-4 h-4 mr-2" />
                 Equipos
@@ -521,6 +575,10 @@ export default function AdminFemenina() {
               <TabsTrigger value="matches">
                 <Calendar className="w-4 h-4 mr-2" />
                 Partidos
+              </TabsTrigger>
+              <TabsTrigger value="byeweeks">
+                <Coffee className="w-4 h-4 mr-2" />
+                Fechas Libres
               </TabsTrigger>
             </TabsList>
 
@@ -1326,6 +1384,103 @@ export default function AdminFemenina() {
                   ))
                 )}
               </div>
+            </TabsContent>
+
+            <TabsContent value="byeweeks" className="mt-6 space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-semibold text-pink-500">Fechas Libres ({byeWeeks.length})</h3>
+                <Button onClick={() => setShowByeWeekForm(!showByeWeekForm)} className="bg-pink-600 hover:bg-pink-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nueva Fecha Libre
+                </Button>
+              </div>
+
+              {showByeWeekForm && (
+                <Card className="border-pink-500/30">
+                  <CardHeader>
+                    <CardTitle className="text-pink-500">Crear Fecha Libre</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleCreateByeWeek} className="space-y-4">
+                      <div>
+                        <Label htmlFor="bye_team_id">Equipo</Label>
+                        <Select name="team_id" required>
+                          <SelectTrigger className="bg-gray-800 border-gray-700">
+                            <SelectValue placeholder="Seleccionar equipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teams.map((team) => (
+                              <SelectItem key={team.id} value={team.id.toString()}>
+                                {team.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="bye_round">Fecha/Jornada</Label>
+                        <Input
+                          id="bye_round"
+                          name="round"
+                          type="number"
+                          min="1"
+                          required
+                          className="bg-gray-800 border-gray-700"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" className="bg-pink-600 hover:bg-pink-700" disabled={isCreatingByeWeek}>
+                          {isCreatingByeWeek ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Creando...
+                            </>
+                          ) : (
+                            "Crear"
+                          )}
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setShowByeWeekForm(false)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                  <Loader2 className="w-8 h-8 animate-spin text-pink-500 mb-3" />
+                  <p>Cargando fechas libres...</p>
+                </div>
+              ) : byeWeeks.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p>No hay fechas libres registradas</p>
+                  <p className="text-sm mt-2">Crea la primera fecha libre para comenzar</p>
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  {byeWeeks.map((byeWeek: any) => (
+                    <div key={byeWeek.id} className="p-3 bg-gray-800 rounded-lg flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Coffee className="w-6 h-6 text-pink-500" />
+                        <div>
+                          <p className="text-white font-medium">{byeWeek.teams?.name}</p>
+                          <p className="text-sm text-gray-400">Fecha {byeWeek.round} - Descanso</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteByeWeek(byeWeek.id)}
+                        className="border-red-500/50 text-red-500"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>
