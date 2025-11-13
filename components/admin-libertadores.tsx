@@ -43,6 +43,9 @@ export default function AdminLibertadores() {
   const [localGoals, setLocalGoals] = useState<any[]>([])
   const [localCards, setLocalCards] = useState<any[]>([])
 
+  const [selectedGoalTeam, setSelectedGoalTeam] = useState<string>("")
+  const [selectedCardTeam, setSelectedCardTeam] = useState<string>("")
+
   const [homeTeamPlayers, setHomeTeamPlayers] = useState<any[]>([])
   const [awayTeamPlayers, setAwayTeamPlayers] = useState<any[]>([])
 
@@ -102,6 +105,8 @@ export default function AdminLibertadores() {
           className: "border-yellow-500/50 bg-gray-900 text-white",
         })
         setShowMatchForm(false)
+        e.currentTarget.reset()
+        setTeamsInGroup([])
         loadAllData()
       } else {
         toast({
@@ -359,7 +364,6 @@ export default function AdminLibertadores() {
     const formData = new FormData(e.currentTarget)
     const teamId = Number.parseInt(formData.get("team_id") as string)
     const playerId = Number.parseInt(formData.get("player_id") as string)
-    const minute = formData.get("minute") as string
 
     const player = [...homeTeamPlayers, ...awayTeamPlayers].find((p) => p.id === playerId)
 
@@ -367,21 +371,13 @@ export default function AdminLibertadores() {
       id: Date.now(), // Temporary ID
       team_id: teamId,
       player_id: playerId,
-      minute: minute || null,
+      minute: 0,
       players: { name: player?.name },
     }
 
     setLocalGoals([...localGoals, newGoal])
     e.currentTarget.reset()
-    // Force select reset by setting a key or triggering re-render
-    const selects = e.currentTarget.querySelectorAll('button[role="combobox"]')
-    selects.forEach((select) => {
-      const valueSpan = select.querySelector("span")
-      if (valueSpan) {
-        if (select === selects[0]) valueSpan.textContent = "Equipo"
-        if (select === selects[1]) valueSpan.textContent = "Jugador"
-      }
-    })
+    setSelectedGoalTeam("")
   }
 
   const handleRemoveGoal = (goalId: number) => {
@@ -395,7 +391,6 @@ export default function AdminLibertadores() {
     const formData = new FormData(e.currentTarget)
     const teamId = Number.parseInt(formData.get("team_id") as string)
     const playerId = Number.parseInt(formData.get("player_id") as string)
-    const minute = formData.get("minute") as string
     const cardType = formData.get("card_type") as string
 
     const player = [...homeTeamPlayers, ...awayTeamPlayers].find((p) => p.id === playerId)
@@ -404,21 +399,14 @@ export default function AdminLibertadores() {
       id: Date.now(), // Temporary ID
       team_id: teamId,
       player_id: playerId,
-      minute: minute || null,
+      minute: 0,
       card_type: cardType,
       players: { name: player?.name },
     }
 
     setLocalCards([...localCards, newCard])
     e.currentTarget.reset()
-    const selects = e.currentTarget.querySelectorAll('button[role="combobox"]')
-    selects.forEach((select) => {
-      const valueSpan = select.querySelector("span")
-      if (valueSpan) {
-        if (select === selects[0]) valueSpan.textContent = "Equipo"
-        if (select === selects[1]) valueSpan.textContent = "Jugador"
-      }
-    })
+    setSelectedCardTeam("")
   }
 
   const handleRemoveCard = (cardId: number) => {
@@ -472,6 +460,18 @@ export default function AdminLibertadores() {
       player.name.toLowerCase().includes(playerSearchQuery.toLowerCase()) || player.cedula.includes(playerSearchQuery)
     return matchesTeam && matchesSearch
   })
+
+  const goalFormPlayers = selectedGoalTeam
+    ? selectedGoalTeam === selectedMatch?.home_team_id.toString()
+      ? homeTeamPlayers
+      : awayTeamPlayers
+    : []
+
+  const cardFormPlayers = selectedCardTeam
+    ? selectedCardTeam === selectedMatch?.home_team_id.toString()
+      ? homeTeamPlayers
+      : awayTeamPlayers
+    : []
 
   return (
     <div className="space-y-6">
@@ -1102,9 +1102,7 @@ export default function AdminLibertadores() {
                         <div className="mb-4 space-y-2">
                           {localGoals.map((goal: any) => (
                             <div key={goal.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
-                              <span className="text-sm text-white">
-                                {goal.players?.name} - Min {goal.minute || "?"}
-                              </span>
+                              <span className="text-sm text-white">{goal.players?.name}</span>
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -1118,8 +1116,8 @@ export default function AdminLibertadores() {
                         </div>
                       )}
 
-                      <form onSubmit={handleAddGoal} className="grid grid-cols-3 gap-2">
-                        <Select name="team_id" required>
+                      <form onSubmit={handleAddGoal} className="grid grid-cols-2 gap-2">
+                        <Select name="team_id" required value={selectedGoalTeam} onValueChange={setSelectedGoalTeam}>
                           <SelectTrigger className="bg-gray-800 border-gray-700">
                             <SelectValue placeholder="Equipo" />
                           </SelectTrigger>
@@ -1132,38 +1130,19 @@ export default function AdminLibertadores() {
                             </SelectItem>
                           </SelectContent>
                         </Select>
-                        <Select name="player_id" required>
-                          <SelectTrigger className="bg-gray-800 border-gray-700">
-                            <SelectValue placeholder="Jugador" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <div className="px-2 py-1 text-xs font-semibold text-yellow-500">
-                              {selectedMatch.home_team?.name}
-                            </div>
-                            {homeTeamPlayers.map((player: any) => (
-                              <SelectItem key={player.id} value={player.id.toString()}>
-                                {player.name} (#{player.number})
-                              </SelectItem>
-                            ))}
-                            <div className="px-2 py-1 text-xs font-semibold text-yellow-500 border-t">
-                              {selectedMatch.away_team?.name}
-                            </div>
-                            {awayTeamPlayers.map((player: any) => (
-                              <SelectItem key={player.id} value={player.id.toString()}>
-                                {player.name} (#{player.number})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                         <div className="flex gap-1">
-                          <Input
-                            name="minute"
-                            type="number"
-                            min="0"
-                            max="120"
-                            placeholder="Min"
-                            className="bg-gray-800 border-gray-700"
-                          />
+                          <Select name="player_id" required disabled={!selectedGoalTeam}>
+                            <SelectTrigger className="bg-gray-800 border-gray-700">
+                              <SelectValue placeholder="Jugador" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {goalFormPlayers.map((player: any) => (
+                                <SelectItem key={player.id} value={player.id.toString()}>
+                                  {player.name} (#{player.number})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <Button type="submit" size="sm" className="bg-yellow-600 hover:bg-yellow-700">
                             +
                           </Button>
@@ -1182,9 +1161,7 @@ export default function AdminLibertadores() {
                             .filter((c: any) => c.card_type === "yellow")
                             .map((card: any) => (
                               <div key={card.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
-                                <span className="text-sm text-white">
-                                  {card.players?.name} - Min {card.minute || "?"}
-                                </span>
+                                <span className="text-sm text-white">{card.players?.name}</span>
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -1198,9 +1175,9 @@ export default function AdminLibertadores() {
                         </div>
                       )}
 
-                      <form onSubmit={handleAddCard} className="grid grid-cols-3 gap-2">
+                      <form onSubmit={handleAddCard} className="grid grid-cols-2 gap-2">
                         <input type="hidden" name="card_type" value="yellow" />
-                        <Select name="team_id" required>
+                        <Select name="team_id" required value={selectedCardTeam} onValueChange={setSelectedCardTeam}>
                           <SelectTrigger className="bg-gray-800 border-gray-700">
                             <SelectValue placeholder="Equipo" />
                           </SelectTrigger>
@@ -1213,38 +1190,19 @@ export default function AdminLibertadores() {
                             </SelectItem>
                           </SelectContent>
                         </Select>
-                        <Select name="player_id" required>
-                          <SelectTrigger className="bg-gray-800 border-gray-700">
-                            <SelectValue placeholder="Jugador" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <div className="px-2 py-1 text-xs font-semibold text-yellow-500">
-                              {selectedMatch.home_team?.name}
-                            </div>
-                            {homeTeamPlayers.map((player: any) => (
-                              <SelectItem key={player.id} value={player.id.toString()}>
-                                {player.name} (#{player.number})
-                              </SelectItem>
-                            ))}
-                            <div className="px-2 py-1 text-xs font-semibold text-yellow-500 border-t">
-                              {selectedMatch.away_team?.name}
-                            </div>
-                            {awayTeamPlayers.map((player: any) => (
-                              <SelectItem key={player.id} value={player.id.toString()}>
-                                {player.name} (#{player.number})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                         <div className="flex gap-1">
-                          <Input
-                            name="minute"
-                            type="number"
-                            min="0"
-                            max="120"
-                            placeholder="Min"
-                            className="bg-gray-800 border-gray-700"
-                          />
+                          <Select name="player_id" required disabled={!selectedCardTeam}>
+                            <SelectTrigger className="bg-gray-800 border-gray-700">
+                              <SelectValue placeholder="Jugador" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {cardFormPlayers.map((player: any) => (
+                                <SelectItem key={player.id} value={player.id.toString()}>
+                                  {player.name} (#{player.number})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <Button type="submit" size="sm" className="bg-yellow-600 hover:bg-yellow-700">
                             +
                           </Button>
@@ -1262,9 +1220,7 @@ export default function AdminLibertadores() {
                             .filter((c: any) => c.card_type === "red")
                             .map((card: any) => (
                               <div key={card.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
-                                <span className="text-sm text-white">
-                                  {card.players?.name} - Min {card.minute || "?"}
-                                </span>
+                                <span className="text-sm text-white">{card.players?.name}</span>
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -1277,9 +1233,9 @@ export default function AdminLibertadores() {
                             ))}
                         </div>
                       )}
-                      <form onSubmit={handleAddCard} className="grid grid-cols-3 gap-2">
+                      <form onSubmit={handleAddCard} className="grid grid-cols-2 gap-2">
                         <input type="hidden" name="card_type" value="red" />
-                        <Select name="team_id" required>
+                        <Select name="team_id" required value={selectedCardTeam} onValueChange={setSelectedCardTeam}>
                           <SelectTrigger className="bg-gray-800 border-gray-700">
                             <SelectValue placeholder="Equipo" />
                           </SelectTrigger>
@@ -1292,38 +1248,19 @@ export default function AdminLibertadores() {
                             </SelectItem>
                           </SelectContent>
                         </Select>
-                        <Select name="player_id" required>
-                          <SelectTrigger className="bg-gray-800 border-gray-700">
-                            <SelectValue placeholder="Jugador" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <div className="px-2 py-1 text-xs font-semibold text-yellow-500">
-                              {selectedMatch.home_team?.name}
-                            </div>
-                            {homeTeamPlayers.map((player: any) => (
-                              <SelectItem key={player.id} value={player.id.toString()}>
-                                {player.name} (#{player.number})
-                              </SelectItem>
-                            ))}
-                            <div className="px-2 py-1 text-xs font-semibold text-yellow-500 border-t">
-                              {selectedMatch.away_team?.name}
-                            </div>
-                            {awayTeamPlayers.map((player: any) => (
-                              <SelectItem key={player.id} value={player.id.toString()}>
-                                {player.name} (#{player.number})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                         <div className="flex gap-1">
-                          <Input
-                            name="minute"
-                            type="number"
-                            min="0"
-                            max="120"
-                            placeholder="Min"
-                            className="bg-gray-800 border-gray-700"
-                          />
+                          <Select name="player_id" required disabled={!selectedCardTeam}>
+                            <SelectTrigger className="bg-gray-800 border-gray-700">
+                              <SelectValue placeholder="Jugador" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {cardFormPlayers.map((player: any) => (
+                                <SelectItem key={player.id} value={player.id.toString()}>
+                                  {player.name} (#{player.number})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <Button type="submit" size="sm" className="bg-yellow-600 hover:bg-yellow-700">
                             +
                           </Button>
