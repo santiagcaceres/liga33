@@ -315,8 +315,8 @@ export default function AdminFemenina() {
         ),
       ])
 
-      setLocalGoals([])
-      setLocalCards([])
+      setLocalGoals(match.goals || [])
+      setLocalCards(match.cards || [])
       setHomeTeamPlayers(homePlayers)
       setAwayTeamPlayers(awayPlayers)
     } catch (error) {
@@ -345,6 +345,11 @@ export default function AdminFemenina() {
 
     setLocalGoals([...localGoals, newGoal])
     e.currentTarget.reset()
+    const selects = e.currentTarget.querySelectorAll('button[role="combobox"]')
+    selects.forEach((select) => {
+      const valueSpan = select.querySelector("span")
+      if (valueSpan) valueSpan.textContent = select === selects[0] ? "Equipo" : "Jugadora"
+    })
   }
 
   const handleRemoveGoal = (goalId: number) => {
@@ -374,6 +379,11 @@ export default function AdminFemenina() {
 
     setLocalCards([...localCards, newCard])
     e.currentTarget.reset()
+    const selects = e.currentTarget.querySelectorAll('button[role="combobox"]')
+    selects.forEach((select) => {
+      const valueSpan = select.querySelector("span")
+      if (valueSpan) valueSpan.textContent = select === selects[0] ? "Equipo" : "Jugadora"
+    })
   }
 
   const handleRemoveCard = (cardId: number) => {

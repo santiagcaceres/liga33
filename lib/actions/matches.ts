@@ -193,13 +193,109 @@ export async function updateMatchResult(
 
     const { data: match, error: matchFetchError } = await supabase
       .from("matches")
-      .select("home_team_id, away_team_id, home_score, away_score, group_id, tournament_id")
+      .select(`
+        home_team_id, 
+        away_team_id, 
+        home_score, 
+        away_score, 
+        group_id, 
+        tournament_id,
+        played,
+        goals(id, player_id),
+        cards(id, player_id, card_type)
+      `)
       .eq("id", matchId)
       .single()
 
     if (matchFetchError || !match) {
       console.error("[v0] Error fetching match:", matchFetchError)
       return { success: false, error: "Match not found" }
+    }
+
+    console.log("[v0] Match data:", match)
+    console.log("[v0] Existing goals:", match.goals?.length || 0)
+    console.log("[v0] Existing cards:", match.cards?.length || 0)
+
+    if (match.played) {
+      console.log("[v0] Match was already played - reverting old statistics")
+
+      // Revert old goal counts
+      if (match.goals && match.goals.length > 0) {
+        for (const oldGoal of match.goals) {
+          const { data: player } = await supabase
+            .from("players")
+            .select("id, goals")
+            .eq("id", oldGoal.player_id)
+            .single()
+
+          if (player && player.goals > 0) {
+            await supabase
+              .from("players")
+              .update({ goals: Math.max(0, player.goals - 1) })
+              .eq("id", player.id)
+            console.log("[v0] Reverted 1 goal from player", player.id)
+          }
+        }
+      }
+
+      // Revert old card counts
+      if (match.cards && match.cards.length > 0) {
+        for (const oldCard of match.cards) {
+          const { data: player } = await supabase
+            .from("players")
+            .select("id, yellow_cards, red_cards, suspended")
+            .eq("id", oldCard.player_id)
+            .single()
+
+          if (player) {
+            const updates: any = {}
+            if (oldCard.card_type === "yellow" && player.yellow_cards > 0) {
+              updates.yellow_cards = Math.max(0, player.yellow_cards - 1)
+              // If player was suspended due to 2 yellows, remove suspension if going below 2
+              if (updates.yellow_cards < 2 && player.suspended) {
+                updates.suspended = false
+              }
+            } else if (oldCard.card_type === "red" && player.red_cards > 0) {
+              updates.red_cards = Math.max(0, player.red_cards - 1)
+              // If player only had red cards causing suspension, remove it
+              if (updates.red_cards === 0 && player.yellow_cards < 2) {
+                updates.suspended = false
+              }
+            }
+
+            if (Object.keys(updates).length > 0) {
+              await supabase.from("players").update(updates).eq("id", player.id)
+              console.log("[v0] Reverted card from player", player.id, updates)
+            }
+          }
+        }
+      }
+
+      // Revert old standings
+      if (match.tournament_id === 2) {
+        console.log("[v0] Reverting league_standings for women's tournament")
+        await revertLeagueStandingsForMatch(
+          match.home_team_id,
+          match.away_team_id,
+          match.home_score,
+          match.away_score,
+          match.tournament_id,
+        )
+      } else if (match.group_id) {
+        console.log("[v0] Reverting team_groups for Libertadores")
+        await revertTeamStandings(
+          match.home_team_id,
+          match.away_team_id,
+          match.home_score,
+          match.away_score,
+          match.group_id,
+        )
+      }
+
+      // Delete old goals and cards
+      await supabase.from("goals").delete().eq("match_id", matchId)
+      await supabase.from("cards").delete().eq("match_id", matchId)
+      console.log("[v0] Deleted old goals and cards")
     }
 
     const { error: matchError } = await supabase
@@ -389,6 +485,154 @@ export async function updateMatchResult(
   }
 }
 
+async function revertTeamStandings(
+  homeTeamId: number,
+  awayTeamId: number,
+  homeScore: number,
+  awayScore: number,
+  groupId: number,
+) {
+  const supabase = await createClient()
+
+  console.log("[v0] Starting revertTeamStandings:", { homeTeamId, awayTeamId, homeScore, awayScore, groupId })
+
+  const { data: homeStanding } = await supabase
+    .from("team_groups")
+    .select("*")
+    .eq("team_id", homeTeamId)
+    .eq("group_id", groupId)
+    .single()
+
+  const { data: awayStanding } = await supabase
+    .from("team_groups")
+    .select("*")
+    .eq("team_id", awayTeamId)
+    .eq("group_id", groupId)
+    .single()
+
+  if (!homeStanding || !awayStanding) {
+    console.error("[v0] Missing team standings - cannot revert")
+    return
+  }
+
+  const homeUpdates: any = {
+    played: Math.max(0, homeStanding.played - 1),
+    goals_for: Math.max(0, homeStanding.goals_for - homeScore),
+    goals_against: Math.max(0, homeStanding.goals_against - awayScore),
+  }
+
+  const awayUpdates: any = {
+    played: Math.max(0, awayStanding.played - 1),
+    goals_for: Math.max(0, awayStanding.goals_for - awayScore),
+    goals_against: Math.max(0, awayStanding.goals_against - homeScore),
+  }
+
+  if (homeScore > awayScore) {
+    homeUpdates.won = Math.max(0, homeStanding.won - 1)
+    homeUpdates.points = Math.max(0, homeStanding.points - 3)
+    awayUpdates.lost = Math.max(0, awayStanding.lost - 1)
+  } else if (homeScore < awayScore) {
+    awayUpdates.won = Math.max(0, awayStanding.won - 1)
+    awayUpdates.points = Math.max(0, awayStanding.points - 3)
+    homeUpdates.lost = Math.max(0, homeStanding.lost - 1)
+  } else {
+    homeUpdates.drawn = Math.max(0, homeStanding.drawn - 1)
+    homeUpdates.points = Math.max(0, homeStanding.points - 1)
+    awayUpdates.drawn = Math.max(0, awayStanding.drawn - 1)
+    awayUpdates.points = Math.max(0, awayStanding.points - 1)
+  }
+
+  homeUpdates.goal_difference = homeUpdates.goals_for - homeUpdates.goals_against
+  awayUpdates.goal_difference = awayUpdates.goals_for - awayUpdates.goals_against
+
+  await supabase.from("team_groups").update(homeUpdates).eq("team_id", homeTeamId).eq("group_id", groupId)
+
+  await supabase.from("team_groups").update(awayUpdates).eq("team_id", awayTeamId).eq("group_id", groupId)
+
+  console.log("[v0] Team standings reverted successfully")
+}
+
+async function revertLeagueStandingsForMatch(
+  homeTeamId: number,
+  awayTeamId: number,
+  homeScore: number,
+  awayScore: number,
+  tournamentId: number,
+) {
+  const supabase = await createClient()
+
+  console.log("[v0] Starting revertLeagueStandingsForMatch:", {
+    homeTeamId,
+    awayTeamId,
+    homeScore,
+    awayScore,
+    tournamentId,
+  })
+
+  const { data: homeStanding } = await supabase
+    .from("league_standings")
+    .select("*")
+    .eq("team_id", homeTeamId)
+    .eq("tournament_id", tournamentId)
+    .single()
+
+  const { data: awayStanding } = await supabase
+    .from("league_standings")
+    .select("*")
+    .eq("team_id", awayTeamId)
+    .eq("tournament_id", tournamentId)
+    .single()
+
+  if (!homeStanding || !awayStanding) {
+    console.error("[v0] Missing team standings - cannot revert")
+    return
+  }
+
+  const homeUpdates: any = {
+    played: Math.max(0, homeStanding.played - 1),
+    goals_for: Math.max(0, homeStanding.goals_for - homeScore),
+    goals_against: Math.max(0, homeStanding.goals_against - awayScore),
+  }
+
+  const awayUpdates: any = {
+    played: Math.max(0, awayStanding.played - 1),
+    goals_for: Math.max(0, awayStanding.goals_for - awayScore),
+    goals_against: Math.max(0, awayStanding.goals_against - homeScore),
+  }
+
+  if (homeScore > awayScore) {
+    homeUpdates.won = Math.max(0, homeStanding.won - 1)
+    homeUpdates.points = Math.max(0, homeStanding.points - 3)
+    awayUpdates.lost = Math.max(0, awayStanding.lost - 1)
+  } else if (homeScore < awayScore) {
+    awayUpdates.won = Math.max(0, awayStanding.won - 1)
+    awayUpdates.points = Math.max(0, awayStanding.points - 3)
+    homeUpdates.lost = Math.max(0, homeStanding.lost - 1)
+  } else {
+    homeUpdates.drawn = Math.max(0, homeStanding.drawn - 1)
+    homeUpdates.points = Math.max(0, homeStanding.points - 1)
+    awayUpdates.drawn = Math.max(0, awayStanding.drawn - 1)
+    awayUpdates.points = Math.max(0, awayStanding.points - 1)
+  }
+
+  homeUpdates.goal_difference = homeUpdates.goals_for - homeUpdates.goals_against
+  awayUpdates.goal_difference = awayUpdates.goals_for - awayUpdates.goals_against
+
+  await supabase
+    .from("league_standings")
+    .update(homeUpdates)
+    .eq("team_id", homeTeamId)
+    .eq("tournament_id", tournamentId)
+
+  await supabase
+    .from("league_standings")
+    .update(awayUpdates)
+    .eq("team_id", awayTeamId)
+    .eq("tournament_id", tournamentId)
+
+  console.log("[v0] League standings reverted successfully")
+}
+
 async function updateTeamStandings(
   homeTeamId: number,
   awayTeamId: number,
@@ -400,29 +644,19 @@ async function updateTeamStandings(
 
   console.log("[v0] Starting updateTeamStandings:", { homeTeamId, awayTeamId, homeScore, awayScore, groupId })
 
-  const { data: homeStanding, error: homeError } = await supabase
+  const { data: homeStanding } = await supabase
     .from("team_groups")
     .select("*")
     .eq("team_id", homeTeamId)
     .eq("group_id", groupId)
     .single()
 
-  if (homeError) {
-    console.error("[v0] Error fetching home team standing:", homeError)
-  }
-  console.log("[v0] Home team standing:", homeStanding)
-
-  const { data: awayStanding, error: awayError } = await supabase
+  const { data: awayStanding } = await supabase
     .from("team_groups")
     .select("*")
     .eq("team_id", awayTeamId)
     .eq("group_id", groupId)
     .single()
-
-  if (awayError) {
-    console.error("[v0] Error fetching away team standing:", awayError)
-  }
-  console.log("[v0] Away team standing:", awayStanding)
 
   if (!homeStanding || !awayStanding) {
     console.error("[v0] Missing team standings - cannot update")
@@ -462,32 +696,11 @@ async function updateTeamStandings(
   homeUpdates.goal_difference = homeUpdates.goals_for - homeUpdates.goals_against
   awayUpdates.goal_difference = awayUpdates.goals_for - awayUpdates.goals_against
 
-  console.log("[v0] Home team updates:", homeUpdates)
-  console.log("[v0] Away team updates:", awayUpdates)
+  await supabase.from("team_groups").update(homeUpdates).eq("team_id", homeTeamId).eq("group_id", groupId)
 
-  const { error: homeUpdateError } = await supabase
-    .from("team_groups")
-    .update(homeUpdates)
-    .eq("team_id", homeTeamId)
-    .eq("group_id", groupId)
+  await supabase.from("team_groups").update(awayUpdates).eq("team_id", awayTeamId).eq("group_id", groupId)
 
-  if (homeUpdateError) {
-    console.error("[v0] Error updating home team standing:", homeUpdateError)
-  } else {
-    console.log("[v0] Home team standing updated successfully")
-  }
-
-  const { error: awayUpdateError } = await supabase
-    .from("team_groups")
-    .update(awayUpdates)
-    .eq("team_id", awayTeamId)
-    .eq("group_id", groupId)
-
-  if (awayUpdateError) {
-    console.error("[v0] Error updating away team standing:", awayUpdateError)
-  } else {
-    console.log("[v0] Away team standing updated successfully")
-  }
+  console.log("[v0] Team standings updated successfully")
 }
 
 async function updateLeagueStandingsForMatch(
@@ -508,29 +721,19 @@ async function updateLeagueStandingsForMatch(
   })
 
   // Get current standings for both teams
-  const { data: homeStanding, error: homeError } = await supabase
+  const { data: homeStanding } = await supabase
     .from("league_standings")
     .select("*")
     .eq("team_id", homeTeamId)
     .eq("tournament_id", tournamentId)
     .single()
 
-  if (homeError) {
-    console.error("[v0] Error fetching home team standing:", homeError)
-  }
-  console.log("[v0] Home team standing:", homeStanding)
-
-  const { data: awayStanding, error: awayError } = await supabase
+  const { data: awayStanding } = await supabase
     .from("league_standings")
     .select("*")
     .eq("team_id", awayTeamId)
     .eq("tournament_id", tournamentId)
     .single()
-
-  if (awayError) {
-    console.error("[v0] Error fetching away team standing:", awayError)
-  }
-  console.log("[v0] Away team standing:", awayStanding)
 
   if (!homeStanding || !awayStanding) {
     console.error("[v0] Missing team standings - cannot update")
@@ -574,34 +777,19 @@ async function updateLeagueStandingsForMatch(
   homeUpdates.goal_difference = homeUpdates.goals_for - homeUpdates.goals_against
   awayUpdates.goal_difference = awayUpdates.goals_for - awayUpdates.goals_against
 
-  console.log("[v0] Home team updates:", homeUpdates)
-  console.log("[v0] Away team updates:", awayUpdates)
-
-  // Update home team standing
-  const { error: homeUpdateError } = await supabase
+  await supabase
     .from("league_standings")
     .update(homeUpdates)
     .eq("team_id", homeTeamId)
     .eq("tournament_id", tournamentId)
 
-  if (homeUpdateError) {
-    console.error("[v0] Error updating home team standing:", homeUpdateError)
-  } else {
-    console.log("[v0] Home team standing updated successfully")
-  }
-
-  // Update away team standing
-  const { error: awayUpdateError } = await supabase
+  await supabase
     .from("league_standings")
     .update(awayUpdates)
     .eq("team_id", awayTeamId)
     .eq("tournament_id", tournamentId)
 
-  if (awayUpdateError) {
-    console.error("[v0] Error updating away team standing:", awayUpdateError)
-  } else {
-    console.log("[v0] Away team standing updated successfully")
-  }
+  console.log("[v0] League standings updated successfully")
 }
 
 export async function deleteMatch(matchId: number) {

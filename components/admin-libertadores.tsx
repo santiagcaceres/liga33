@@ -343,8 +343,8 @@ export default function AdminLibertadores() {
         ),
       ])
 
-      setLocalGoals([])
-      setLocalCards([])
+      setLocalGoals(match.goals || [])
+      setLocalCards(match.cards || [])
       setHomeTeamPlayers(homePlayers)
       setAwayTeamPlayers(awayPlayers)
     } catch (error) {
@@ -373,6 +373,15 @@ export default function AdminLibertadores() {
 
     setLocalGoals([...localGoals, newGoal])
     e.currentTarget.reset()
+    // Force select reset by setting a key or triggering re-render
+    const selects = e.currentTarget.querySelectorAll('button[role="combobox"]')
+    selects.forEach((select) => {
+      const valueSpan = select.querySelector("span")
+      if (valueSpan) {
+        if (select === selects[0]) valueSpan.textContent = "Equipo"
+        if (select === selects[1]) valueSpan.textContent = "Jugador"
+      }
+    })
   }
 
   const handleRemoveGoal = (goalId: number) => {
@@ -402,6 +411,14 @@ export default function AdminLibertadores() {
 
     setLocalCards([...localCards, newCard])
     e.currentTarget.reset()
+    const selects = e.currentTarget.querySelectorAll('button[role="combobox"]')
+    selects.forEach((select) => {
+      const valueSpan = select.querySelector("span")
+      if (valueSpan) {
+        if (select === selects[0]) valueSpan.textContent = "Equipo"
+        if (select === selects[1]) valueSpan.textContent = "Jugador"
+      }
+    })
   }
 
   const handleRemoveCard = (cardId: number) => {
