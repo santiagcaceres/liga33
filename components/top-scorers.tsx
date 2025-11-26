@@ -9,6 +9,7 @@ interface Scorer {
   player_id: number
   player_name: string
   team_name: string
+  team_logo: string
   goals: number
 }
 
@@ -32,6 +33,7 @@ export default function TopScorers() {
             name,
             teams!inner (
               name,
+              logo_url,
               tournament_id
             )
           )
@@ -50,6 +52,7 @@ export default function TopScorers() {
         const playerId = goal.player_id
         const playerName = goal.players?.name
         const teamName = goal.players?.teams?.name
+        const teamLogo = goal.players?.teams?.logo_url
 
         if (!playerName || !teamName || playerName === "Desconocido" || teamName === "Sin equipo") {
           return // Skip this goal
@@ -63,6 +66,7 @@ export default function TopScorers() {
             player_id: playerId,
             player_name: playerName,
             team_name: teamName,
+            team_logo: teamLogo || "",
             goals: 1,
           })
         }
@@ -144,10 +148,19 @@ export default function TopScorers() {
                         }`}
                       >
                         <td className="p-3 font-semibold text-primary">{index + 1}</td>
-                        <td className={`p-3 ${index === 0 ? "font-bold text-lg" : "font-medium"}`}>
+                        <td className={`p-3 ${index === 0 ? "font-bold text-xl" : "font-semibold text-lg"}`}>
                           {scorer.player_name}
                         </td>
-                        <td className="p-3 text-muted-foreground">{scorer.team_name}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <img
+                              src={scorer.team_logo || "/placeholder.svg"}
+                              alt={scorer.team_name}
+                              className="w-6 h-6 object-contain"
+                            />
+                            <span className="text-muted-foreground">{scorer.team_name}</span>
+                          </div>
+                        </td>
                         <td className="p-3 text-center">
                           <span
                             className={`inline-flex items-center justify-center rounded-full font-bold ${
@@ -180,10 +193,17 @@ export default function TopScorers() {
                         {index + 1}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <div className={`font-semibold truncate ${index === 0 ? "text-base" : "text-sm"}`}>
+                        <div className={`font-semibold truncate ${index === 0 ? "text-lg" : "text-base"}`}>
                           {scorer.player_name}
                         </div>
-                        <div className="text-xs text-muted-foreground truncate">{scorer.team_name}</div>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground truncate">
+                          <img
+                            src={scorer.team_logo || "/placeholder.svg"}
+                            alt={scorer.team_name}
+                            className="w-4 h-4 object-contain"
+                          />
+                          <span>{scorer.team_name}</span>
+                        </div>
                       </div>
                     </div>
                     <span

@@ -84,7 +84,7 @@ export default function FemeninaPage() {
                 onClick={() => setActiveSection("inicio")}
                 className="flex items-center gap-3 hover:opacity-80 transition-opacity"
               >
-                <img src="/logo-liga33.png" alt="Liga 33" className="w-20 h-20 md:w-32 md:h-32 object-contain" />
+                <img src="/images/logo-20fem.png" alt="Liga 33" className="w-20 h-20 md:w-32 md:h-32 object-contain" />
                 <div>
                   <h1 className="text-2xl md:text-3xl font-bold leading-tight text-pink-500">Liga 33</h1>
                   <p className="text-purple-400 text-sm md:text-base font-semibold">SuperLiga Femenina</p>
@@ -104,13 +104,6 @@ export default function FemeninaPage() {
             </div>
 
             <nav className="hidden md:flex gap-4 lg:gap-6">
-              <Button
-                variant="ghost"
-                className="text-white hover:bg-pink-500/20 hover:text-pink-500 text-sm lg:text-base"
-                onClick={() => setActiveSection("inicio")}
-              >
-                Inicio
-              </Button>
               <Button
                 variant="ghost"
                 className="text-white hover:bg-pink-500/20 hover:text-pink-500 text-sm lg:text-base"
@@ -152,16 +145,6 @@ export default function FemeninaPage() {
           {isMobileMenuOpen && (
             <nav className="md:hidden mt-4 pb-4 border-t border-pink-500/30 pt-4">
               <div className="flex flex-col gap-2">
-                <Button
-                  variant="ghost"
-                  className="text-white hover:bg-pink-500/20 hover:text-pink-500 justify-start"
-                  onClick={() => {
-                    setActiveSection("inicio")
-                    setIsMobileMenuOpen(false)
-                  }}
-                >
-                  Inicio
-                </Button>
                 <Button
                   variant="ghost"
                   className="text-white hover:bg-pink-500/20 hover:text-pink-500 justify-start"
@@ -316,7 +299,7 @@ export default function FemeninaPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <img src="/logo-liga33.png" alt="Liga 33" className="w-12 h-12 object-contain" />
+                <img src="/images/logo-20fem.png" alt="Liga 33" className="w-12 h-12 object-contain" />
                 <h3 className="text-lg font-bold text-pink-500">Liga 33</h3>
               </div>
               <p className="text-gray-300 text-sm md:text-base font-semibold">
