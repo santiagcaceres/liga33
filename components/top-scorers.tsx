@@ -24,15 +24,19 @@ export default function TopScorers() {
     try {
       const supabase = await createClient()
 
-      const { data: goalsData, error } = await supabase.from("goals").select(`
+      const { data: goalsData, error } = await supabase
+        .from("goals")
+        .select(`
           player_id,
           players (
             name,
-            teams (
-              name
+            teams!inner (
+              name,
+              tournament_id
             )
           )
         `)
+        .eq("players.teams.tournament_id", 1)
 
       if (error) {
         console.error("[v0] Error loading scorers:", error)
@@ -44,8 +48,12 @@ export default function TopScorers() {
 
       goalsData?.forEach((goal: any) => {
         const playerId = goal.player_id
-        const playerName = goal.players?.name || "Desconocido"
-        const teamName = goal.players?.teams?.name || "Sin equipo"
+        const playerName = goal.players?.name
+        const teamName = goal.players?.teams?.name
+
+        if (!playerName || !teamName || playerName === "Desconocido" || teamName === "Sin equipo") {
+          return // Skip this goal
+        }
 
         if (scorersMap.has(playerId)) {
           const scorer = scorersMap.get(playerId)!

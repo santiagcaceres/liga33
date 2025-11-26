@@ -16,13 +16,10 @@ import { getTeamsByTournament, createTeam, updateTeam, deleteTeam } from "@/lib/
 import { getPlayersByTournament, createPlayer, updatePlayer, deletePlayer } from "@/lib/actions/players"
 import { getMatchesByTournament, createMatch, updateMatchResult } from "@/lib/actions/matches"
 import { createByeWeek, getByeWeeks, deleteByeWeek } from "@/lib/actions/bye-weeks"
-// Removed: import { getGroupsByTournament } from "@/lib/actions/groups" // Import getGroupsByTournament
 
 export default function AdminFemenina() {
   const { toast } = useToast()
   const TOURNAMENT_ID = 2 // SuperLiga Femenina
-
-  // Removed: const [defaultGroupId, setDefaultGroupId] = useState<number | null>(null)
 
   const [isLoading, setIsLoading] = useState(true)
   const [isCreatingTeam, setIsCreatingTeam] = useState(false)
@@ -428,18 +425,6 @@ export default function AdminFemenina() {
     e.preventDefault()
     console.log("[v0] ============ HANDLE CREATE MATCH START ============")
 
-    // Removed group check - women's tournament doesn't use groups
-    // if (!defaultGroupId) {
-    //   toast({
-    //     title: "Error",
-    //     description: "No se pudo obtener el grupo por defecto. Ejecuta el script 010_create_femenino_group.sql",
-    //     variant: "destructive",
-    //     className: "border-pink-500/50 bg-gray-900",
-    //   })
-    //   console.error("[v0] ❌ Cannot create match: defaultGroupId is null")
-    //   return
-    // }
-
     setIsCreatingMatch(true) // Show loading state
     const formData = new FormData(e.currentTarget)
 
@@ -575,7 +560,7 @@ export default function AdminFemenina() {
     : []
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gray-900 text-white p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Trophy className="w-8 h-8 text-pink-500" />
@@ -596,7 +581,7 @@ export default function AdminFemenina() {
         </Link>
       </div>
 
-      <Card className="border-2 border-pink-500/50 bg-gradient-to-br from-gray-800 to-gray-900">
+      <Card className="border-2 border-pink-500/50 bg-gradient-to-br from-gray-800 to-gray-900 mt-6">
         <CardContent className="p-6">
           <Tabs defaultValue="teams" className="w-full">
             <TabsList className="grid w-full grid-cols-4 bg-gray-700/50">

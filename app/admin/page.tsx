@@ -1,26 +1,49 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Trophy, Settings, Eye, EyeOff } from "lucide-react"
+import { Trophy, Settings, Eye, EyeOff, CloudRain } from "lucide-react"
+import { getRainStatus, toggleRainStatus } from "@/lib/actions/rain-status"
 
 export default function AdminPage() {
   const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [isRainActive, setIsRainActive] = useState(false)
+  const [isTogglingRain, setIsTogglingRain] = useState(false)
+
+  useEffect(() => {
+    async function loadRainStatus() {
+      if (isAuthenticated) {
+        const result = await getRainStatus()
+        if (result.success) {
+          setIsRainActive(result.active)
+        }
+      }
+    }
+    loadRainStatus()
+  }, [isAuthenticated])
 
   const handleLogin = () => {
-    // Simple authentication - in production, use proper authentication
     if (password === "admin123") {
       setIsAuthenticated(true)
     } else {
       alert("Contraseña incorrecta")
     }
+  }
+
+  const toggleRainSuspension = async () => {
+    setIsTogglingRain(true)
+    const result = await toggleRainStatus()
+    if (result.success) {
+      setIsRainActive(result.active)
+    }
+    setIsTogglingRain(false)
   }
 
   if (!isAuthenticated) {
@@ -79,8 +102,38 @@ export default function AdminPage() {
           <p className="text-gray-400">Selecciona el torneo que deseas gestionar</p>
         </div>
 
+        <Card className="border-blue-500/50 bg-gradient-to-br from-gray-800 to-gray-900">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-blue-400">
+              <CloudRain className="w-6 h-6" />
+              Control de Suspensión por Lluvia
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-gray-300 text-sm">
+              Activa este botón para mostrar un aviso de suspensión por lluvia a todos los visitantes de las páginas
+              públicas.
+            </p>
+            <Button
+              onClick={toggleRainSuspension}
+              disabled={isTogglingRain}
+              className={`w-full transition-all ${
+                isRainActive
+                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/50"
+                  : "bg-gray-700 hover:bg-gray-600 text-gray-300"
+              }`}
+            >
+              <CloudRain className="w-5 h-5 mr-2" />
+              {isTogglingRain
+                ? "Actualizando..."
+                : isRainActive
+                  ? "Lluvia Activa - Click para Desactivar"
+                  : "Activar Suspensión por Lluvia"}
+            </Button>
+          </CardContent>
+        </Card>
+
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Copa Libertadores Card */}
           <Card
             className="border-2 border-yellow-500/50 bg-gradient-to-br from-gray-800 to-gray-900 hover:border-yellow-500 transition-all cursor-pointer group"
             onClick={() => router.push("/admin/libertadores")}
@@ -108,7 +161,6 @@ export default function AdminPage() {
             </CardContent>
           </Card>
 
-          {/* SuperLiga Femenina Card */}
           <Card
             className="border-2 border-pink-500/50 bg-gradient-to-br from-gray-800 to-gray-900 hover:border-pink-500 transition-all cursor-pointer group"
             onClick={() => router.push("/admin/femenina")}

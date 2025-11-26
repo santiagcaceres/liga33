@@ -16,6 +16,7 @@ import { getTeamsByTournament, createTeam, updateTeam, deleteTeam } from "@/lib/
 import { getPlayersByTournament, createPlayer, updatePlayer, deletePlayer } from "@/lib/actions/players"
 import { getMatchesByTournament, createMatch, updateMatchResult } from "@/lib/actions/matches"
 import { getGroupsByTournament, getTeamsByGroup } from "@/lib/actions/groups"
+// import { toggleRainSuspension, checkRoundSuspended } from "@/lib/actions/rain-suspensions"
 
 export default function AdminLibertadores() {
   const { toast } = useToast()
@@ -54,6 +55,30 @@ export default function AdminLibertadores() {
   const [playerTeamFilter, setPlayerTeamFilter] = useState<string>("all")
   const [playerSearchQuery, setPlayerSearchQuery] = useState<string>("")
 
+  // Ya no es necesario para el estado de suspensión de lluvia por ronda, se maneja con localStorage
+  // const [rainActive, setRainActive] = useState(false)
+
+  // useEffect(() => {
+  //   // Cargar estado de lluvia desde localStorage
+  //   const stored = localStorage.getItem("rainActive_libertadores")
+  //   if (stored) {
+  //     setRainActive(JSON.parse(stored))
+  //   }
+  // }, [])
+
+  // This function is for the global rain toggle
+  // function handleGlobalToggleRain() {
+  //   const newState = !rainActive
+  //   setRainActive(newState)
+  //   localStorage.setItem("rainActive_libertadores", JSON.stringify(newState))
+  //   toast({
+  //     title: newState ? "Lluvia activada" : "Lluvia desactivada",
+  //     description: newState
+  //       ? "El efecto de lluvia se mostrará a los usuarios"
+  //       : "El efecto de lluvia ha sido desactivado",
+  //   })
+  // }
+
   useEffect(() => {
     loadAllData()
   }, [])
@@ -90,6 +115,27 @@ export default function AdminLibertadores() {
       setIsLoading(false)
     }
   }
+
+  // Ya no se necesita esta función para cargar el estado de suspensión de lluvia por ronda
+  // async function loadRainSuspensions() {
+  //   const rounds = [...new Set(matches.map((m) => m.round))]
+  //   const suspensions: Record<number, boolean> = {}
+
+  //   for (const round of rounds) {
+  //     const result = await checkRoundSuspended(1, round) // tournament_id = 1 para Libertadores
+  //     if (result.success && result.suspended) {
+  //       suspensions[round] = true
+  //     }
+  //   }
+
+  //   setRainSuspensions(suspensions)
+  // }
+
+  // useEffect(() => {
+  //   if (matches.length > 0) {
+  //     loadRainSuspensions()
+  //   }
+  // }, [matches])
 
   const handleCreateMatch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -473,8 +519,26 @@ export default function AdminLibertadores() {
       : awayTeamPlayers
     : []
 
+  // Esta función ya no es necesaria ya que el estado de lluvia por ronda se maneja con localStorage globalmente.
+  // async function handleToggleRoundRainSuspension(round: number) {
+  //   const result = await toggleRainSuspension(1, round) // tournament_id = 1
+  //   if (result.success) {
+  //     setRainSuspensions((prev) => ({
+  //       ...prev,
+  //       [round]: result.suspended || false,
+  //     }))
+  //     toast({
+  //       title: result.suspended ? "Fecha suspendida por lluvia" : "Suspensión levantada",
+  //       description: `Fecha ${round} ${result.suspended ? "marcada como suspendida" : "reactivada"}`,
+  //     })
+  //   }
+  // }
+
+  // Determinar la pestaña activa para mostrar el botón de lluvia condicionalmente
+  const [activeTab, setActiveTab] = useState("teams")
+
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gray-900 text-white p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Trophy className="w-8 h-8 text-yellow-500" />
@@ -492,20 +556,20 @@ export default function AdminLibertadores() {
         </Link>
       </div>
 
-      <Card className="border-2 border-yellow-500/50 bg-gradient-to-br from-gray-800 to-gray-900">
+      <Card className="border-2 border-yellow-500/50 bg-gradient-to-br from-gray-800 to-gray-900 mt-6">
         <CardContent className="p-6">
-          <Tabs defaultValue="teams" className="w-full">
+          <Tabs defaultValue="teams" className="w-full" onValueChange={(value) => setActiveTab(value)}>
             <TabsList className="grid w-full grid-cols-3 bg-gray-700/50">
               <TabsTrigger value="teams">
-                <Users className="w-4 h-4 mr-2" />
+                <Users className="w-4 h-4 mr-1" />
                 Equipos
               </TabsTrigger>
               <TabsTrigger value="players">
-                <UserPlus className="w-4 h-4 mr-2" />
+                <UserPlus className="w-4 h-4 mr-1" />
                 Jugadores
               </TabsTrigger>
               <TabsTrigger value="matches">
-                <Calendar className="w-4 h-4 mr-2" />
+                <Calendar className="w-4 h-4 mr-1" />
                 Partidos
               </TabsTrigger>
             </TabsList>
@@ -1058,7 +1122,9 @@ export default function AdminLibertadores() {
                     {viewMode === "round" && (
                       <Select
                         value={selectedRound?.toString()}
-                        onValueChange={(value) => setSelectedRound(Number.parseInt(value))}
+                        onValueChange={(value) => {
+                          setSelectedRound(Number.parseInt(value))
+                        }}
                       >
                         <SelectTrigger className="w-[150px] bg-gray-800 border-gray-700">
                           <SelectValue placeholder="Fecha" />
@@ -1072,274 +1138,357 @@ export default function AdminLibertadores() {
                         </SelectContent>
                       </Select>
                     )}
+
+                    {/* El botón para suspender una fecha específica por lluvia ya no es relevante */}
+                    {/* {viewMode === "round" && selectedRound && (
+                      <Button
+                        size="sm"
+                        variant={rainSuspensions[selectedRound] ? "default" : "outline"}
+                        onClick={() => handleToggleRoundRainSuspension(selectedRound)}
+                        className={
+                          rainSuspensions[selectedRound]
+                            ? "bg-blue-600 hover:bg-blue-700"
+                            : "border-blue-500/50 text-blue-400 hover:bg-blue-600/20"
+                        }
+                      >
+                        {rainSuspensions[selectedRound] ? (
+                          <>
+                            <CloudRain className="w-4 h-4 mr-1" />
+                            Suspendido por lluvia
+                          </>
+                        ) : (
+                          <>
+                            <CloudOff className="w-4 h-4 mr-1" />
+                            Marcar lluvia
+                          </>
+                        )}
+                      </Button>
+                    )} */}
                   </div>
                 </CardContent>
               </Card>
 
-              {showResultForm && selectedMatch && (
-                <Card className="border-yellow-500/30">
-                  <CardHeader>
-                    <CardTitle className="text-yellow-500">Asignar Resultado</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="text-white text-center">
-                      <p className="font-semibold">
-                        {selectedMatch.home_team?.name} vs {selectedMatch.away_team?.name}
-                      </p>
-                      <p className="text-sm text-gray-400">
-                        {selectedMatch.match_date} - Grupo {selectedMatch.copa_groups?.name}
-                      </p>
-                      <div className="text-4xl font-bold text-yellow-500 mt-4">
-                        {homeScore} - {awayScore}
-                      </div>
-                      <p className="text-xs text-gray-400 mt-2">Marcador calculado automáticamente según los goles</p>
-                    </div>
-
-                    <div className="border-t border-gray-700 pt-4">
-                      <h4 className="text-lg font-semibold text-yellow-500 mb-3">Goles ({localGoals.length})</h4>
-
-                      {localGoals.length > 0 && (
-                        <div className="mb-4 space-y-2">
-                          {localGoals.map((goal: any) => (
-                            <div key={goal.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
-                              <span className="text-sm text-white">{goal.players?.name}</span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleRemoveGoal(goal.id)}
-                                className="text-red-500 hover:text-red-400"
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
+              {/* En la sección de Partidos, agregar el botón de lluvia global */}
+              {activeTab === "matches" && (
+                <div className="space-y-6">
+                  {/* Botón de lluvia global */}
+                  {/* <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      variant={rainActive ? "default" : "outline"}
+                      onClick={handleGlobalToggleRain}
+                      className={
+                        rainActive
+                          ? "bg-blue-600 hover:bg-blue-700"
+                          : "border-blue-500/50 text-blue-400 hover:bg-blue-600/20"
+                      }
+                    >
+                      {rainActive ? (
+                        <>
+                          <CloudRain className="w-4 h-4 mr-1" />
+                          Lluvia Activa
+                        </>
+                      ) : (
+                        <>
+                          <CloudOff className="w-4 h-4 mr-1" />
+                          Activar Lluvia
+                        </>
                       )}
+                    </Button>
+                  </div> */}
 
-                      <form onSubmit={handleAddGoal} className="grid grid-cols-2 gap-2">
-                        <Select name="team_id" required value={selectedGoalTeam} onValueChange={setSelectedGoalTeam}>
-                          <SelectTrigger className="bg-gray-800 border-gray-700">
-                            <SelectValue placeholder="Equipo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={selectedMatch.home_team_id.toString()}>
-                              {selectedMatch.home_team?.name}
-                            </SelectItem>
-                            <SelectItem value={selectedMatch.away_team_id.toString()}>
-                              {selectedMatch.away_team?.name}
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <div className="flex gap-1">
-                          <Select name="player_id" required disabled={!selectedGoalTeam}>
-                            <SelectTrigger className="bg-gray-800 border-gray-700">
-                              <SelectValue placeholder="Jugador" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {goalFormPlayers.map((player: any) => (
-                                <SelectItem key={player.id} value={player.id.toString()}>
-                                  {player.name} (#{player.number})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button type="submit" size="sm" className="bg-yellow-600 hover:bg-yellow-700">
-                            +
-                          </Button>
-                        </div>
-                      </form>
-                    </div>
-
-                    <div className="border-t border-gray-700 pt-4">
-                      <h4 className="text-lg font-semibold text-yellow-500 mb-3">
-                        Tarjetas Amarillas ({localCards.filter((c) => c.card_type === "yellow").length})
-                      </h4>
-
-                      {localCards.filter((c: any) => c.card_type === "yellow").length > 0 && (
-                        <div className="mb-4 space-y-2">
-                          {localCards
-                            .filter((c: any) => c.card_type === "yellow")
-                            .map((card: any) => (
-                              <div key={card.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
-                                <span className="text-sm text-white">{card.players?.name}</span>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleRemoveCard(card.id)}
-                                  className="text-red-500 hover:text-red-400"
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            ))}
-                        </div>
-                      )}
-
-                      <form onSubmit={handleAddCard} className="grid grid-cols-2 gap-2">
-                        <input type="hidden" name="card_type" value="yellow" />
-                        <Select name="team_id" required value={selectedCardTeam} onValueChange={setSelectedCardTeam}>
-                          <SelectTrigger className="bg-gray-800 border-gray-700">
-                            <SelectValue placeholder="Equipo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={selectedMatch.home_team_id.toString()}>
-                              {selectedMatch.home_team?.name}
-                            </SelectItem>
-                            <SelectItem value={selectedMatch.away_team_id.toString()}>
-                              {selectedMatch.away_team?.name}
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <div className="flex gap-1">
-                          <Select name="player_id" required disabled={!selectedCardTeam}>
-                            <SelectTrigger className="bg-gray-800 border-gray-700">
-                              <SelectValue placeholder="Jugador" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {cardFormPlayers.map((player: any) => (
-                                <SelectItem key={player.id} value={player.id.toString()}>
-                                  {player.name} (#{player.number})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button type="submit" size="sm" className="bg-yellow-600 hover:bg-yellow-700">
-                            +
-                          </Button>
-                        </div>
-                      </form>
-                    </div>
-
-                    <div className="border-t border-gray-700 pt-4">
-                      <h4 className="text-lg font-semibold text-yellow-500 mb-3">
-                        Tarjetas Rojas ({localCards.filter((c) => c.card_type === "red").length})
-                      </h4>
-                      {localCards.filter((c: any) => c.card_type === "red").length > 0 && (
-                        <div className="mb-4 space-y-2">
-                          {localCards
-                            .filter((c: any) => c.card_type === "red")
-                            .map((card: any) => (
-                              <div key={card.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
-                                <span className="text-sm text-white">{card.players?.name}</span>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleRemoveCard(card.id)}
-                                  className="text-red-500 hover:text-red-400"
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            ))}
-                        </div>
-                      )}
-                      <form onSubmit={handleAddCard} className="grid grid-cols-2 gap-2">
-                        <input type="hidden" name="card_type" value="red" />
-                        <Select name="team_id" required value={selectedCardTeam} onValueChange={setSelectedCardTeam}>
-                          <SelectTrigger className="bg-gray-800 border-gray-700">
-                            <SelectValue placeholder="Equipo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={selectedMatch.home_team_id.toString()}>
-                              {selectedMatch.home_team?.name}
-                            </SelectItem>
-                            <SelectItem value={selectedMatch.away_team_id.toString()}>
-                              {selectedMatch.away_team?.name}
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <div className="flex gap-1">
-                          <Select name="player_id" required disabled={!selectedCardTeam}>
-                            <SelectTrigger className="bg-gray-800 border-gray-700">
-                              <SelectValue placeholder="Jugador" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {cardFormPlayers.map((player: any) => (
-                                <SelectItem key={player.id} value={player.id.toString()}>
-                                  {player.name} (#{player.number})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button type="submit" size="sm" className="bg-yellow-600 hover:bg-yellow-700">
-                            +
-                          </Button>
-                        </div>
-                      </form>
-                    </div>
-
-                    <div className="border-t border-gray-700 pt-4 flex gap-2">
-                      <Button onClick={handleSaveResult} className="flex-1 bg-yellow-600 hover:bg-yellow-700">
-                        Guardar Resultado Completo
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setShowResultForm(false)
-                          setSelectedMatch(null)
-                          setLocalGoals([])
-                          setLocalCards([])
-                        }}
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              <div className="max-h-[500px] overflow-y-auto space-y-2">
-                {isLoading ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                    <Loader2 className="w-8 h-8 animate-spin text-yellow-500 mb-3" />
-                    <p>Cargando partidos...</p>
-                  </div>
-                ) : filteredMatches.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
-                    No hay partidos{viewMode !== "all" ? " en este filtro" : ""}
-                  </div>
-                ) : (
-                  filteredMatches.map((match) => (
-                    <div key={match.id} className="p-3 bg-gray-800 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <p className="text-white font-medium">
-                            {match.home_team?.name} vs {match.away_team?.name}
+                  {showResultForm && selectedMatch && (
+                    <Card className="border-yellow-500/30">
+                      <CardHeader>
+                        <CardTitle className="text-yellow-500">Asignar Resultado</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        <div className="text-white text-center">
+                          <p className="font-semibold">
+                            {selectedMatch.home_team?.name} vs {selectedMatch.away_team?.name}
                           </p>
                           <p className="text-sm text-gray-400">
-                            {match.played ? `Resultado: ${match.home_score} - ${match.away_score}` : "VS"}
+                            {selectedMatch.match_date} - Grupo {selectedMatch.copa_groups?.name}
                           </p>
-                          <p className="text-xs text-gray-500">
-                            Fecha {match.round} - Grupo {match.copa_groups?.name} - {match.match_date}
-                            {match.field && ` - ${match.field}`}
+                          <div className="text-4xl font-bold text-yellow-500 mt-4">
+                            {homeScore} - {awayScore}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-2">
+                            Marcador calculado automáticamente según los goles
                           </p>
                         </div>
-                        {!match.played ? (
-                          <Button
-                            size="sm"
-                            onClick={() => loadMatchDetails(match)}
-                            className="bg-yellow-600 hover:bg-yellow-700"
-                          >
-                            Asignar Resultado
-                          </Button>
-                        ) : (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => loadMatchDetails(match)}
-                              className="border-yellow-500/50 text-yellow-500"
+
+                        <div className="border-t border-gray-700 pt-4">
+                          <h4 className="text-lg font-semibold text-yellow-500 mb-3">Goles ({localGoals.length})</h4>
+
+                          {localGoals.length > 0 && (
+                            <div className="mb-4 space-y-2">
+                              {localGoals.map((goal: any) => (
+                                <div
+                                  key={goal.id}
+                                  className="flex items-center justify-between p-2 bg-gray-800 rounded"
+                                >
+                                  <span className="text-sm text-white">{goal.players?.name}</span>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleRemoveGoal(goal.id)}
+                                    className="text-red-500 hover:text-red-400"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <form onSubmit={handleAddGoal} className="grid grid-cols-2 gap-2">
+                            <Select
+                              name="team_id"
+                              required
+                              value={selectedGoalTeam}
+                              onValueChange={setSelectedGoalTeam}
                             >
-                              <Pencil className="w-4 h-4 mr-1" />
-                              Editar
-                            </Button>
-                          </div>
-                        )}
+                              <SelectTrigger className="bg-gray-800 border-gray-700">
+                                <SelectValue placeholder="Equipo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={selectedMatch.home_team_id.toString()}>
+                                  {selectedMatch.home_team?.name}
+                                </SelectItem>
+                                <SelectItem value={selectedMatch.away_team_id.toString()}>
+                                  {selectedMatch.away_team?.name}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-1">
+                              <Select name="player_id" required disabled={!selectedGoalTeam}>
+                                <SelectTrigger className="bg-gray-800 border-gray-700">
+                                  <SelectValue placeholder="Jugador" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {goalFormPlayers.map((player: any) => (
+                                    <SelectItem key={player.id} value={player.id.toString()}>
+                                      {player.name} (#{player.number})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button type="submit" size="sm" className="bg-yellow-600 hover:bg-yellow-700">
+                                +
+                              </Button>
+                            </div>
+                          </form>
+                        </div>
+
+                        <div className="border-t border-gray-700 pt-4">
+                          <h4 className="text-lg font-semibold text-yellow-500 mb-3">
+                            Tarjetas Amarillas ({localCards.filter((c) => c.card_type === "yellow").length})
+                          </h4>
+
+                          {localCards.filter((c: any) => c.card_type === "yellow").length > 0 && (
+                            <div className="mb-4 space-y-2">
+                              {localCards
+                                .filter((c: any) => c.card_type === "yellow")
+                                .map((card: any) => (
+                                  <div
+                                    key={card.id}
+                                    className="flex items-center justify-between p-2 bg-gray-800 rounded"
+                                  >
+                                    <span className="text-sm text-white">{card.players?.name}</span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleRemoveCard(card.id)}
+                                      className="text-red-500 hover:text-red-400"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
+
+                          <form onSubmit={handleAddCard} className="grid grid-cols-2 gap-2">
+                            <input type="hidden" name="card_type" value="yellow" />
+                            <Select
+                              name="team_id"
+                              required
+                              value={selectedCardTeam}
+                              onValueChange={setSelectedCardTeam}
+                            >
+                              <SelectTrigger className="bg-gray-800 border-gray-700">
+                                <SelectValue placeholder="Equipo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={selectedMatch.home_team_id.toString()}>
+                                  {selectedMatch.home_team?.name}
+                                </SelectItem>
+                                <SelectItem value={selectedMatch.away_team_id.toString()}>
+                                  {selectedMatch.away_team?.name}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-1">
+                              <Select name="player_id" required disabled={!selectedCardTeam}>
+                                <SelectTrigger className="bg-gray-800 border-gray-700">
+                                  <SelectValue placeholder="Jugador" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {cardFormPlayers.map((player: any) => (
+                                    <SelectItem key={player.id} value={player.id.toString()}>
+                                      {player.name} (#{player.number})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button type="submit" size="sm" className="bg-yellow-600 hover:bg-yellow-700">
+                                +
+                              </Button>
+                            </div>
+                          </form>
+                        </div>
+
+                        <div className="border-t border-gray-700 pt-4">
+                          <h4 className="text-lg font-semibold text-yellow-500 mb-3">
+                            Tarjetas Rojas ({localCards.filter((c) => c.card_type === "red").length})
+                          </h4>
+                          {localCards.filter((c: any) => c.card_type === "red").length > 0 && (
+                            <div className="mb-4 space-y-2">
+                              {localCards
+                                .filter((c: any) => c.card_type === "red")
+                                .map((card: any) => (
+                                  <div
+                                    key={card.id}
+                                    className="flex items-center justify-between p-2 bg-gray-800 rounded"
+                                  >
+                                    <span className="text-sm text-white">{card.players?.name}</span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleRemoveCard(card.id)}
+                                      className="text-red-500 hover:text-red-400"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
+                          <form onSubmit={handleAddCard} className="grid grid-cols-2 gap-2">
+                            <input type="hidden" name="card_type" value="red" />
+                            <Select
+                              name="team_id"
+                              required
+                              value={selectedCardTeam}
+                              onValueChange={setSelectedCardTeam}
+                            >
+                              <SelectTrigger className="bg-gray-800 border-gray-700">
+                                <SelectValue placeholder="Equipo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={selectedMatch.home_team_id.toString()}>
+                                  {selectedMatch.home_team?.name}
+                                </SelectItem>
+                                <SelectItem value={selectedMatch.away_team_id.toString()}>
+                                  {selectedMatch.away_team?.name}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-1">
+                              <Select name="player_id" required disabled={!selectedCardTeam}>
+                                <SelectTrigger className="bg-gray-800 border-gray-700">
+                                  <SelectValue placeholder="Jugador" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {cardFormPlayers.map((player: any) => (
+                                    <SelectItem key={player.id} value={player.id.toString()}>
+                                      {player.name} (#{player.number})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button type="submit" size="sm" className="bg-yellow-600 hover:bg-yellow-700">
+                                +
+                              </Button>
+                            </div>
+                          </form>
+                        </div>
+
+                        <div className="border-t border-gray-700 pt-4 flex gap-2">
+                          <Button onClick={handleSaveResult} className="flex-1 bg-yellow-600 hover:bg-yellow-700">
+                            Guardar Resultado Completo
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setShowResultForm(false)
+                              setSelectedMatch(null)
+                              setLocalGoals([])
+                              setLocalCards([])
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="max-h-[500px] overflow-y-auto space-y-2">
+                    {isLoading ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                        <Loader2 className="w-8 h-8 animate-spin text-yellow-500 mb-3" />
+                        <p>Cargando partidos...</p>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                    ) : filteredMatches.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400">
+                        No hay partidos{viewMode !== "all" ? " en este filtro" : ""}
+                      </div>
+                    ) : (
+                      filteredMatches.map((match) => (
+                        <div key={match.id} className="p-3 bg-gray-800 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <p className="text-white font-medium">
+                                {match.home_team?.name} vs {match.away_team?.name}
+                              </p>
+                              <p className="text-sm text-gray-400">
+                                {match.played ? `Resultado: ${match.home_score} - ${match.away_score}` : "VS"}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Fecha {match.round} - Grupo {match.copa_groups?.name} - {match.match_date}
+                                {match.field && ` - ${match.field}`}
+                              </p>
+                            </div>
+                            {!match.played ? (
+                              <Button
+                                size="sm"
+                                onClick={() => loadMatchDetails(match)}
+                                className="bg-yellow-600 hover:bg-yellow-700"
+                              >
+                                Asignar Resultado
+                              </Button>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => loadMatchDetails(match)}
+                                  className="border-yellow-500/50 text-yellow-500"
+                                >
+                                  <Pencil className="w-4 h-4 mr-1" />
+                                  Editar
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>

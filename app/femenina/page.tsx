@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Menu, X, ArrowLeft, Trophy, Calendar, Target, Users, FileText, Download } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -11,7 +11,9 @@ import LeagueFixtures from "@/components/league-fixtures"
 import LeagueTopScorers from "@/components/league-top-scorers"
 import LeagueTeamsRoster from "@/components/league-teams-roster"
 import NewsSection from "@/components/news-section"
+import { RainAlert } from "@/components/rain-alert"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { getRainStatus } from "@/lib/actions/rain-status"
 
 export default function FemeninaPage() {
   const router = useRouter()
@@ -31,6 +33,18 @@ export default function FemeninaPage() {
   const [activeSection, setActiveSection] = useState<string>("inicio")
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
+  const [showRainAlert, setShowRainAlert] = useState(false)
+
+  useEffect(() => {
+    async function checkRainSuspensions() {
+      const result = await getRainStatus()
+      if (result.success && result.active) {
+        setShowRainAlert(true)
+      }
+    }
+    checkRainSuspensions()
+  }, [])
+
   const handleLoadingComplete = () => {
     if (typeof window !== "undefined") {
       localStorage.setItem("lastLoadingShownFemenina", Date.now().toString())
@@ -42,7 +56,7 @@ export default function FemeninaPage() {
     return (
       <LoadingAnimation
         onComplete={handleLoadingComplete}
-        logoUrl="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo%20fem-iqSGF186XTkPixDKR43n9kMdMjAl1T.png"
+        logoUrl="/images/logo-20fem.png"
         shadowColor="rgba(236, 72, 153, 0.8)"
       />
     )
@@ -51,6 +65,8 @@ export default function FemeninaPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black">
       <WhatsAppButton />
+
+      {showRainAlert && <RainAlert message="Partidos suspendidos por lluvia" onClose={() => setShowRainAlert(false)} />}
 
       <header className="bg-gradient-to-r from-black via-pink-500/20 to-black text-white shadow-lg border-b border-pink-500/30">
         <div className="container mx-auto px-4 py-4 md:py-6">

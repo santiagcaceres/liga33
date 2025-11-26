@@ -11,8 +11,10 @@ import WhatsAppButton from "@/components/whatsapp-button"
 import CopaLibertadores from "@/components/copa-libertadores"
 import TeamsRoster from "@/components/teams-roster"
 import NewsSection from "@/components/news-section"
+import { RainAlert } from "@/components/rain-alert"
 import { Card } from "@/components/ui/card"
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { getRainStatus } from "@/lib/actions/rain-status"
 
 export default function LibertadoresPage() {
   const router = useRouter()
@@ -37,11 +39,24 @@ export default function LibertadoresPage() {
   })
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
+  const [showRainAlert, setShowRainAlert] = useState(false)
+  const [rainSuspensions, setRainSuspensions] = useState<any[]>([])
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("activeSectionLibertadores", activeSection)
     }
   }, [activeSection])
+
+  useEffect(() => {
+    async function checkRainSuspensions() {
+      const result = await getRainStatus()
+      if (result.success && result.active) {
+        setShowRainAlert(true)
+      }
+    }
+    checkRainSuspensions()
+  }, [])
 
   const handleLoadingComplete = () => {
     if (typeof window !== "undefined") {
@@ -57,6 +72,8 @@ export default function LibertadoresPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black">
       <WhatsAppButton />
+
+      {showRainAlert && <RainAlert message="Partidos suspendidos por lluvia" onClose={() => setShowRainAlert(false)} />}
 
       <header className="bg-gradient-to-r from-black via-primary/20 to-black text-white shadow-lg border-b border-primary/30">
         <div className="container mx-auto px-4 py-4 md:py-6">
