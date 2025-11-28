@@ -16,6 +16,7 @@ import { getTeamsByTournament, createTeam, updateTeam, deleteTeam } from "@/lib/
 import { getPlayersByTournament, createPlayer, updatePlayer, deletePlayer } from "@/lib/actions/players"
 import { getMatchesByTournament, createMatch, updateMatchResult } from "@/lib/actions/matches"
 import { getGroupsByTournament, getTeamsByGroup } from "@/lib/actions/groups"
+import { getPlayoffsByTournament, createPlayoff, deletePlayoff } from "@/lib/actions/playoffs"
 // import { toggleRainSuspension, checkRoundSuspended } from "@/lib/actions/rain-suspensions"
 
 export default function AdminLibertadores() {
@@ -27,6 +28,11 @@ export default function AdminLibertadores() {
   const [players, setPlayers] = useState<any[]>([])
   const [matches, setMatches] = useState<any[]>([])
   const [groups, setGroups] = useState<any[]>([])
+
+  const [playoffMatches, setPlayoffMatches] = useState<any[]>([])
+  const [showPlayoffForm, setShowPlayoffForm] = useState(false)
+  const [editingPlayoff, setEditingPlayoff] = useState<any>(null)
+  const [selectedPhase, setSelectedPhase] = useState<string>("octavos")
 
   const [showTeamForm, setShowTeamForm] = useState(false)
   const [showPlayerForm, setShowPlayerForm] = useState(false)
@@ -89,17 +95,22 @@ export default function AdminLibertadores() {
     const startTime = Date.now()
 
     try {
-      const [teamsData, playersData, matchesData, groupsData] = await Promise.all([
+      const [teamsData, playersData, matchesData, groupsData, playoffsData] = await Promise.all([
         getTeamsByTournament(TOURNAMENT_ID),
         getPlayersByTournament(TOURNAMENT_ID),
         getMatchesByTournament(TOURNAMENT_ID),
         getGroupsByTournament(TOURNAMENT_ID),
+        getPlayoffsByTournament(TOURNAMENT_ID),
       ])
 
       setTeams(teamsData)
       setPlayers(playersData)
       setMatches(matchesData)
       setGroups(groupsData)
+
+      if (playoffsData.success) {
+        setPlayoffMatches(playoffsData.data || [])
+      }
 
       const endTime = Date.now()
       console.log(`[v0] ✅ Admin Libertadores data loaded in ${endTime - startTime}ms`)
@@ -536,6 +547,64 @@ export default function AdminLibertadores() {
 
   // Determinar la pestaña activa para mostrar el botón de lluvia condicionalmente
   const [activeTab, setActiveTab] = useState("teams")
+
+  async function handleCreatePlayoff(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+
+    const playoff = {
+      tournament_id: 1,
+      phase: formData.get("phase") as string,
+      match_number: Number.parseInt(formData.get("match_number") as string),
+      team1_id: Number.parseInt(formData.get("team1_id") as string),
+      team2_id: Number.parseInt(formData.get("team2_id") as string),
+      match_date: formData.get("match_date") as string,
+      match_time: (formData.get("match_time") as string) || null,
+      field: (formData.get("field") as string) || null,
+    }
+
+    const result = await createPlayoff(playoff)
+    if (result.success) {
+      await loadAllData()
+      setShowPlayoffForm(false)
+      e.currentTarget.reset()
+      toast({
+        title: "Éxito",
+        description: "Partido de playoff creado correctamente",
+        className: "border-yellow-500/50 bg-gray-900 text-white",
+      })
+    } else {
+      toast({
+        title: "Error",
+        description: result.error,
+        variant: "destructive",
+        className: "border-yellow-500/50 bg-gray-900",
+      })
+    }
+  }
+
+  async function handleDeletePlayoff(id: number) {
+    if (confirm("¿Estás seguro de que quieres eliminar este partido de playoffs?")) {
+      const result = await deletePlayoff(id)
+      if (result.success) {
+        await loadAllData()
+        toast({
+          title: "Éxito",
+          description: "Partido de playoff eliminado correctamente",
+          className: "border-yellow-500/50 bg-gray-900 text-white",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+          className: "border-yellow-500/50 bg-gray-900",
+        })
+      }
+    }
+  }
+
+  const filteredPlayoffs = playoffMatches.filter((p) => p.phase === selectedPhase)
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
@@ -1489,6 +1558,200 @@ export default function AdminLibertadores() {
                   </div>
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="playoffs" className="mt-6 space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-semibold text-yellow-500">Eliminatorias ({filteredPlayoffs.length})</h3>
+                <Button
+                  onClick={() => setShowPlayoffForm(!showPlayoffForm)}
+                  className="bg-yellow-600 hover:bg-yellow-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Partido
+                </Button>
+              </div>
+
+              {showPlayoffForm && (
+                <Card className="border-yellow-500/30">
+                  <CardHeader>
+                    <CardTitle className="text-yellow-500">Crear Partido de Playoff</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleCreatePlayoff} className="space-y-4">
+                      <div>
+                        <Label htmlFor="phase">Fase</Label>
+                        <Select name="phase" required>
+                          <SelectTrigger className="bg-gray-800 border-gray-700">
+                            <SelectValue placeholder="Seleccionar fase" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="octavos">Octavos de Final</SelectItem>
+                            <SelectItem value="cuartos">Cuartos de Final</SelectItem>
+                            <SelectItem value="semifinal">Semifinal</SelectItem>
+                            <SelectItem value="final">Final</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="match_number">Número de Partido</Label>
+                        <Input
+                          id="match_number"
+                          name="match_number"
+                          type="number"
+                          min="1"
+                          max="8"
+                          required
+                          className="bg-gray-800 border-gray-700"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="team1_id">Equipo 1</Label>
+                          <Select name="team1_id" required>
+                            <SelectTrigger className="bg-gray-800 border-gray-700">
+                              <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {teams.map((team) => (
+                                <SelectItem key={team.id} value={team.id.toString()}>
+                                  {team.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="team2_id">Equipo 2</Label>
+                          <Select name="team2_id" required>
+                            <SelectTrigger className="bg-gray-800 border-gray-700">
+                              <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {teams.map((team) => (
+                                <SelectItem key={team.id} value={team.id.toString()}>
+                                  {team.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="match_date">Fecha</Label>
+                          <Input
+                            id="match_date"
+                            name="match_date"
+                            type="date"
+                            required
+                            className="bg-gray-800 border-gray-700"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="match_time">Hora</Label>
+                          <Input
+                            id="match_time"
+                            name="match_time"
+                            type="time"
+                            className="bg-gray-800 border-gray-700"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="field">Cancha</Label>
+                        <Input
+                          id="field"
+                          name="field"
+                          placeholder="Ej: Cancha 1"
+                          className="bg-gray-800 border-gray-700"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" className="bg-yellow-600 hover:bg-yellow-700">
+                          Crear Partido
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setShowPlayoffForm(false)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card className="border-yellow-500/30">
+                <CardContent className="p-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Label className="text-yellow-500">Filtrar por fase:</Label>
+                    <Button
+                      size="sm"
+                      variant={selectedPhase === "octavos" ? "default" : "outline"}
+                      onClick={() => setSelectedPhase("octavos")}
+                      className={selectedPhase === "octavos" ? "bg-yellow-600 hover:bg-yellow-700" : ""}
+                    >
+                      Octavos
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={selectedPhase === "cuartos" ? "default" : "outline"}
+                      onClick={() => setSelectedPhase("cuartos")}
+                      className={selectedPhase === "cuartos" ? "bg-yellow-600 hover:bg-yellow-700" : ""}
+                    >
+                      Cuartos
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={selectedPhase === "semifinal" ? "default" : "outline"}
+                      onClick={() => setSelectedPhase("semifinal")}
+                      className={selectedPhase === "semifinal" ? "bg-yellow-600 hover:bg-yellow-700" : ""}
+                    >
+                      Semifinal
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={selectedPhase === "final" ? "default" : "outline"}
+                      onClick={() => setSelectedPhase("final")}
+                      className={selectedPhase === "final" ? "bg-yellow-600 hover:bg-yellow-700" : ""}
+                    >
+                      Final
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="max-h-96 overflow-y-auto space-y-2">
+                {filteredPlayoffs.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">No hay partidos en esta fase</div>
+                ) : (
+                  filteredPlayoffs.map((playoff) => (
+                    <div key={playoff.id} className="p-3 bg-gray-800 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-white font-medium">
+                            {playoff.team1?.name} vs {playoff.team2?.name}
+                          </p>
+                          <p className="text-sm text-gray-400">
+                            {playoff.played ? `Resultado: ${playoff.team1_score} - ${playoff.team2_score}` : "VS"}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Partido {playoff.match_number} - {playoff.match_date}
+                            {playoff.field && ` - ${playoff.field}`}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeletePlayoff(playoff.id)}
+                          className="border-red-500/50 text-red-500"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>

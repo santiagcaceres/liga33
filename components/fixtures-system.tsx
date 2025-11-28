@@ -185,9 +185,13 @@ export default function FixturesSystem({ competition }: FixturesSystemProps) {
                                 </div>
 
                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                  <span className="text-lg md:text-2xl font-bold">
-                                    {match.home_score} - {match.away_score}
-                                  </span>
+                                  {match.played ? (
+                                    <span className="text-lg md:text-2xl font-bold">
+                                      {match.home_score} - {match.away_score}
+                                    </span>
+                                  ) : (
+                                    <span className="text-primary font-bold text-base md:text-lg">VS</span>
+                                  )}
                                 </div>
 
                                 <div className="flex items-center gap-2 md:gap-3 flex-1 justify-end min-w-0">
@@ -335,7 +339,13 @@ export default function FixturesSystem({ competition }: FixturesSystemProps) {
                                 </div>
 
                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                  <span className="text-primary font-bold text-base md:text-lg">VS</span>
+                                  {match.played ? (
+                                    <span className="text-lg md:text-2xl font-bold">
+                                      {match.home_score} - {match.away_score}
+                                    </span>
+                                  ) : (
+                                    <span className="text-primary font-bold text-base md:text-lg">VS</span>
+                                  )}
                                 </div>
 
                                 <div className="flex items-center gap-2 md:gap-3 flex-1 justify-end min-w-0">
