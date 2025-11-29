@@ -31,12 +31,7 @@ export default function LibertadoresPage() {
     return true
   })
 
-  const [activeSection, setActiveSection] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("activeSectionLibertadores") || "inicio"
-    }
-    return "inicio"
-  })
+  const [activeSection, setActiveSection] = useState<string>("inicio")
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const [showRainAlert, setShowRainAlert] = useState(false)
@@ -92,13 +87,13 @@ export default function LibertadoresPage() {
                 className="flex items-center gap-3 hover:opacity-80 transition-opacity"
               >
                 <img
-                  src="/images/libertadores.png"
+                  src="/images/logo-copa-libertadores.png"
                   alt="Copa Libertadores"
-                  className="w-12 h-12 md:w-16 md:h-16 object-contain"
+                  className="w-20 h-20 md:w-32 md:h-32 object-contain"
                 />
-                <div className="flex flex-col">
-                  <h1 className="text-xl md:text-2xl font-bold leading-tight text-primary">Liga 33</h1>
-                  <p className="text-yellow-500 text-xs md:text-sm font-semibold">Copa Libertadores</p>
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold leading-tight text-primary">Liga 33</h1>
+                  <p className="text-yellow-500 text-sm md:text-base font-semibold">Copa Libertadores</p>
                 </div>
               </button>
             </div>
@@ -374,7 +369,11 @@ export default function LibertadoresPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <img src="/images/libertadores.png" alt="Copa Libertadores" className="w-12 h-12 object-contain" />
+                <img
+                  src="/images/logo-copa-libertadores.png"
+                  alt="Copa Libertadores"
+                  className="w-12 h-12 object-contain"
+                />
                 <h3 className="text-lg font-bold text-primary">Liga 33</h3>
               </div>
               <p className="text-gray-300 text-sm md:text-base font-semibold">
