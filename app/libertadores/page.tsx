@@ -92,7 +92,7 @@ export default function LibertadoresPage() {
                 className="flex items-center gap-3 hover:opacity-80 transition-opacity"
               >
                 <img
-                  src="/images/libertadores.jpg"
+                  src="/images/libertadores.png"
                   alt="Copa Libertadores"
                   className="w-12 h-12 md:w-16 md:h-16 object-contain"
                 />
@@ -374,7 +374,7 @@ export default function LibertadoresPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <img src="/images/libertadores.jpg" alt="Copa Libertadores" className="w-12 h-12 object-contain" />
+                <img src="/images/libertadores.png" alt="Copa Libertadores" className="w-12 h-12 object-contain" />
                 <h3 className="text-lg font-bold text-primary">Liga 33</h3>
               </div>
               <p className="text-gray-300 text-sm md:text-base font-semibold">

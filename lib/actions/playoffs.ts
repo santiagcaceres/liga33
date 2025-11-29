@@ -7,13 +7,7 @@ export async function getPlayoffsByTournament(tournament_id: number) {
 
   const { data, error } = await supabase
     .from("playoffs")
-    .select(
-      `
-      *,
-      team1:teams!playoffs_team1_id_fkey(id, name, logo_url),
-      team2:teams!playoffs_team2_id_fkey(id, name, logo_url)
-    `,
-    )
+    .select("*")
     .eq("tournament_id", tournament_id)
     .order("phase", { ascending: false })
     .order("match_number", { ascending: true })
@@ -23,15 +17,34 @@ export async function getPlayoffsByTournament(tournament_id: number) {
     return { success: false, error: error.message, data: [] }
   }
 
-  return { success: true, data: data || [] }
+  const playoffsWithTeams = await Promise.all(
+    (data || []).map(async (playoff) => {
+      const teams = await Promise.all([
+        playoff.home_team_id
+          ? supabase.from("teams").select("id, name, logo_url").eq("id", playoff.home_team_id).single()
+          : null,
+        playoff.away_team_id
+          ? supabase.from("teams").select("id, name, logo_url").eq("id", playoff.away_team_id).single()
+          : null,
+      ])
+
+      return {
+        ...playoff,
+        home_team: teams[0]?.data || null,
+        away_team: teams[1]?.data || null,
+      }
+    }),
+  )
+
+  return { success: true, data: playoffsWithTeams }
 }
 
 export async function createPlayoff(playoff: {
   tournament_id: number
   phase: string
   match_number: number
-  team1_id: number
-  team2_id: number
+  home_team_id: number
+  away_team_id: number
   match_date: string
   match_time?: string | null
   field?: string | null
@@ -117,7 +130,7 @@ export async function advanceWinnerToNextPhase(playoffId: number, winnerId: numb
   const isHomeInNext = currentMatch.match_number % 2 === 1
 
   if (existingMatch) {
-    const updates = isHomeInNext ? { team1_id: winnerId } : { team2_id: winnerId }
+    const updates = isHomeInNext ? { home_team_id: winnerId } : { away_team_id: winnerId }
 
     const { error: updateError } = await supabase.from("playoffs").update(updates).eq("id", existingMatch.id)
 
@@ -129,8 +142,8 @@ export async function advanceWinnerToNextPhase(playoffId: number, winnerId: numb
       tournament_id: currentMatch.tournament_id,
       phase: nextPhase,
       match_number: nextMatchNumber,
-      team1_id: isHomeInNext ? winnerId : null,
-      team2_id: isHomeInNext ? null : winnerId,
+      home_team_id: isHomeInNext ? winnerId : null,
+      away_team_id: isHomeInNext ? null : winnerId,
     }
 
     const { error: insertError } = await supabase.from("playoffs").insert([newMatch])
